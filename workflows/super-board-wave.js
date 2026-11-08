@@ -42,6 +42,7 @@ if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
 let halted = false
 // Valid form per --kind, from validate() in scripts/super-board-github-read.py (#32).
 const READ_SHAPES = [
+  `Every GitHub command, ready to copy: .claude/skills/super-board/references/github-cheatsheet.md. Never run the helper's --resume.`,
   `Read shapes (helper: .claude/bin/super-board-github-read.py --kind <kind> -- <gh args>):`,
   `- issue title+body: --kind issue -- issue view <N> --json number,title,body`,
   `- issue comments: --kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp (zero comments = [[]])`,
@@ -50,7 +51,8 @@ const READ_SHAPES = [
   `- PR body+head: --kind body -- pr view <N> --json body,headRefOid`,
   `- PR metadata: --kind metadata -- pr view <N> --json files,labels,body,additions,deletions,changedFiles`,
   `- issue state: --kind state -- issue view <N> --json state --jq .state`,
-  `A read whose output misses its shape exits 64 for that call only and prints the valid form: fix the read, do not halt.`,
+  `- quota: use the guard's sb_gh_guard_check; never pass --jq to --kind quota`,
+  `A read whose output misses its shape (incl. any you reshaped with --jq/-q/--template) exits 64 for that call only and prints the valid form: fix the read, do not halt.`,
 ].join('\n')
 const READ_FAILURE = READ_SHAPES + '\n' + `Verification-readiness exit 9 means missing/unusable config.verify_commands: preserve card/worktree/approval/claims, report status=halted (preflight verdict=halted), stop dispatch, repair project configuration before explicit restart; no Build bounce or automatic retries. ` + `Required GitHub reads use .claude/bin/super-board-github-read.py: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
 

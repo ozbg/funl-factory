@@ -5,9 +5,10 @@ A logical read gets three total attempts. Success resets its own sequence; other
 reads cannot reset it. Permanent query/auth errors stop on the first attempt.
 The halt file is shared through the main checkout, including linked worktrees.
 Only an explicit new run clears it with --resume after preserving the old reason.
-Mutations never enter this retry helper. For the agent-facing kinds in FORMS, a
-payload that fails its shape on every attempt is the caller's malformed read, not
-an outage: that call exits 64 with the valid form and the run keeps going. Scripts
+Mutations never enter this retry helper. For the agent-facing kinds in FORMS, and
+for any read the caller reshaped with --jq, -q or --template, a payload that fails
+its shape on every attempt is the caller's malformed read, not an outage: that call
+exits 64 with the valid form and the run keeps going. Scripts
 whose commands are fixed set SB_GITHUB_READ_STRICT=1 to keep halting on it.
 """
 from __future__ import annotations
@@ -117,6 +118,35 @@ def read_only(args):
         if arg in ('-f', '-F', '--field', '--raw-field', '--input') or arg.startswith(('--field=', '--raw-field=', '--input=')):
             return False
     return True
+
+
+def reshaped(args):
+    """True when the caller trimmed GitHub's payload itself (--jq, -q, --template)."""
+    return any(a in ('--jq', '-q', '--template', '-t') or a.startswith(('--jq=', '--template='))
+               for a in args)
+
+
+def usage_error(text):
+    """gh rejected the command line itself (bad flag or args): the caller's mistake, never GitHub's."""
+    return re.search(r"unknown (?:shorthand )?flag|unknown command|flag needs an argument|"
+                     r"accepts \d+ arg|requires at least \d+ arg|invalid argument \"|"
+                     r"specify only one of|cannot use `?--|Unknown JSON field|"
+                     r"failed to parse jq expression|jq: error", text, re.I) is not None
+
+
+def missing_resource(text):
+    """GitHub says this one thing does not exist (wrong endpoint, ID or number)."""
+    return re.search(r'HTTP 404|Could not resolve to an? (?:PullRequest|Issue)\b', text) is not None
+
+
+def repo_readable():
+    """The repo itself answers, so a 404 inside it is the caller's wrong path, not lost access."""
+    try:
+        probe = subprocess.run(['gh', 'api', 'repos/{owner}/{repo}', '--silent'],
+                               capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return probe.returncode == 0
 
 
 def permanent_error(text):
@@ -340,6 +370,16 @@ def read(args, kind='json', meta=None, recovering=False):
                     diagnostic += json.dumps([p.get('errors', []) for p in (payload if isinstance(payload, list) else [payload]) if isinstance(p, dict)])
                 except ValueError:
                     pass
+            if result.returncode and usage_error(result.stderr):
+                first = result.stderr.strip().splitlines()[0]
+                form = FORMS.get(kind) or 'see .claude/skills/super-board/references/github-cheatsheet.md'
+                raise ValueError(f'gh rejected the command ({first}); this call failed, the run continues. '
+                                 f'Valid form: --kind {kind} -- {form}')
+            if (result.returncode and not recovering and missing_resource(result.stderr)
+                    and repo_readable()):
+                first = result.stderr.strip().splitlines()[0]
+                raise ValueError(f'GitHub has no such resource ({first}); this call failed, the run continues. '
+                                 'Check the number or path against .claude/skills/super-board/references/github-cheatsheet.md')
             if permanent_error(diagnostic):
                 halt('GitHub rejected a required read (query, authentication, or permission error); fix it before restarting', attempt, operation)
             if result.returncode:
@@ -361,8 +401,11 @@ def read(args, kind='json', meta=None, recovering=False):
         if attempt < 3:
             print(f'[github-read] {last}; retry {attempt + 1}/3', file=sys.stderr)
             time.sleep(max(0, delay) * attempt)
-    if shape_only and kind in FORMS and not os.environ.get('SB_GITHUB_READ_STRICT'):
-        raise ValueError(f'{last}; this call failed, the run continues. Valid form: --kind {kind} -- {FORMS[kind]}')
+    # GitHub answered every attempt; the payload just did not match the kind the caller asked for.
+    # That is the caller's malformed read, whatever the kind, so fail this call and keep the run.
+    if shape_only and not os.environ.get('SB_GITHUB_READ_STRICT'):
+        form = FORMS.get(kind) or "the same gh args with no --jq, -q or --template (this kind checks GitHub's raw payload)"
+        raise ValueError(f'{last}; this call failed, the run continues. Valid form: --kind {kind} -- {form}')
     halt(f'{last}; stopped after 3 failed attempts', 3, operation)
 
 
