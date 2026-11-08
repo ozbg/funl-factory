@@ -402,8 +402,10 @@ def read(args, kind='json', meta=None, recovering=False):
             print(f'[github-read] {last}; retry {attempt + 1}/3', file=sys.stderr)
             time.sleep(max(0, delay) * attempt)
     # GitHub answered every attempt; the payload just did not match the kind the caller asked for.
-    # That is the caller's malformed read, whatever the kind, so fail this call and keep the run.
-    if shape_only and not os.environ.get('SB_GITHUB_READ_STRICT'):
+    # For the agent-facing kinds, or a read the caller trimmed itself (--jq, -q, --template), that is
+    # the caller's malformed read: fail this call and keep the run. A raw payload that misses a
+    # required kind's shape (quota, items, dedupe ...) still halts: GitHub gave us bad evidence.
+    if shape_only and (kind in FORMS or reshaped(args)) and not os.environ.get('SB_GITHUB_READ_STRICT'):
         form = FORMS.get(kind) or "the same gh args with no --jq, -q or --template (this kind checks GitHub's raw payload)"
         raise ValueError(f'{last}; this call failed, the run continues. Valid form: --kind {kind} -- {form}')
     halt(f'{last}; stopped after 3 failed attempts', 3, operation)

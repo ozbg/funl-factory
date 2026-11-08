@@ -48,10 +48,11 @@ test('a raw quota read that passes its shape still succeeds', () => {
   assert.strictEqual(r.code, 0, r.stderr)
 })
 
-test('a raw read GitHub answers with the wrong shape fails that call only (64); STRICT callers still halt', () => {
+test('a raw required read GitHub answers with the wrong shape still halts (79)', () => {
+  // No --jq: the caller did not trim the payload, so bad data is GitHub's, and a required kind fails closed.
   const r = run(['--kind', 'quota', '--', 'api', 'rate_limit'], { out: '{}' })
-  assert.strictEqual(r.code, 64, r.stderr)
-  assert.strictEqual(r.halted, false)
+  assert.strictEqual(r.code, 79, r.stderr)
+  assert.strictEqual(r.halted, true)
 })
 
 test('fixed-command scripts (STRICT) keep halting on a reshaped read', () => {
@@ -92,13 +93,6 @@ test('an unknown --json field fails that call only (64)', () => {
 test('a malformed --jq filter fails that call only (64), with no run halt', () => {
   const r = run(['--kind', 'head', '--', 'pr', 'view', '38', '--json', 'headRefName,headRefOid', '--jq', '".headRefName + " " + .headRefOid"'],
     { err: 'failed to parse jq expression (line 1, column 19)\n    ".headRefName + " " + .headRefOid"', code: 1 })
-  assert.strictEqual(r.code, 64, r.stderr)
-  assert.strictEqual(r.halted, false)
-})
-
-test('any kind whose payload has the wrong shape fails that call only (64)', () => {
-  const r = run(['--kind', 'approval', '--', 'pr', 'view', '50', '--json', 'body,headRefOid'],
-    { out: '{"body":"x","headRefOid":"abc"}', code: 0 })
   assert.strictEqual(r.code, 64, r.stderr)
   assert.strictEqual(r.halted, false)
 })
