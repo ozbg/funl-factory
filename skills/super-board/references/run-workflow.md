@@ -29,12 +29,27 @@ Say so once, in the first wave report: `🔁 codex host — running as --codex`.
 `opencode` (no OpenCode backend yet) halts before any claim, even with no Workflow tool, with one line:
 `⛔ unknown host — set SUPER_BOARD_HOST=claude|codex and re-run`. Never guess a backend.
 
-After the same plan and claim steps, launch this command as a background task:
+**Rolling dispatch is the default.** Launch one background task that plans, claims and
+starts cards itself, and keeps going until the board is idle:
+`bash .claude/bin/super-board-codex-wave.sh --config <config-path> --rolling --events <events.jsonl> --codex[=<model>] --tier <low|medium|high> --output <run-result.json>`.
+It re-plans each time a card finishes and starts every newly runnable card while a slot is
+free (`max_workers`), so a fast card never waits for a slow one. A card that did not
+advance waits `--cooldown` seconds (default 300) before it can be picked again: watch
+`<events.jsonl>` (one JSON line per finished card) and post any ruling on that card inside
+the window. The quality gates are unchanged: every card still runs Build, QA, Review and the
+merge gate. On a halt it stops starting cards, lets running ones finish, and exits 79. It
+starts no new card below 10 GB of free disk, and removes clean scratch checkouts left in temp folders when it ends.
+
+A fixed wave is still available for a hand-picked set, after the plan and claim steps:
 `bash .claude/bin/super-board-codex-wave.sh --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
 The helper starts one `super-board-lane.sh --backend codex` per card/lane, cards in parallel,
 each advancing Build → QA → Review only after a successful handoff (QA labels skip Build).
-Concurrency uses positive `max_workers`, otherwise `max(1, min(16, cpus - 2))`.
+Concurrency uses positive `max_workers`, otherwise `max(1, min(16, cpus - 2))`. A rolling run re-reads `max_workers` every loop, so lowering it in the config takes effect without a restart.
 Pre-flight/classification and truth-check run inline; there are no Claude sub-agents.
+Each lane prompt sends the worker to `references/github-cheatsheet.md` for every GitHub
+command, forbids `--resume`, and asks for the result JSON alone. The sandbox makes `$HOME`
+read-only, so the launcher points `npm_config_cache` and `npm_config_store_dir` at `$TMPDIR`.
+A lane that ends its turn with prose instead of the JSON is resumed in the same session, up to twice.
 Each lane emits `{status,column,detail}`; the wave returns the same `cards` summary
 as the workflow, so reconcile, manifest, board/comments and throttle steps stay the same.
 Review is allowed only with explicit `--codex`; merges still use the unchanged
@@ -49,8 +64,12 @@ Three total attempts means the first attempt plus two retries of that same read;
 unrelated successful calls do not reset its failures. Invalid GraphQL queries,
 authentication, and permission errors stop immediately. Do not retry mutations.
 A payload that misses an agent-facing `--kind` shape (`READ_SHAPES` in
-`workflows/super-board-wave.js`) exits 64 for that call only, printing the valid
-form; it never halts the run. Fixed-command scripts set `SB_GITHUB_READ_STRICT=1`.
+`workflows/super-board-wave.js`), or any read the caller reshaped with `--jq`,
+`-q` or `--template` that then misses its shape (e.g. `--kind quota` over a
+trimmed `rate_limit`), exits 64 for that call only, printing the valid form; it
+never halts the run. A bad `gh` flag, an unknown `--json` field or a 404 inside a
+readable repo is the same: that call fails, the run continues. Fixed-command
+scripts set `SB_GITHUB_READ_STRICT=1`.
 
 Exit **79**, a workflow result with `halted: true`, or a failed `--check` ends this
 run. Check the helper's `--check` before claims, board/comment writes, each new
