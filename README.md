@@ -44,7 +44,7 @@ curl -fsSL https://raw.githubusercontent.com/ozbg/funl-factory/main/get.sh | bas
 Or as a Claude Code plugin:
 
 ```
-/plugin marketplace add EricTechPro/super-board
+/plugin marketplace add ozbg/funl-factory
 /plugin install super-board@super-board
 ```
 
