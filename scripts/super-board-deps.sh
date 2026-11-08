@@ -158,6 +158,9 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
             ( $cl | capture("blocked-by:[ \t]*(?<v>.*)$"; "i").v | gsub("[ \t]"; "") ) as $v
             | if $v == "-" or $v == "" then
                 { parseable: true, blockers: [], human_gated: true, why: "" }
+              elif ($v | test("^(none|nothing)$"; "i")) then
+                # Lanes write "none" when a card has no open blockers; read it as exactly that.
+                { parseable: true, blockers: [], human_gated: false, why: "" }
               elif ($v | test("^[0-9]+(,[0-9]+)*$")) then
                 { parseable: true, blockers: ($v / "," | map(tonumber)), human_gated: false, why: "" }
               else

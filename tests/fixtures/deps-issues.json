@@ -181,5 +181,31 @@
         }
       ]
     }
+  },
+  {
+    "number": 29,
+    "title": "comment says none",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- #2\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "🛡 super-board · Reviewer · BLOCKED\nblocked-by: none\n"
+        }
+      ]
+    }
+  },
+  {
+    "number": 30,
+    "title": "comment says Nothing",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- #2\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "blocked-by: Nothing\n"
+        }
+      ]
+    }
   }
 ]
