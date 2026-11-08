@@ -17,10 +17,12 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 def fail(message, code=64):
     print(message, file=sys.stderr)
@@ -46,8 +48,10 @@ class Codex:
         # A custom profile deliberately does NOT extend :workspace, which protects
         # .git as read-only. Explicit git/common-dir grants also cover submodules.
         # https://learn.chatgpt.com/docs/permissions → File access limited to workspace
-        filesystem = {':root': 'read', ':slash_tmp': 'write', ':tmpdir': 'write',
-                      str(run['root']): 'write', str(run['git_dir']): 'write', str(run['common_dir']): 'write'}
+        filesystem = {':root': 'read', ':slash_tmp': 'write', ':tmpdir': 'write'}
+        if run.get('private_home'):
+            filesystem.update(self.private_home_denials(run['root']))
+        filesystem.update({str(run['root']): 'write', str(run['git_dir']): 'write', str(run['common_dir']): 'write'})
         grants = '{' + ', '.join(json.dumps(key) + '=' + json.dumps(value) for key, value in filesystem.items()) + '}'
         command = ['codex', 'exec', '-C', str(run['root']), '-c', 'approval_policy="never"',
                    '-c', 'default_permissions="super-board-lane"',
@@ -57,6 +61,57 @@ class Codex:
         if run['model'] and run['model'].strip():
             command[2:2] = ['-m', run['model']]
         return command, run['prompt']
+
+    @staticmethod
+    def private_home_denials(root):
+        """codex.private_home: lanes run on a third-party model, so hide the owner's home folder.
+
+        Denying $HOME itself breaks path traversal, so deny every sibling along the path from
+        $HOME down to the repo instead (all of home, all of Documents, every other repo). Only the
+        repo and the config the tools need are allowed back. Deny before allow."""
+        home, repo = Path.home().resolve(), Path(root).resolve()
+        grants = {}
+        if home in repo.parents:
+            chain = [home] + [parent for parent in reversed(repo.parents) if home in parent.parents] + [repo]
+            for parent, keep in zip(chain, chain[1:]):
+                for entry in parent.iterdir():
+                    if entry != keep:
+                        grants[str(entry)] = 'none'
+        for allowed in [home / '.config' / 'gh', home / '.config' / 'git', home / '.gitconfig']:
+            if allowed.exists():
+                grants[str(allowed)] = 'read'
+        return grants
+
+    def env(self, run):
+        """Environment for the lane: the sandbox makes $HOME read-only, so point caches at the temp dir."""
+        cache_root = Path(os.environ.get('TMPDIR') or tempfile.gettempdir()) / 'super-board-codex'
+        env = dict(os.environ)
+        env.setdefault('npm_config_cache', str(cache_root / 'npm-cache'))
+        env.setdefault('npm_config_store_dir', str(cache_root / 'pnpm-store'))
+        # One browser download per machine, not one per lane.
+        env.setdefault('PLAYWRIGHT_BROWSERS_PATH', str(cache_root / 'ms-playwright'))
+        # Evidence logs get committed; keep ANSI colour codes out of them.
+        env['NO_COLOR'] = '1'
+        env['FORCE_COLOR'] = '0'
+        # The keychain sits in the (possibly blocked) home folder, so hand gh the token it already uses.
+        if not env.get('GH_TOKEN'):
+            token = subprocess.run(['gh', 'auth', 'token'], capture_output=True, text=True)
+            if token.returncode == 0 and token.stdout.strip():
+                env['GH_TOKEN'] = token.stdout.strip()
+        return env
+
+    @staticmethod
+    def session_id(line):
+        found = re.match(r'session id:\s*(\S+)', line.strip())
+        return found.group(1) if found else None
+
+    def resume_command(self, run, command, session):
+        """argv that resumes `session` with the same sandbox and schema (the model's context is kept)."""
+        resume = ['codex', 'exec', 'resume'] + command[command.index('-c'):command.index('--output-schema')]
+        resume += ['--output-schema', str(run['schema_path']), '-o', str(run['output']), session, '-']
+        if run['model'] and run['model'].strip():
+            resume[3:3] = ['-m', run['model']]
+        return resume
 
     def final_message(self, run, stdout):
         """The host's last message, which must be the lane result JSON."""
@@ -113,6 +168,12 @@ try:
     if type(card.get('number')) is not int or card['number'] < 1 or not isinstance(card.get('status'), str):
         raise ValueError('card needs a positive issue number and status')
     configured = config.get(backend.name, {}).get('model') if config.get(backend.name) else None
+    # <backend>.models pins a model per lane ({"build": ..., "qa": ..., "review": ...}); it wins over <backend>.model.
+    per_lane = (config.get(backend.name) or {}).get('models') or {}
+    if not isinstance(per_lane, dict):
+        raise ValueError(f'{backend.name}.models must be an object of lane -> model')
+    if isinstance(per_lane.get(args.lane), str) and per_lane[args.lane].strip():
+        configured = per_lane[args.lane]
     if configured is not None and not isinstance(configured, str):
         raise ValueError(f'{backend.name}.model must be a string')
     model = model if model is not None else (configured if configured and configured.strip() else None)
@@ -175,12 +236,16 @@ First operation: recheck .claude/bin/super-board-skills-ready.py --root {root} -
 Resolved skill report: {json.dumps(skills)}
 Config: {config_path}
 Card: {json.dumps(card)}
-Read .claude/skills/{skill}/SKILL.md and .claude/skills/super-board/references/run.md → {section} lifecycle; follow all its board, branch, worktree, comments, test and merge requirements.
-Source .claude/bin/super-board-gh-guard.sh and use its quota checks. Required GitHub reads go through .claude/bin/super-board-github-read.py; a read that misses its --kind shape exits 64 for that call only and prints the valid form, so fix the read. A --kind diff read needs --meta <file> from a --kind metadata read first. Check --check before new writes, migrations and merges; exit 79 means status=halted, no more GitHub calls, preserve claims/worktree/card/approval. Never retry a mutation.
+If docs/super-board/PROJECT.md or docs/agents/coding-standards.md exist, read them first; builders follow the standards and reviewers report a broken rule as a Standards finding. Never read anything outside this repository, and test with made-up fixture data only. Read .claude/skills/{skill}/SKILL.md and .claude/skills/super-board/references/run.md → {section} lifecycle; follow all its board, branch, worktree, comments, test and merge requirements.
+GitHub: before your first GitHub call read .claude/skills/super-board/references/github-cheatsheet.md and copy its commands exactly; a GitHub command not on it is a mistake. Never run the read helper's --resume or touch .claude/super-board/github-halt*.json: only the owner unpauses a run. You report findings; scope rulings, AC changes and size-cap changes belong to the orchestrator.
+Sandbox: your home folder is read-only. npm_config_cache and npm_config_store_dir already point at writable $TMPDIR folders; never override them. Scratch files go in $TMPDIR, never inside the worktree. Commit and push your work before every exit.
+Follow-up tickets: pass --title as a plain subject; the filing script adds the emoji and [type] prefix itself.
+Source .claude/bin/super-board-gh-guard.sh and use its quota checks (sb_gh_guard_check); never call the read helper with --kind quota or --jq on rate_limit yourself. Required GitHub reads go through .claude/bin/super-board-github-read.py; a read that misses its --kind shape exits 64 for that call only and prints the valid form, so fix the read. A --kind diff read needs --meta <file> from a --kind metadata read first. Check --check before new writes, migrations and merges; exit 79 means status=halted, no more GitHub calls, preserve claims/worktree/card/approval. Never retry a mutation.
 Use .claude/bin/super-board-card.sh for board reads/moves and .claude/bin/super-board-pr-body.sh for owned PR blocks; follow writing-standard.md and pr-author-notes.md.
-Use your own worktree under .claude/worktrees/; never edit the main checkout. Clean up on ordinary exit, preserve work on halt/interruption.
+Use your own worktree under .claude/worktrees/; never edit the main checkout. Any extra checkout (for example a base-branch comparison) also goes under .claude/worktrees/scratch-<card>-<name> and is removed with git worktree remove before you exit; never create worktrees in /tmp or $TMPDIR. Clean up on ordinary exit, preserve work on halt/interruption.
 {backend.label} adaptation: do not launch Claude or other sub-agents. Perform preflight, classification, independent review and truth-check duties inline. This changes the execution host, never the evidence requirements, confidence threshold or merge policy.
 Return JSON: status=advanced|bounced|blocked|human-gate|failed|halted; column=current board column; detail=one line; prUrl/branch when known, otherwise null; priorFindings=review counts or null. A non-advanced exit ends this card's lane chain. On merge-gate exit 9, return status=halted with detail starting exactly "verification-readiness:"; preserve work and never bounce/retry.
+Your final message is that JSON object alone: no prose before or after it, no code fence. A summary in prose makes the lane count as failed even when the work succeeded; put any notes in a GitHub comment instead.
 '''
 if args.lane == 'build':
     prompt += '''Before creating any worktree or changing code, perform run.md's Builder pre-flight inline: call super-board-preflight.sh, judge its candidates semantically, and act on proceed/hold/sequence/skipped. Blind preflight leaves Ready and returns failed. Your own issue branch PR is not a duplicate. Read the issue and all comments; preserve qa/bug/feature labels. Existing docs/ux/tests/refactor/tech-debt rows keep their label chain: classify complexity without adding feature/bug. If truly untyped, classify feature or bug, re-run skills-ready on the proposed labelled card before adding that label, never qa. Then follow the Builder lifecycle.
@@ -232,27 +297,73 @@ signal.signal(signal.SIGTERM, interrupted)
 signal.signal(signal.SIGINT, interrupted)
 with tempfile.TemporaryDirectory(prefix=f'super-board-{backend.name}-') as temporary:
     run = dict(root=root, git_dir=git_dir, common_dir=common_dir, model=model, prompt=prompt,
+               private_home=bool((config.get(backend.name) or {}).get('private_home')),
                schema_path=Path(temporary) / 'schema.json', output=Path(temporary) / 'result.json')
     run['schema_path'].write_text(json.dumps(schema))
     command, stdin = backend.command(run)
+    env = backend.env(run) if hasattr(backend, 'env') else dict(os.environ)
+
+    def launch(argv, text):
+        """Run the host once. Return (exit code, stdout when captured, session id when the host reports one)."""
+        global child
+        child = subprocess.Popen(argv, stdin=subprocess.PIPE if text is not None else subprocess.DEVNULL,
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT if not backend.capture_stdout else None,
+                                 text=True, env=env, cwd=str(root))
+        if text is not None:
+            child.stdin.write(text)
+            child.stdin.close()
+        session, seen = None, []
+        for line in child.stdout:
+            if backend.capture_stdout:
+                seen.append(line)
+            else:
+                sys.stderr.write(line)  # the host's log goes to the wave log; the answer is a file
+            if session is None and hasattr(backend, 'session_id'):
+                session = backend.session_id(line)
+        child.wait()
+        return child.returncode, ''.join(seen), session
+
     try:
-        child = subprocess.Popen(command, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
-                                 stdout=subprocess.PIPE if backend.capture_stdout else sys.stderr, text=True)
-        stdout, _ = child.communicate(stdin)
-        require_verification_ready()
-        if child.returncode:
-            result('halted' if child.returncode in (9, 10, 79) else 'failed',
-                   'verification-readiness: repair verify_commands and restart explicitly; preserve work'
-                   if child.returncode == 9 else 'skills-readiness: required skills became unavailable; preserve work' if child.returncode == 10 else f"{' '.join(command[:2])} exited {child.returncode}")
-            sys.exit(child.returncode if child.returncode in (9, 10, 79) else 1)
-        parsed = json.loads(backend.final_message(run, stdout))
-        if not conforms(parsed, schema):
-            raise ValueError('lane result does not match the lane schema')
+        # Some models end their turn with a sentence of narration instead of the JSON result.
+        # Resume the same session, which keeps its context, and ask it to finish; give up after two resumes.
+        resume_prompt = ('You stopped before finishing this lane. Do not redo finished steps. Complete every '
+                         'remaining step of the lifecycle (board move, comments, cleanup), then reply with '
+                         'only the JSON result object: no prose, no code fence.')
+        code, stdout, session = launch(command, stdin)
+        for attempt in range(3):
+            require_verification_ready()
+            if code:
+                result('halted' if code in (9, 10, 79) else 'failed',
+                       'verification-readiness: repair verify_commands and restart explicitly; preserve work'
+                       if code == 9 else 'skills-readiness: required skills became unavailable; preserve work' if code == 10 else f"{' '.join(command[:2])} exited {code}")
+                sys.exit(code if code in (9, 10, 79) else 1)
+            try:
+                parsed = json.loads(backend.final_message(run, stdout))
+                if not conforms(parsed, schema):
+                    raise ValueError('lane result does not match the lane schema')
+                break
+            except (OSError, ValueError):
+                if attempt == 2 or session is None or not hasattr(backend, 'resume_command'):
+                    raise
+                sys.stderr.write(f'[lane] final message was not the JSON result; resuming session {session} ({attempt + 1}/2)\n')
+                code, stdout, _ = launch(backend.resume_command(run, command, session), resume_prompt)
         print(json.dumps(parsed))
         sys.exit(10 if parsed['status'] == 'halted' and parsed['detail'].startswith('skills-readiness:')
                  else 9 if parsed['status'] == 'halted' and parsed['detail'].startswith('verification-readiness:')
                  else 79 if parsed['status'] == 'halted' else 0)
     except (OSError, ValueError) as error:
-        result('failed', f'{backend.label} returned no valid lane result: {error}')
+        # Keep the raw final message: a lane that did the work but answered in prose is worth reading.
+        try:
+            raw = run['output'].read_text(errors='replace') if run['output'].exists() else ''
+        except OSError:
+            raw = ''
+        keep = Path(os.environ.get('TMPDIR') or tempfile.gettempdir()) / f'super-board-{backend.name}' / 'failed-lanes' / f"{card['number']}-{args.lane}-{int(time.time())}.txt"
+        try:
+            keep.parent.mkdir(parents=True, exist_ok=True)
+            keep.write_text(raw)
+        except OSError:
+            keep = None
+        snippet = ' '.join(raw.split())[:160] or 'empty final message'
+        result('failed', f'{backend.label} returned no valid lane result: {error}; final message: {snippet}; saved: {keep}')
         sys.exit(1)
 PY

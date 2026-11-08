@@ -65,7 +65,16 @@
     // Optional model name passed to `codex exec -m` for every card, over the
     // Codex ladder. `--codex=<model>` wins; absent/null lets the ladder pick
     // (run tier x card grade, see scripts/super-board-codex-lane.sh).
-    "model": null
+    "model": null,
+    // Optional per-lane models, {"build": "...", "qa": "...", "review": "..."}.
+    // A lane's entry wins over `model` and the ladder; `--codex=<model>` still wins.
+    // Lets a stronger model build while cheaper ones test and review.
+    "models": null,
+    // true: the lane sandbox hides the owner's home folder (every sibling along the
+    // path from $HOME to the repo is denied; only the repo and the gh/git config are
+    // allowed back). Use it when lanes run on a third-party model and business data
+    // lives outside the repo.
+    "private_home": false
   },
 
   "target": {
@@ -307,6 +316,8 @@
   // agents at min(16, cpus-2) and queues the rest, so a 19-card wave is normal.
   // Codex waves also cap concurrent cards at a positive max_workers; absent/0
   // uses max(1, min(16, cpus-2)), with each card's lanes running sequentially.
+  // Rolling Codex runs (the default) keep up to max_workers cards running and
+  // start each new one as a slot frees; max_workers is re-read every loop.
   //
   // Set it only to deliberately throttle a machine. A fixed cap used to do the
   // wave sizing, and it sized it badly: on a board where 23 of 32 Ready cards

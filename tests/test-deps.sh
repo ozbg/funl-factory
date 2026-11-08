@@ -113,4 +113,9 @@ get 28 '.needsYouDone == false' || fail "#28: a 'done' before the 🙋 block mus
 get 26 '.runnable == false'     || fail "#26: done goes through resume, never the Ready sweep"
 get 2  '.needsYou == false and .needsYouDone == false' || fail "an ordinary card is not needsYou"
 
-echo "PASS: test-deps.sh (18 scenarios)"
+# 19 — lanes write `blocked-by: none` when a card has no open blockers. Read it as exactly
+#      that (any case, `nothing` too): a card that said "none" is free, not unparseable.
+get 29 '.parseable == true and .blockers == [] and .humanGated == false and .runnable == true' || fail "#29: blocked-by: none must free the card"
+get 30 '.parseable == true and .blockers == [] and .runnable == true' || fail "#30: blocked-by: Nothing must free the card"
+
+echo "PASS: test-deps.sh (20 scenarios)"

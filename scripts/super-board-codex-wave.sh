@@ -2,6 +2,10 @@
 # Dispatch an explicitly selected Codex wave; stdout/--output matches the
 # Claude workflow's {cards:[summary...], halted} reconciliation contract.
 # Usage: --config f --cards '<JSON array>' --codex[=model] [--tier low|medium|high] [--output f]
+#        --config f --rolling --codex[=model] [--events f] [--cooldown 300]   (no --cards)
+# --rolling keeps planning: each newly runnable card starts as soon as a slot is free, until the
+# board is idle. max_workers is re-read every loop, so it can be lowered mid-run. No new card
+# starts below 10 GB free disk, and the run ends by removing clean scratch checkouts in temp folders.
 # Unless one model is pinned (--codex=<model> or codex.model), a cheap router
 # (ROUTER_MODEL) grades each Ready card low/medium/high; the lane launcher maps
 # tier x grade to a model through its Codex.LADDERS table.
@@ -9,6 +13,7 @@ set -euo pipefail
 exec python3 - "${BASH_SOURCE[0]}" "$@" <<'PY'
 import argparse
 import importlib.util
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -22,7 +27,12 @@ import time
 
 parser = argparse.ArgumentParser(description='Dispatch one explicitly opted-in Codex wave.')
 parser.add_argument('--config', required=True)
-parser.add_argument('--cards', required=True, help='planner card array JSON or JSON file')
+parser.add_argument('--cards', help='planner card array JSON or JSON file (omit with --rolling)')
+parser.add_argument('--rolling', action='store_true',
+                    help='keep planning: start each newly runnable card as soon as a slot is free, until the board is idle')
+parser.add_argument('--events', help='rolling: append one JSON line per finished card to this file')
+parser.add_argument('--cooldown', type=int, default=300,
+                    help='rolling: seconds before a card that did not advance may be picked again (default 300)')
 parser.add_argument('--output')
 parser.add_argument('--tier', default='medium', choices=['low', 'medium', 'high'])
 raw = sys.argv[2:]
@@ -35,7 +45,12 @@ launcher = Path(sys.argv[1]).resolve().with_name('super-board-lane.sh')
 try:
     config_path = Path(args.config).resolve()
     config = json.loads(config_path.read_text())
-    cards = json.loads(args.cards if args.cards.lstrip().startswith('[') else Path(args.cards).read_text())
+    if args.rolling:
+        cards = []
+    elif not args.cards:
+        raise ValueError('--cards is required unless --rolling')
+    else:
+        cards = json.loads(args.cards if args.cards.lstrip().startswith('[') else Path(args.cards).read_text())
     if not isinstance(config, dict) or not isinstance(cards, list):
         raise ValueError('config must be an object; cards must be an array')
     numbers = set()
@@ -232,7 +247,7 @@ def run_card(card):
                     ['advanced', 'bounced', 'blocked', 'human-gate', 'failed', 'halted']
                     or not all(isinstance(result.get(key), str) for key in ['column', 'detail'])):
                     raise ValueError('invalid lane result')
-                if process.returncode and result['status'] != 'halted':
+                if process.returncode and result['status'] not in ('halted', 'failed'):
                     raise ValueError(f'lane exited {process.returncode}')
             except (ValueError, TypeError):
                 result = dict(status='halted' if process.returncode in (9, 10, 79) or halted.is_set() else 'failed',
@@ -262,9 +277,114 @@ def run_card(card):
                 priorFindings=last.get('priorFindings'),
                 lanesRun=' → '.join(f"{item['lane']}:{item['status']}" for item in history))
 
+bin_dir = Path(sys.argv[1]).resolve().parent
+bot = ((config.get('notifications') or {}).get('bot_identity') or '').strip()
+events_path = Path(args.events).resolve() if args.events else None
+
+def plan():
+    """Runnable cards from the board, or [] when the planner or the guard fails."""
+    subprocess.run(['bash', str(bin_dir / 'super-board-gh-guard.sh'), 'check', '200'], capture_output=True)
+    out = subprocess.run(['bash', str(bin_dir / 'super-board-wave-plan.sh'), '--config', str(config_path)],
+                         capture_output=True, text=True)
+    try:
+        planned = json.loads(out.stdout).get('cards', []) if out.returncode == 0 else []
+    except ValueError:
+        planned = []
+    planned = [card for card in planned if isinstance(card, dict) and type(card.get('number')) is int]
+    # Cards from the planner have no body yet; the lane's skills-readiness check needs it.
+    try:
+        resolver.hydrate(planned, root)
+    except (SystemExit, OSError, ValueError, TypeError, KeyError):
+        return []
+    return planned
+
+def claim(number):
+    if bot:
+        subprocess.run(['gh', 'issue', 'edit', str(number), '--add-assignee', bot], capture_output=True)
+
+def emit(summary):
+    if events_path:
+        with events_path.open('a') as stream:
+            stream.write(json.dumps(dict(at=time.strftime('%Y-%m-%dT%H:%M:%S%z'), **summary)) + '\n')
+
+MIN_FREE_GB = 10
+
+def cap():
+    """max_workers, re-read every loop so the orchestrator can lower it mid-run (never above the start value)."""
+    try:
+        value = json.loads(config_path.read_text()).get('max_workers', workers)
+        return max(1, min(workers, int(value))) if int(value) > 0 else workers
+    except (OSError, ValueError, TypeError):
+        return workers
+
+def free_gb():
+    return shutil.disk_usage(root).free / 1e9
+
+def sweep_scratch():
+    """Remove clean scratch checkouts lanes left in temp folders; report dirty ones."""
+    listing = subprocess.run(['git', 'worktree', 'list', '--porcelain'], capture_output=True, text=True).stdout
+    temp_roots = [str(Path(p).resolve()) for p in ['/tmp', '/private/tmp', os.environ.get('TMPDIR') or '/tmp']]
+    kept = []
+    for line in listing.splitlines():
+        if not line.startswith('worktree '):
+            continue
+        path = line.split(' ', 1)[1]
+        if Path(path).resolve() == Path(root).resolve():
+            continue  # never the checkout the run itself works in, even when that sits in a temp folder
+        if not any(str(Path(path).resolve()).startswith(t) for t in temp_roots):
+            continue
+        dirty = subprocess.run(['git', '-C', path, 'status', '--porcelain'], capture_output=True, text=True).stdout.strip()
+        if dirty:
+            kept.append(path)
+        else:
+            subprocess.run(['git', 'worktree', 'remove', '--force', path], capture_output=True)
+    subprocess.run(['git', 'worktree', 'prune'], capture_output=True)
+    return kept
+
+def roll(pool):
+    """Waves wait for their slowest card; rolling starts each runnable card as soon as a
+    slot frees. A card that did not advance waits `cooldown` seconds before it is picked
+    again, so the orchestrator can rule on it first. Ends when nothing runs and nothing
+    is runnable, or when the run halts."""
+    summaries, running, cooled, replan = [], {}, {}, True
+    while True:
+        for number, future in list(running.items()):
+            if future.done():
+                summary = future.result()
+                summaries.append(summary)
+                emit(summary)
+                del running[number]
+                replan = True
+                if summary['finalStatus'] != 'advanced':
+                    cooled[number] = time.time() + max(0, args.cooldown)
+        if halted.is_set():
+            if not running:
+                return summaries
+        elif len(running) < cap() and free_gb() < MIN_FREE_GB:
+            # A full disk fails lanes mid-write; stop starting cards until space returns.
+            if not getattr(roll, 'warned', False):
+                emit(dict(number=0, finalStatus='paused', lastLane='none', column='-',
+                          detail=f'disk low: {free_gb():.1f} GB free (< {MIN_FREE_GB}); not starting new cards'))
+                roll.warned = True
+        elif len(running) < cap() and (replan or any(t <= time.time() for t in cooled.values())):
+            roll.warned = False
+            replan = False
+            for card in plan():
+                number = card['number']
+                if len(running) >= cap():
+                    break
+                if number in running or cooled.get(number, 0) > time.time():
+                    continue
+                cooled.pop(number, None)
+                claim(number)
+                running[number] = pool.submit(run_card, card)
+            if not running and not any(t > time.time() for t in cooled.values()):
+                return summaries
+        time.sleep(float(os.environ.get('SB_ROLLING_POLL', '15')))
+
 try:
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        summaries = list(pool.map(run_card, cards))
+        summaries = roll(pool) if args.rolling else list(pool.map(run_card, cards))
     result = json.dumps(dict(cards=summaries, halted=halted.is_set()))
     if output_path:
         output = output_path
@@ -275,5 +395,11 @@ try:
 finally:
     if marker.exists() and marker.read_text().strip() == owner:
         marker.unlink()
+    try:
+        left = sweep_scratch()
+        if left:
+            print('[codex-wave] dirty scratch checkouts kept: ' + ', '.join(left), file=sys.stderr)
+    except Exception as error:  # cleanup must never change the exit code
+        print(f'[codex-wave] scratch sweep failed: {error}', file=sys.stderr)
 sys.exit(10 if skills_halted.is_set() else 9 if readiness_halted.is_set() else 79 if halted.is_set() else 0)
 PY

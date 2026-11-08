@@ -103,6 +103,43 @@ lane build --codex --tier high --complexity low >"$T/out"
 RC=0; lane build --codex --tier extreme >"$T/out" || RC=$?
 [ "$RC" -ne 0 ] || fail 'unknown tier must refuse'
 
+# Per-lane models: codex.models.<lane> beats codex.model; a lane without an entry keeps codex.model.
+echo '{"codex":{"model":"config-model","models":{"build":"build-model","qa":"qa-model"}},"verify_commands":["git diff --check"]}' > "$T/config.json"
+lane build --codex >"$T/out"; [ "$(last_model)" = build-model ] || fail 'codex.models.build must reach -m'
+lane qa --codex >"$T/out";    [ "$(last_model)" = qa-model ] || fail 'codex.models.qa must reach -m'
+lane review --codex >"$T/out"; [ "$(last_model)" = config-model ] || fail 'a lane with no codex.models entry keeps codex.model'
+lane build --codex=flag-model >"$T/out"; [ "$(last_model)" = flag-model ] || fail '--codex=<model> beats codex.models'
+echo '{"codex":{"models":"build-model"},"verify_commands":["git diff --check"]}' > "$T/config.json"
+RC=0; lane build --codex >"$T/out" || RC=$?
+[ "$RC" -eq 64 ] || fail 'codex.models must be an object'
+echo '{"verify_commands":["git diff --check"]}' > "$T/config.json"
+
+# The lane env makes caches writable, shares one browser path and keeps colour out of evidence logs.
+lane build --codex >"$T/out"
+tail -1 "$SB_CODEX_TEST_LOG" | jq -e '.env.NO_COLOR == "1" and .env.FORCE_COLOR == "0" and (.env.npm_config_cache | test("super-board-codex/npm-cache$")) and (.env.npm_config_store_dir | test("pnpm-store$")) and (.env.PLAYWRIGHT_BROWSERS_PATH | test("ms-playwright$"))' >/dev/null || fail 'lane env must set caches, browser path and NO_COLOR'
+tail -1 "$SB_CODEX_TEST_LOG" | jq -e '.prompt | contains("github-cheatsheet.md") and contains("JSON object alone") and contains("scratch-<card>")' >/dev/null || fail 'lane prompt must carry the cheat sheet, JSON-only and scratch checkout rules'
+
+# private_home denies every sibling along the path from $HOME to the repo; off by default.
+tail -1 "$SB_CODEX_TEST_LOG" | jq -e '[.args[] | select(startswith("permissions.super-board-lane.filesystem="))][0] | contains("\"none\"") | not' >/dev/null || fail 'home denials are opt-in'
+HOMEDIR=$(cd "$(mktemp -d)" && pwd -P); export HOMEDIR; mkdir -p "$HOMEDIR/Documents/work/repo" "$HOMEDIR/Documents/other" "$HOMEDIR/secrets"
+(cd "$HOMEDIR/Documents/work/repo" && git init -q && python3 "$KIT/tests/fixtures/install_worker_skills.py" . && \
+  echo '{"codex":{"private_home":true},"verify_commands":["git diff --check"]}' > "$T/private.json" && \
+  HOME="$HOMEDIR" bash "${LAUNCHER[@]}" --config "$T/private.json" --card "$CARD" --lane build --codex >"$T/out" 2>"$T/stderr")
+tail -1 "$SB_CODEX_TEST_LOG" | jq -e '[.args[] | select(startswith("permissions.super-board-lane.filesystem="))][0] | contains("secrets") and contains("Documents/other") and contains("none")' >/dev/null || fail 'private_home must deny home siblings'
+tail -1 "$SB_CODEX_TEST_LOG" | jq -e '[.args[] | select(startswith("permissions.super-board-lane.filesystem="))][0] | (contains("Documents/work/repo\"=\"write")) and (contains("\"" + env.HOMEDIR + "\"=") | not)' >/dev/null || fail 'private_home keeps the repo writable and never denies a parent folder itself'
+rm -rf "$HOMEDIR"
+
+# A lane that ends in prose is resumed in the same session and then counts as advanced.
+: > "$SB_CODEX_TEST_LOG"
+SB_CODEX_TEST_PROSE_FIRST=1 lane build --codex >"$T/out"
+jq -e '.status == "advanced" and .detail == "finished after resume"' "$T/out" >/dev/null || fail 'prose-only lane must be resumed to a valid result'
+jq -s -e '[.[].lane] == ["build", "resume"] and .[1].session == "sess-1234" and (.[1].prompt | contains("only the JSON result object"))' "$SB_CODEX_TEST_LOG" >/dev/null || fail 'resume must reuse the session id with the finish prompt'
+# No session id and invalid output: fail with the final message kept, not a bare error.
+: > "$SB_CODEX_TEST_LOG"
+RC=0; SB_CODEX_TEST_INVALID=1 lane build --codex >"$T/out" || RC=$?
+[ "$RC" -eq 1 ] && jq -e '.status == "failed" and (.detail | contains("final message: not json") and contains("saved:"))' "$T/out" >/dev/null || fail 'invalid final message must be reported and kept'
+echo '{"verify_commands":["git diff --check"]}' > "$T/config.json"
+
 # Wave: the luna router grades Ready cards only when nothing pins a model.
 echo '{"max_workers":1,"verify_commands":["git diff --check"]}' > "$T/config.json"
 CARDS='[{"number":1,"status":"Ready","title":"easy"},{"number":2,"status":"Review"}]'
@@ -204,6 +241,34 @@ jq -e '.cards[0].lanesRun == "build:bounced"' "$T/out" >/dev/null || fail 'non-a
 RC=0; SB_CODEX_TEST_STATUS=halted wave --codex >"$T/out" || RC=$?
 [ "$RC" -eq 79 ] && [ "$(wc -l < "$SB_CODEX_TEST_LOG" | tr -d ' ')" -eq 1 ] || fail 'halt stops all new lane dispatch'
 jq -e '.halted and (.cards | length) == 4' "$T/out" >/dev/null || fail 'halt summary preserves all cards'
+
+# Rolling dispatch: no --cards; the planner is asked again after every finished card, the cap is
+# max_workers, each finished card is one line in --events, and the run ends when the board is idle.
+mkdir -p "$T/rolling"; cp "$KIT"/scripts/* "$T/rolling/"
+cat > "$T/rolling/super-board-wave-plan.sh" <<'PLAN'
+#!/usr/bin/env bash
+# Stub planner: cards 1 and 2 are runnable until their review lane has started.
+jq -n --slurpfile log "$SB_CODEX_TEST_LOG" '{cards: [range(1;3) | select(. as $n | ([$log[] | select(.number == $n and .lane == "review")] | length) == 0) | {number: ., status: "Review", title: "rolling", lane: "review", labels: []}]}'
+PLAN
+chmod +x "$T/rolling/super-board-wave-plan.sh"
+cp "$T/config.json" "$T/config.saved"
+echo '{"max_workers":1,"verify_commands":["git diff --check"]}' > "$T/config.json"
+: > "$SB_CODEX_TEST_LOG"; rm -f "$T/events.jsonl"
+SB_ROLLING_POLL=0.2 bash "$T/rolling/super-board-codex-wave.sh" --config "$T/config.json" --rolling --events "$T/events.jsonl" --codex >"$T/out" 2>"$T/stderr" || fail 'rolling run must end 0 when the board is idle'
+jq -e '.halted == false and ([.cards[].number] | sort) == [1, 2] and all(.cards[]; .finalStatus == "advanced")' "$T/out" >/dev/null || fail 'rolling run must finish both planned cards'
+jq -s -e 'all(.active == 1)' "$SB_CODEX_TEST_LOG" >/dev/null || fail 'rolling honours max_workers=1'
+[ "$(wc -l < "$T/events.jsonl" | tr -d ' ')" -eq 2 ] && jq -s -e 'all(.finalStatus == "advanced" and has("at"))' "$T/events.jsonl" >/dev/null || fail 'rolling writes one event per finished card'
+RC=0; bash "$KIT/scripts/super-board-codex-wave.sh" --config "$T/config.json" --codex >/dev/null 2>&1 || RC=$?
+[ "$RC" -ne 0 ] || fail 'without --rolling, --cards stays required'
+# A card that did not advance waits out --cooldown before it is picked again.
+: > "$SB_CODEX_TEST_LOG"; rm -f "$T/events.jsonl"
+SB_CODEX_TEST_STATUS=bounced SB_ROLLING_POLL=0.2 bash "$T/rolling/super-board-codex-wave.sh" --config "$T/config.json" --rolling --events "$T/events.jsonl" --cooldown 0 --codex >"$T/out" 2>"$T/stderr" &
+ROLL=$!; for _ in {1..40}; do [ -f "$T/events.jsonl" ] && [ "$(wc -l < "$T/events.jsonl")" -ge 2 ] && break; sleep 0.25; done
+kill "$ROLL" 2>/dev/null || true; wait "$ROLL" 2>/dev/null || true
+[ "$(jq -s 'length' "$T/events.jsonl")" -ge 2 ] || fail 'a bounced card is picked again once its cooldown ends'
+rm -f .claude/super-board/codex-wave.pid; rm -rf .claude/super-board/inflight; mkdir -p .claude/super-board/inflight
+echo '{"verify_commands":["git diff --check"]}' > "$T/config.json"
+cp "$T/config.saved" "$T/config.json"
 
 # A readiness halt returned by a running lane stops dispatch and preserves its owned lock.
 : > "$SB_CODEX_TEST_LOG"
