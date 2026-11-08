@@ -163,6 +163,14 @@ DIFF
   "api repos/x/y/collaborators/owner/permission")
     [ "${STUB_PERMISSION_FAIL:-0}" = 0 ] || exit 1
     echo '{"permission":"admin"}' ;;
+  "api repos/"*)
+    # The paginated file list the gate reads instead of `pr view --json files` (which stops at 100).
+    case "$*" in */pulls/*/files*) ;; *) exit 1 ;; esac
+    meta="${STUB_META:-{\"files\":[]}}"
+    if [ -n "${STUB_META_AFTER:-}" ] && [ -f "$STUB_VERIFIED" ]; then meta="$STUB_META_AFTER"; fi
+    printf '%s' "$meta" | jq -c --argjson size "${STUB_PAGE_SIZE:-100}" \
+      '. as $m | [.files | to_entries | map(.value as $f | {filename: $f.path, additions: ($f.additions // (if .key == 0 then $m.additions else 0 end)), deletions: ($f.deletions // (if .key == 0 then $m.deletions else 0 end))}) | . as $f | range(0; ([length, 1] | max); $size) | $f[.:(. + $size)]]'
+    exit 0 ;;
   *) exit 1 ;;
 esac
 STUB
@@ -261,6 +269,22 @@ RC=0; SB_GITHUB_RETRY_DELAY=0 STUB_DIFF_FAIL=1 STUB_OID="$SHA" STUB_META="$(meta
 [ ! -f "$TMP/ran" ] || fail "no migration may run without policy evidence"
 grep -q '^pr merge' "$GH_LOG" && fail "no merge may run without policy evidence"
 [ "$(grep -c '^pr diff' "$GH_LOG")" -eq 3 ] || fail "exactly three failed read attempts"
+teardown
+
+# 13b — a big PR: the file list comes from the paginated REST endpoint (`pr view --json files`
+#       stops at 100), pages are joined, and the count must match changedFiles. A PR with ANSI
+#       codes in its diff is read with --allow-escape-sequences.
+head_setup
+BIGFILES=$(jq -cn '[range(0;130) | {path: "src/f\(.).ts", additions: 1, deletions: 0}]')
+RC=0; STUB_PAGE_SIZE=100 STUB_OID="$SHA" STUB_META="$(jq -cn --argjson f "$BIGFILES" '{labels: [], body: "", additions: 130, deletions: 0, files: $f, changedFiles: 130}')" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "a 130-file PR read over two pages should merge, got $RC"
+grep -q 'pr diff 1 .*--allow-escape-sequences' "$GH_LOG" || fail "the gate must read diffs with --allow-escape-sequences"
+grep -q 'pulls/1/files?per_page=100 --paginate --slurp' "$GH_LOG" || fail "the gate must read the file list from the paginated REST endpoint"
+teardown
+head_setup
+RC=0; STUB_OID="$SHA" STUB_META="$(jq -cn --argjson f "$BIGFILES" '{labels: [], body: "", additions: 130, deletions: 0, files: $f, changedFiles: 150}')" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 79 ] || fail "a file list shorter than changedFiles must halt (79), got $RC"
+grep -q '^pr merge' "$GH_LOG" && fail "no merge may run on an incomplete file list"
 teardown
 
 # 14 — a money label: a human merges. Exit 7, the category is named, no merge.

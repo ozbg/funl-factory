@@ -150,6 +150,8 @@ REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
 export SB_REPO_PATH="$REPO_PATH"
 # Read with a while-loop rather than `mapfile`: macOS ships bash 3.2 and every
 # other script in this repo runs there, so this one does too.
+# Browser tests share one Playwright browser per machine instead of one per lane.
+export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-${TMPDIR:-/tmp}/super-board-codex/ms-playwright}"
 VERIFY=()
 while IFS= read -r line; do
   if [[ "$line" =~ [^[:space:]] ]]; then VERIFY+=("$line"); fi
@@ -236,8 +238,25 @@ fi
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Outside $SCRATCH: `git worktree add` below needs that directory empty.
 META=$(mktemp); DIFF=$(mktemp)
-python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
-python3 "$GITHUB_READ" --kind diff --meta "$META" -- pr diff "$PR" ${REPO:+--repo "$REPO"} > "$DIFF"
+# `gh pr view --json files` stops at 100 files, so a big PR (QA evidence adds many)
+# read as truncated and halted the run. Read the rest of the metadata there and the
+# file list from the paginated REST endpoint, then require the count to match.
+read_meta() {
+  local base files
+  base=$(python3 "$GITHUB_READ" --kind json -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,additions,deletions,changedFiles,body) || exit $?
+  local slug="${REPO:-}"
+  [ -n "$slug" ] || slug='{owner}/{repo}'
+  files=$(python3 "$GITHUB_READ" --kind json -- api "repos/$slug/pulls/$PR/files?per_page=100" --paginate --slurp) || exit $?
+  jq -n --argjson b "$base" --argjson f "$files" \
+    '$b + {files: [$f[][] | {path: .filename, additions: .additions, deletions: .deletions}]}' > "$META" || exit 70
+  if ! jq -e '(.files | length) == .changedFiles' "$META" >/dev/null; then
+    python3 "$GITHUB_READ" --halt "PR #$PR file list incomplete: $(jq '.files|length' "$META") of $(jq .changedFiles "$META") files"
+    exit 79
+  fi
+}
+read_meta
+# QA evidence logs can hold ANSI colour codes; gh refuses those on a terminal, but this goes to a file.
+python3 "$GITHUB_READ" --kind diff --meta "$META" -- pr diff "$PR" ${REPO:+--repo "$REPO"} --allow-escape-sequences > "$DIFF"
 PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
   echo "human-gate: policy — could not classify the PR (unreadable metadata)"
   say "merge policy could not be evaluated — a human merges this one"; exit 7; }
@@ -326,7 +345,7 @@ fi
 if [ "$APPROVED" = true ]; then
   # Code remains pinned; body-declared human steps and config can change without
   # a commit. Reclassify them too instead of reusing the old approval scope.
-  python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
+  read_meta
   PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
     say "human approval scope could not be refreshed"; exit 7; }
   approval_check
