@@ -275,7 +275,9 @@ def run_card(card):
                 pass
     last = history[-1]
     # Codex picks its own -m per lane; lane_models applies to Claude waves only.
-    ran = lambda lane: 'codex' if any(h['lane'] == lane for h in history) else None
+    # A pinned --codex=<model> names the model; otherwise the lane launcher chose it.
+    chosen = codex[0].partition('=')[2].strip() or 'codex'
+    ran = lambda lane: chosen if any(h['lane'] == lane for h in history) else None
     return dict(number=card['number'], finalStatus=last['status'], lastLane=last['lane'],
                 column=last['column'], detail=last['detail'], prUrl=last.get('prUrl'),
                 priorFindings=last.get('priorFindings'),

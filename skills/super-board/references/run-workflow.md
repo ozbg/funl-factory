@@ -20,6 +20,15 @@ Ready takes its tier's medium cell. `--codex=<model>`, else optional `codex.mode
 pins one model for every card and skips the router.
 Keep this run choice in each wave and resume command; skip only the Claude usage guard.
 
+**The owner picks the Codex model.** A `run --codex` with no `=<model>`, or a run that
+becomes `--codex` on a Codex host, asks the owner which model before the first claim
+(AskUserQuestion; on a host without it, a plain question and wait). Offer the configured
+`codex.models.<lane>` / `codex.model` values first, then "Other". Never start on the ladder
+or the provider's default unasked: that default once pointed at a model the owner's privacy
+rules forbid. Launch with `--codex=<chosen model>` and keep it in every wave and resume line.
+`--codex=<model>` given up front is the answer; do not ask again. Usage fallback is
+unattended, so it runs only with `codex.model` set and never asks.
+
 **Inside Codex, plain `run` is `--codex`.** Your tool list has no Workflow tool, or
 `bash .claude/bin/super-board-host.sh --config <config-path>` prints `codex` → run as `--codex` (tier flags and
 `--codex=<model>` still apply); it counts as explicit `--codex`, Review included.

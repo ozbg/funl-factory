@@ -232,11 +232,13 @@ wave --codex=wave-model --output "$T/wave.json" > "$T/out"
 cmp "$T/out" "$T/wave.json" || fail 'file and stdout wave result differ'
 jq -e '.halted == false and (.cards | length) == 4 and .cards[0].lanesRun == "build:advanced → qa:advanced → review:advanced" and .cards[1].lanesRun == "qa:advanced → review:advanced" and .cards[2].lastLane == "review" and .cards[3].column == "Done"' "$T/out" >/dev/null || fail 'wave routing/summary'
 [ "$(last_model)" = wave-model ] || fail 'wave propagates explicit model'
+jq -e '.cards[0].buildModel == "wave-model" and .cards[0].qaModel == "wave-model" and .cards[3].reviewModel == "wave-model" and .cards[3].buildModel == null' "$T/out" >/dev/null || fail 'summary names the pinned --codex model per lane that ran'
 jq -s -e 'all(.active == 1)' "$SB_CODEX_TEST_LOG" >/dev/null || fail 'max_workers=1 must serialize cards'
 [ ! -e .claude/super-board/codex-wave.pid ] && [ -z "$(ls -A .claude/super-board/inflight)" ] || fail 'completed wave leaves no PID/worker locks'
 : > "$SB_CODEX_TEST_LOG"
 SB_CODEX_TEST_STATUS=bounced wave --codex >"$T/out"
 jq -e '.cards[0].lanesRun == "build:bounced"' "$T/out" >/dev/null || fail 'non-advanced ends card chain'
+jq -e '.cards[0].buildModel == "codex" and .cards[0].qaModel == null' "$T/out" >/dev/null || fail 'no pinned model reports codex, and only for lanes that ran'
 : > "$SB_CODEX_TEST_LOG"
 RC=0; SB_CODEX_TEST_STATUS=halted wave --codex >"$T/out" || RC=$?
 [ "$RC" -eq 79 ] && [ "$(wc -l < "$SB_CODEX_TEST_LOG" | tr -d ' ')" -eq 1 ] || fail 'halt stops all new lane dispatch'
