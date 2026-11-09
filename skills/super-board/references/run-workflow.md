@@ -113,6 +113,21 @@ The interactive session that runs this backend is the orchestrator. It:
 
 ## Preconditions (before the first wave)
 
+**Goal check first, every run (factory #40).** The goal is a GitHub milestone named in the
+config's `goal.milestone`. Before anything else:
+1. Read the open milestones (`gh api repos/<owner>/<repo>/milestones`): title, description
+   (its "Done when: …" line), and open and closed issue counts.
+2. Show the owner the current goal in two lines (`🎯 <title> · <closed>/<total>` and its
+   done-when line), then ask with AskUserQuestion: keep it, reword it, or switch to another
+   open milestone. With no goal set, propose one from the open milestones or the plan, and
+   ask. Don't start a wave without a goal the owner has confirmed this session.
+3. Save the answer to `goal.milestone`. A reworded goal is saved to the milestone's
+   title or description on GitHub first.
+4. Ready cards that are free but not on the goal show up in the planner's `offGoal` list.
+   Tell the owner how many there are in one line, and never run them. A card belongs to
+   the goal only when its milestone says so: move a card onto the goal only when the
+   owner asks, never because it's runnable.
+
 Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 1. Config exists and validates against `config-schema.json`. Run
    `python3 .claude/bin/super-board-verification-ready.py --config <config>`; exit 9
@@ -264,7 +279,9 @@ Repeat until a done condition or halt gate fires:
    absent = no cap). `max_workers` is the GitHub-limit valve: step 5 lowers it
    after a wave that hit the hourly limit. If `cards` is empty and
    Building/QA/Review counts are 0 → done. If empty but cards sit in Blocked
-   only → report and stop. This is unfinished work, not a completed-run calibration trigger.
+   only → report and stop. **Goal reached:** when the goal milestone has no open
+   issues, stop, report `🎯 <title> reached`, and ask the owner for the next goal
+   (the goal check above). Off-goal cards never keep a run going. This is unfinished work, not a completed-run calibration trigger.
 3. **Claim** — for each card, `gh issue edit <n> --add-assignee <bot_identity>`,
    then VERIFY: re-read assignees (`gh issue view <n> --json assignees`) and
    proceed only if the list is exactly `[<bot_identity>]`. Adding an assignee
@@ -312,7 +329,9 @@ Repeat until a done condition or halt gate fires:
 6. **Report** — one short block to the user per wave, in the session. Outcome
    first, one line per card that needs a human, then what happens next:
 
+   The goal line comes first:
    ```
+   🎯 M1 · Ben can test funl · 3/5 done · next: #78, #65 · 2 off-goal waiting
    Wave 3 · 5 cards → 2 merged · 1 bounced · 1 blocked · 1 failed · usage 5h 62%
      🛡 #15 Blocked 🔐 missing STRIPE_TEST_KEY — owner: Eric
      ❌ #18 failed: build lane returned no result — retried next wave

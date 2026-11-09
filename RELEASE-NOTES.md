@@ -23,6 +23,11 @@ Each lane gets its own model, and Review keeps a scorecard that shows whether ch
   the card at its current column, so a just-built card's Tester is not told to skip Building.
 - 🐛 **Every summary row keeps its complexity** (#33), including cards held, bounced or failed
   mid-chain. The scorecard groups cards built before these waves as "not built in these waves".
+- ✨ **Goals come first** (#40). Each run opens with a goal check: the config's `goal.milestone`
+  (a GitHub milestone) is shown with its done-when line, and the owner confirms, rewords or
+  switches it. Waves run Ready cards from that milestone only; in-flight cards finish, and
+  free cards off the goal are listed as `offGoal`. Reports open with `🎯 <goal> · n/m`. The run
+  stops when the goal is reached. Lint criterion 20 flags Ready cards off the goal.
 - 🧪 `test-wave-lane-models.sh` and `test_scorecard.py`; the Codex schema and summary
   contract tests cover the new fields.
 

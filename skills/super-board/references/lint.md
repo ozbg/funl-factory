@@ -79,7 +79,7 @@ PHASE 7 — Final summary + session-reset nudge
 
 ---
 
-## Lint criteria — 19-criterion table
+## Lint criteria — 20-criterion table
 
 An issue is flagged if any of these apply. An issue can fail multiple criteria; all firing criteria are surfaced in Phase 4.
 
@@ -104,6 +104,7 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 17 | Acceptance Criteria not a checklist | ACs as prose or plain `-` bullets | Rewrite as `- [ ] <checkable outcome>`, one per line |
 | 18 | Context steps not lettered under Where, more than one step per line, or chained with arrows | "Where: /x — sign in → open Receipts → drop file" | Rewrite as `- **Where:** …` then `  - a. Sign in` / `  - b. …`, one per line; embed the screenshot (raw URL pinned to a sha), never link it |
 | 19 | Unsettled new ownership boundary, new/changed public interface, or architecture expensive to reverse; no adequate applicable design record | Two callers could each own the new shared state, with no recorded choice | Follow [design preflight](design-preflight.md); compare two sketches and propose a choice in Context |
+| 20 | Ready card with no milestone, or not on the config's `goal.milestone` (factory #40) | A refactor in Ready with no milestone | Ask the owner which goal it serves; with none, move it to Backlog |
 
 Criterion 19 is conditional. Read the current flow, owners/callers and applicable specs/ADRs
 before flagging it. Labels alone do not trigger it. Ordinary bugs, mechanical refactors and
@@ -272,7 +273,7 @@ Before declaring lint complete, the worker MUST verify all three:
 
 - [ ] `docs/super-board/pre-flight.md` exists and lists every credential / tool / env signal encountered while scanning issues + PROJECT.md.
 - [ ] Every issue in active-pipeline columns (Ready, Building, QA, Review) either:
-  - has a populated `## Acceptance Criteria` section that passes all 19 criteria (conditional #19 only when triggered), OR
+  - has a populated `## Acceptance Criteria` section that passes all 20 criteria (conditional #19 only when triggered), OR
   - was dropped on purpose (closed as not planned, Done, `🤷 dropped` comment), OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
 - [ ] No issue is left in an in-between state (flagged but not resolved, partially edited, or awaiting user input that never came).

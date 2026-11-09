@@ -59,6 +59,11 @@
   //   "high"   — opus for every card
   "model_tier": "medium",
 
+  // The run's goal: a GitHub milestone title (factory #40). The planner runs Ready
+  // cards from this milestone only; in-flight cards always finish. Each run starts
+  // by asking the owner to confirm or change it. Absent = no goal filter.
+  "goal": { "milestone": null },
+
   // Optional per-lane models for Claude waves, over model_tier (factory #25).
   // Each lane is a model name, "session" (this orchestrator session's model),
   // or {"low","medium","high"} picked by the card's complexity (a card that

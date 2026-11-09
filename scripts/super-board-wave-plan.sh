@@ -95,6 +95,9 @@ python3 "$HERE/super-board-github-read.py" --check
 VARIANT=$(echo "$CONFIG_JSON" | jq -r '.variant // ""')
 # 0 or absent = unlimited. A wave is sized by the dependency graph, not a knob.
 MAX_WORKERS=$(echo "$CONFIG_JSON" | jq -r '.max_workers // 0')
+# The run's goal (factory #40): a milestone title. Set, only its Ready cards run;
+# in-flight cards always finish. Empty = no goal filter (old behaviour).
+GOAL=$(echo "$CONFIG_JSON" | jq -r '.goal.milestone // ""')
 OWNER=$(echo "$CONFIG_JSON" | jq -r '.project.owner')
 NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
 
@@ -132,7 +135,7 @@ fi
 # auto-merges into one base branch race. That guard now lives where the race
 # actually is — the merge step takes a lock inside the wave workflow and the
 # freshness gate re-verifies under it — so reviews may run in parallel here.
-echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argjson deps "$DEPS" '
+echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argjson deps "$DEPS" --arg goal "$GOAL" '
   def dep($n): $deps[($n | tostring)];
   # gh project item-list puts label names on the item (`labels`); some shapes put
   # them on the content, as strings or {name}. Lower-cased, names only.
@@ -145,13 +148,16 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
     else "build" end;
   # Unknown to the graph (closed, or beyond the fetch limit) is not "free".
   def free($n): (dep($n) | if . == null then false else .runnable end);
+  # On the goal milestone of this run, or no goal set.
+  def on_goal: $goal == "" or .milestone == $goal;
 
   [ .items[]
     | select(.content.type == "Issue")
     | select((.content.assignees // []) | length == 0)
     | labels_of as $l
     | { number: .content.number, status: .status, title: .content.title,
-        lane: lane_of(.status; $l), labels: $l } ] as $all
+        lane: lane_of(.status; $l), labels: $l,
+        milestone: (.milestone.title // .content.milestone.title // null) } ] as $all
 
   # In flight: already past preflight, so the graph does not gate them. Iterated
   # in $cols order (Review, then QA) rather than board order, so a throttled wave
@@ -159,11 +165,15 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
   | [ $cols[] as $c | $all[] | select(.status == $c and $c != "Ready") ] as $flight
 
   # Ready: only the ones the graph says are actually free.
-  | [ $all[] | select(.status == "Ready") | select(free(.number)) ] as $ready
+  | [ $all[] | select(.status == "Ready") | select(free(.number)) | select(on_goal) ] as $ready
+  # Free but not on the goal: reported so the report can say what is waiting, never run.
+  | [ $all[] | select(.status == "Ready") | select(free(.number)) | select(on_goal | not)
+      | { number, title, milestone } ] as $offgoal
 
   # Downstream-first, so work already begun finishes before new work starts.
   | ($flight + $ready) as $picked
-  | { cards: (if $cap > 0 then ($picked | .[:$cap]) else $picked end),
+  | { cards: (if $cap > 0 then ($picked | .[:$cap]) else $picked end | map(del(.milestone))),
+      offGoal: $offgoal,
 
       # Blocked cards whose blockers have all closed. The orchestrator moves
       # these to Ready before launching, so they join this very wave.

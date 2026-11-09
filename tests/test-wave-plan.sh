@@ -16,6 +16,7 @@ ITEMS=fixtures/wave-items.json
 DEPS=fixtures/wave-deps.json
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
+TMPDIR_GOAL=$(mktemp -d); trap 'rm -rf "$TMPDIR_GOAL"' EXIT
 plan() { "$PLAN" --config "$1" --items "$ITEMS" --deps "$DEPS"; }
 
 # Uncapped is the default shape, so every scenario runs without a cap unless it
@@ -152,5 +153,21 @@ echo "$OUT" | jq -e '[.sweep[].number, .cards[].number] | (index(20) == null and
 OUT19=$("$PLAN" --config <(echo "$NOCAP") --items "$ITEMS" --deps <(jq '.["21"].approvalRefresh=true | .["21"].approvalWhy="PR head changed"' "$DEPS"))
 echo "$OUT19" | jq -e '[.refreshApproval[].number] == [21]' >/dev/null || fail "stale approval must get a fresh request"
 echo "$OUT19" | jq -e '[.resume[].number, .cards[].number, .sweep[].number] | index(21) == null' >/dev/null || fail "refresh is not permission to merge or build"
+
+
+# Goal — config goal.milestone runs only that milestone's Ready cards (factory #40).
+# In-flight cards always finish; free Ready cards off the goal are reported, never run.
+GOAL=$(echo "$NOCAP" | jq '.goal = {milestone: "M1 · test"}')
+jq '(.items[] | select(.content.number == 12)) += {milestone: {title: "M2 · later"}}' "$ITEMS" > "$TMPDIR_GOAL/items-off.json"
+OUT=$("$PLAN" --config <(echo "$GOAL") --items "$TMPDIR_GOAL/items-off.json" --deps "$DEPS")
+echo "$OUT" | jq -e '[.cards[].number] | sort == [10,13]' >/dev/null || fail "off-goal Ready #12 must not run, in-flight must: $OUT"
+echo "$OUT" | jq -e '[.offGoal[].number] == [12]' >/dev/null || fail "#12 must be reported offGoal: $(echo "$OUT" | jq -c .offGoal)"
+jq '(.items[] | select(.content.number == 12)) += {milestone: {title: "M1 · test"}}' "$ITEMS" > "$TMPDIR_GOAL/items-on.json"
+OUT=$("$PLAN" --config <(echo "$GOAL") --items "$TMPDIR_GOAL/items-on.json" --deps "$DEPS")
+echo "$OUT" | jq -e '([.cards[].number] | sort) == [10,12,13] and (.offGoal | length) == 0' >/dev/null || fail "on-goal #12 must run: $OUT"
+OUT=$("$PLAN" --config <(echo "$GOAL") --items "$ITEMS" --deps "$DEPS")
+echo "$OUT" | jq -e '[.offGoal[].number] == [12]' >/dev/null || fail "a Ready card with no milestone is off-goal: $OUT"
+# No goal: unchanged, and offGoal is empty.
+echo "$(plan <(echo "$NOCAP"))" | jq -e '(.offGoal // []) | length == 0' >/dev/null || fail "no goal must report no offGoal"
 
 echo "PASS: test-wave-plan.sh (19 scenarios)"
