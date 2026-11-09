@@ -15,6 +15,10 @@ Each lane gets its own model, and Review keeps a scorecard that shows whether ch
   `docs/super-board/runs/scorecard.jsonl`, with tokens and minutes read from the wave's agent
   logs (each agent counted once). `summary` prints one line per build model: merged, first
   pass, average rounds, rework, cause split, tokens and minutes per card, with 🟢 🟡 🔴.
+- 🐛 **Build and QA no longer halt on two skills nothing installs** (#29).
+  `verification-before-completion` and `testing-strategy` fall back to short checklists in
+  `decision-policy.md` ("Verify before done", "Testing strategy"), as `ponytail` does. An
+  installed skill still wins.
 - 🧪 `test-wave-lane-models.sh` and `test_scorecard.py`; the Codex schema and summary
   contract tests cover the new fields.
 

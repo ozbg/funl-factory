@@ -37,7 +37,10 @@ REGISTRY = {
     'aliases': {'mattpocock-skills': ['diagnosing-bugs', 'tdd', 'implement', 'codebase-design', 'code-review',
                                    'resolving-merge-conflicts', 'domain-modeling', 'ask-matt', 'to-spec', 'to-tickets', 'implement-spec', 'improve-codebase-architecture'],
                 'ponytail': ['ponytail', 'ponytail-review']},
+    # Skills no installer fetches fall back to a checklist in the decision policy (#29).
     'fallbacks': {'ponytail:ponytail': {'id': 'simplest-solution-first', 'source': POLICY + '#simplest-solution-first'},
+                  'verification-before-completion': {'id': 'verify-before-done', 'source': POLICY + '#verify-before-done'},
+                  'testing-strategy': {'id': 'testing-strategy', 'source': POLICY + '#testing-strategy'},
                   'ponytail:ponytail-review': {'id': 'over-engineering-ladder', 'source': 'skills/super-review/SKILL.md#over-engineering'}},
 }
 CORE = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'visual', 'git-sync', 'ui-refine-loop', 'pr-security-review']
