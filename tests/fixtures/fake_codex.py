@@ -16,7 +16,7 @@ if args[:2] == ['exec', 'resume']:
     with open(os.environ['SB_CODEX_TEST_LOG'], 'a') as log:
         fcntl.flock(log, fcntl.LOCK_EX)
         log.write(json.dumps(dict(args=args, prompt=prompt, number=0, lane='resume', active=1, session=args[-2])) + '\n')
-    Path(args[args.index('-o') + 1]).write_text(json.dumps(dict(status='advanced', column='QA', detail='finished after resume', prUrl=None, branch=None, priorFindings=None)))
+    Path(args[args.index('-o') + 1]).write_text(json.dumps(dict(status='advanced', column='QA', detail='finished after resume', prUrl=None, branch=None, priorFindings=None, score=None)))
     sys.exit(0)
 card = json.loads(re.search(r'^Card: (.+)$', prompt, re.M).group(1))
 lane = re.search(r'Run super-(build|qa|review)', prompt).group(1)
@@ -43,7 +43,7 @@ elif os.environ.get('SB_CODEX_TEST_INVALID'):
 elif os.environ.get('SB_CODEX_TEST_RESULT'):
     output.write_text(os.environ['SB_CODEX_TEST_RESULT'])
 else:
-    output.write_text(json.dumps(dict(status=status, column=column, detail=os.environ.get('SB_CODEX_TEST_DETAIL', 'stub lane result'), prUrl=None, branch=None, priorFindings=None)))
+    output.write_text(json.dumps(dict(status=status, column=column, detail=os.environ.get('SB_CODEX_TEST_DETAIL', 'stub lane result'), prUrl=None, branch=None, priorFindings=None, score=None)))
 print('codex log noise must not appear in result stdout')
 with open(os.environ['SB_CODEX_TEST_LOG'], 'a') as log:
     fcntl.flock(log, fcntl.LOCK_EX)

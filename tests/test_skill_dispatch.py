@@ -48,7 +48,7 @@ if 'Grade complexity' in prompt:
 else:
     card=json.loads(re.search(r'^Card: (.+)$',prompt,re.M).group(1))
     lane=re.search(r'Run super-(build|qa|review)',prompt).group(1)
-    result={'status':'advanced','column':{'build':'QA','qa':'Review','review':'Done'}[lane], 'detail':'fixture','prUrl':None,'branch':None,'priorFindings':None}
+    result={'status':'advanced','column':{'build':'QA','qa':'Review','review':'Done'}[lane], 'detail':'fixture','prUrl':None,'branch':None,'priorFindings':None,'score':None}
 output.write_text(json.dumps(result))
 ''')
         self.tool('claude', "import json,os\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'claude'})+'\\n')\n")

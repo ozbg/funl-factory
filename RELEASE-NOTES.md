@@ -1,5 +1,23 @@
 # Release notes
 
+## Unreleased
+
+Each lane gets its own model, and Review keeps a scorecard that shows whether cheap lanes are landing good work (#25).
+
+- ✨ **`lane_models` in the board config.** One model per lane (classify, preflight, build,
+  qa, review): a model name, `"session"`, or `{low, medium, high}` by card complexity. A lane
+  left out keeps `model_tier`'s choice; no `lane_models` changes nothing. Bad values fail the
+  wave before any agent runs. Claude waves only; Codex keeps its own ladder.
+- ✨ **Review scorecard.** Review also returns `score`: verdict (clean · fixes · rework), ACs
+  proven, blockers, round, and cause (build · ticket · none). It comes from checks Review
+  already does. The Codex lane schema carries the same field, null outside Review.
+- ✨ **`super-board-scorecard.py`.** `record` appends one row per card per wave to
+  `docs/super-board/runs/scorecard.jsonl`, with tokens and minutes read from the wave's agent
+  logs (each agent counted once). `summary` prints one line per build model: merged, first
+  pass, average rounds, rework, cause split, tokens and minutes per card, with 🟢 🟡 🔴.
+- 🧪 `test-wave-lane-models.sh` and `test_scorecard.py`; the Codex schema and summary
+  contract tests cover the new fields.
+
 ## v3.3.0 — 2026-10-27
 
 The security check moves to QA, and `/super-collect` hands its findings to Matt Pocock's planning chain.
