@@ -51,6 +51,33 @@ class Readiness(unittest.TestCase):
         (self.root / '.claude/skills/code-review/SKILL.md').unlink()
         self.assertIn('mattpocock-skills:code-review', [e['name'] for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing'])
 
+    def test_verification_and_testing_strategy_fall_back_when_absent(self):
+        # Neither skill has an installer (factory #29): a built-in checklist stands in.
+        for name in CORE + ['tdd', 'implement', 'codebase-design', 'code-review', 'diagnosing-bugs']:
+            self.put(name)
+        qa_card = dict(number=2, status='QA', labels=['bug'], body='')
+        for card, lane in [(self.card, 'build'), (qa_card, 'qa')]:
+            result = self.run_cli(cards=[card], extra=('--lane', lane))
+            self.assertTrue(result['ready'], (lane, result))
+            got = {e['name']: e for e in result['entries'] if e['lane'] == lane}
+            self.assertEqual(got['verification-before-completion']['status'], 'fallback')
+            if lane == 'qa':
+                self.assertEqual(got['testing-strategy']['status'], 'fallback')
+        # Each fallback points at a real section of its source file.
+        import importlib.util, re
+        spec = importlib.util.spec_from_file_location('sr', CLI)
+        sr = importlib.util.module_from_spec(spec); spec.loader.exec_module(sr)
+        for name in ['verification-before-completion', 'testing-strategy']:
+            path, _, anchor = sr.REGISTRY['fallbacks'][name]['source'].partition('#')
+            heads = [re.sub(r'[^a-z0-9 -]', '', h.lower()).strip().replace(' ', '-')
+                     for h in re.findall(r'^#+ (.+)$', (KIT / path).read_text(), re.M)]
+            self.assertIn(anchor, heads, name)
+        # Installed skills still win.
+        self.put('verification-before-completion'); self.put('testing-strategy')
+        got = {e['name']: e for e in self.run_cli(cards=[qa_card], extra=('--lane', 'qa'))['entries']}
+        self.assertEqual(got['verification-before-completion']['status'], 'resolved')
+        self.assertEqual(got['testing-strategy']['status'], 'resolved')
+
     def test_qa_requires_pr_security_review_and_review_does_not(self):
         self.full()
         entries = self.run_cli()['entries']

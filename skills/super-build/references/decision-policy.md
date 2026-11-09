@@ -147,6 +147,30 @@ fails, apply this fallback and carry on:
 Ponytail picks *how little* to write. It never overrides an acceptance
 criterion, the `tdd` red test, or the decision ladder below.
 
+## Verify before done
+
+Invoke `verification-before-completion` before you claim a fix or a card is done. It may not
+be installed; if the Skill call fails, apply this fallback and carry on:
+
+1. Run the check that proves the claim, fresh, in this worktree: the failing test now
+   passes, then the full suite and `verify_commands`. Never reuse an earlier run's output.
+2. Read the output, not the exit code alone: count passes, failures and skips.
+3. Tick an acceptance criterion only when a test or probe you just ran shows it.
+4. Report what you ran and what it printed. If something was not run, say so; never
+   write "should work" or "probably passes".
+
+## Testing strategy
+
+Use `testing-strategy` to decide what a component is worth testing. It may not be installed;
+if the Skill call fails, apply this fallback and carry on:
+
+1. Test where the defect lives: pure logic → unit, wiring across modules → integration,
+   only what the browser itself breaks → e2e (the localisation ladder above).
+2. Cover each acceptance criterion and each edge the ticket names, once, at the lowest layer that proves it.
+3. Data-changing paths, auth and money get a failure-case test as well as the happy path.
+4. Skip tests for framework behaviour, generated code, and pure pass-through glue.
+5. Every new test is red for the right reason before the fix, and survives a refactor.
+
 ## The decision ladder
 
 Most forks in a worker run are not gray at all — they are already settled by
