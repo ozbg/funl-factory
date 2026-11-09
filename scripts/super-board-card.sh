@@ -23,7 +23,7 @@
 #     item-id <issue>         print the card's project item id (cached)
 #     ids                     print {projectId, fieldId, options:{name:id}} (cached)
 #     items                   the whole board in `gh project item-list --format json` shape
-#                             ({items:[{id,status,labels,title,content:{type,number,title,url,repository}}],totalCount})
+#                             ({items:[{id,status,labels,milestone,title,content:{type,number,title,url,repository}}],totalCount})
 #
 # Owner/number/repo come from --config (project.owner, project.number,
 # repo.remote), else $BUILD_LOOP_OWNER / $BUILD_LOOP_PROJECT and the origin remote.
@@ -180,7 +180,7 @@ items() {  # whole board, gh item-list shape, ~1 point per 100 cards
         items(first:100, after:$endCursor){ totalCount pageInfo{ hasNextPage endCursor }
           nodes{ id fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue{ name } }
             content{ __typename
-              ... on Issue { number title url repository{ nameWithOwner } labels(first:30){ nodes{ name } } }
+              ... on Issue { number title url repository{ nameWithOwner } labels(first:30){ nodes{ name } } milestone{ title } }
               ... on PullRequest { number title url repository{ nameWithOwner } labels(first:30){ nodes{ name } } }
               ... on DraftIssue { title } } } } } } } }' \
       -F owner="$OWNER" -F number="$NUMBER") || return $?
@@ -197,7 +197,8 @@ items() {  # whole board, gh item-list shape, ~1 point per 100 cards
                             repository: .content.repository.nameWithOwner } end)) }
           + (if .fieldValueByName.name then { status: .fieldValueByName.name } else {} end)
           + (if ((.content.labels.nodes // []) | length) > 0
-             then { labels: [ .content.labels.nodes[].name ] } else {} end) ] as $items
+             then { labels: [ .content.labels.nodes[].name ] } else {} end)
+          + (if .content.milestone.title then { milestone: { title: .content.milestone.title } } else {} end) ] as $items
     | if ($items | length) == ([ $p[].nodes[] ] | length) and ([ $p[].nodes[] ] | length) == $total
       then { items: $items, totalCount: $total }
       else error("board read incomplete: \([ $p[].nodes[] ] | length) of \($total) items") end' \
