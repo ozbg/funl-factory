@@ -244,7 +244,7 @@ Source .claude/bin/super-board-gh-guard.sh and use its quota checks (sb_gh_guard
 Use .claude/bin/super-board-card.sh for board reads/moves and .claude/bin/super-board-pr-body.sh for owned PR blocks; follow writing-standard.md and pr-author-notes.md.
 Use your own worktree under .claude/worktrees/; never edit the main checkout. Any extra checkout (for example a base-branch comparison) also goes under .claude/worktrees/scratch-<card>-<name> and is removed with git worktree remove before you exit; never create worktrees in /tmp or $TMPDIR. Clean up on ordinary exit, preserve work on halt/interruption.
 {backend.label} adaptation: do not launch Claude or other sub-agents. Perform preflight, classification, independent review and truth-check duties inline. This changes the execution host, never the evidence requirements, confidence threshold or merge policy.
-Return JSON: status=advanced|bounced|blocked|human-gate|failed|halted; column=current board column; detail=one line; prUrl/branch when known, otherwise null; priorFindings=review counts or null. A non-advanced exit ends this card's lane chain. On merge-gate exit 9, return status=halted with detail starting exactly "verification-readiness:"; preserve work and never bounce/retry.
+Return JSON: status=advanced|bounced|blocked|human-gate|failed|halted; column=current board column; detail=one line; prUrl/branch when known, otherwise null; priorFindings=review counts or null; score=null except in Review (verdict clean|fixes|rework, acsProven/acsTotal, blockers, round 1 = first review of this PR, cause none|build = code missed a clear AC|ticket = AC missing, vague or wrong). A non-advanced exit ends this card's lane chain. On merge-gate exit 9, return status=halted with detail starting exactly "verification-readiness:"; preserve work and never bounce/retry.
 Your final message is that JSON object alone: no prose before or after it, no code fence. A summary in prose makes the lane count as failed even when the work succeeded; put any notes in a GitHub comment instead.
 '''
 if args.lane == 'build':
@@ -259,12 +259,18 @@ Merge ONLY through the unchanged .claude/bin/super-board-merge-gate.sh, pinning 
 '''
 
 counts = {key: {'type': 'integer'} for key in ['fixed', 'notFixed', 'noLongerApplies']}
+score_props = {'verdict': {'type': 'string', 'enum': ['clean', 'fixes', 'rework']},
+               **{key: {'type': 'integer'} for key in ['acsProven', 'acsTotal', 'blockers', 'round']},
+               'cause': {'type': 'string', 'enum': ['build', 'ticket', 'none']}}
 properties = {
     'status': {'type': 'string', 'enum': ['advanced', 'bounced', 'blocked', 'human-gate', 'failed', 'halted']},
     'column': {'type': 'string'}, 'detail': {'type': 'string'},
     'prUrl': {'type': ['string', 'null']}, 'branch': {'type': ['string', 'null']},
     'priorFindings': {'anyOf': [{'type': 'null'}, {'type': 'object', 'properties': counts,
                       'required': list(counts), 'additionalProperties': False}]},
+    # Review scorecard (factory #25); null from build and QA.
+    'score': {'anyOf': [{'type': 'null'}, {'type': 'object', 'properties': score_props,
+              'required': list(score_props), 'additionalProperties': False}]},
 }
 schema = {'type': 'object', 'properties': properties, 'required': list(properties), 'additionalProperties': False}
 JSON_TYPES = {'object': dict, 'array': list, 'string': str, 'null': type(None)}

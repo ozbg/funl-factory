@@ -74,11 +74,13 @@ try:
     pinned = codex[0].startswith('--codex=') or (isinstance(configured, str) and configured.strip())
 except (OSError, ValueError, subprocess.CalledProcessError) as error:
     parser.error(str(error))
+# Summary keys the workflow adds for the scorecard (factory #25); empty on halt paths.
+NO_SCORE = dict(complexity=None, buildModel=None, qaModel=None, reviewModel=None, score=None)
 readiness = launcher.with_name('super-board-verification-ready.py')
 if subprocess.run([sys.executable, str(readiness), '--config', str(config_path)]).returncode:
     result = json.dumps({'cards': [dict(number=c['number'], finalStatus='halted', lastLane='none',
                                        column=c['status'], detail='verification-readiness: repair verify_commands and restart explicitly',
-                                       prUrl=None, priorFindings=None, lanesRun='none:halted') for c in cards], 'halted': True})
+                                       prUrl=None, priorFindings=None, lanesRun='none:halted', **NO_SCORE) for c in cards], 'halted': True})
     if output_path:
         output_path.write_text(result + '\n')
     print(result)
@@ -101,7 +103,7 @@ else:
     detail = 'skills-readiness: missing ' + ', '.join(dict.fromkeys(e['name'] for e in skills['entries'] if e['status'] == 'missing'))
 if code:
     result = json.dumps(dict(cards=[dict(number=c['number'], finalStatus='halted', lastLane='none', column=c['status'],
-                                       detail=detail, prUrl=None, priorFindings=None, lanesRun='none:halted') for c in cards], halted=True))
+                                       detail=detail, prUrl=None, priorFindings=None, lanesRun='none:halted', **NO_SCORE) for c in cards], halted=True))
     if output_path:
         output_path.write_text(result + '\n')
     print(result)
@@ -195,7 +197,7 @@ def run_card(card):
         halted.set()
         return dict(number=card['number'], finalStatus='halted', lastLane='none', column=card['status'],
                     detail='run halted while grading; preserve claims and worktrees', prUrl=None,
-                    priorFindings=None, lanesRun='none:halted')
+                    priorFindings=None, lanesRun='none:halted', **NO_SCORE)
     labels = [str(label).lower() for label in card.get('labels', [])]
     first = card.get('lane') or ('qa' if 'qa' in labels else 'build')
     entry = 'review' if card['status'] == 'Review' else 'qa' if card['status'] == 'QA' else first
@@ -272,10 +274,14 @@ def run_card(card):
             except FileNotFoundError:
                 pass
     last = history[-1]
+    # Codex picks its own -m per lane; lane_models applies to Claude waves only.
+    ran = lambda lane: 'codex' if any(h['lane'] == lane for h in history) else None
     return dict(number=card['number'], finalStatus=last['status'], lastLane=last['lane'],
                 column=last['column'], detail=last['detail'], prUrl=last.get('prUrl'),
                 priorFindings=last.get('priorFindings'),
-                lanesRun=' → '.join(f"{item['lane']}:{item['status']}" for item in history))
+                lanesRun=' → '.join(f"{item['lane']}:{item['status']}" for item in history),
+                complexity=complexity, buildModel=ran('build'), qaModel=ran('qa'), reviewModel=ran('review'),
+                score=next((h.get('score') for h in reversed(history) if h['lane'] == 'review' and h.get('score')), None))
 
 bin_dir = Path(sys.argv[1]).resolve().parent
 bot = ((config.get('notifications') or {}).get('bot_identity') or '').strip()

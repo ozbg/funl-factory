@@ -16,7 +16,7 @@ KIT = Path(__file__).resolve().parent.parent
 def lane_schema():
     text = (KIT / 'scripts/super-board-lane.sh').read_text()
     source = text.split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
-    wanted = {'counts', 'properties', 'schema'}
+    wanted = {'counts', 'score_props', 'properties', 'schema'}
     nodes = [node for node in ast.parse(source).body if isinstance(node, ast.Assign)
              and any(isinstance(t, ast.Name) and t.id in wanted for t in node.targets)]
     namespace = {}
@@ -41,6 +41,8 @@ def main():
     assert sorted(lane_props) == sorted(stage_props), (sorted(lane_props), sorted(stage_props))
     findings = next(option for option in lane_props['priorFindings']['anyOf'] if option['type'] == 'object')
     assert sorted(findings['properties']) == sorted(stage_props['priorFindings']['properties'])
+    score = next(option for option in lane_props['score']['anyOf'] if option['type'] == 'object')
+    assert score['properties'] == stage_props['score']['properties'], (score['properties'], stage_props['score']['properties'])
     assert set(stage['required']) <= set(lane['required'])
     print('PASS: test_codex_lane_schema.py (status enum and field names match STAGE_SCHEMA)')
 

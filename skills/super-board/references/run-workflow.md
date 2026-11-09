@@ -269,7 +269,7 @@ Repeat until a done condition or halt gate fires:
    "Codex runs" above. The host check printing `claude` uses the Workflow tool; exit 65 or
    `opencode` never reaches Launch (see "Unknown host halts"). Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
-   `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` hydrated after the planner: each
+   `args: { configPath, cards, humanApprovesMerge, tier, laneModels }` (`cards` hydrated after the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config; when false the workflow serializes Review-lane agents (merge-race guard, execution side).
    `tier` is the run's model ladder: `'low'` when the user invoked
@@ -277,6 +277,9 @@ Repeat until a done condition or halt gate fires:
    for `run --high` (opus for every card), omitted/`'medium'`
    otherwise (sonnet/opus/session — the default). A `model_tier` key in the
    config sets the default; an explicit flag wins over config.
+   `laneModels` is the config's `lane_models`, passed as is (omit it when unset). It sets
+   the model per lane (classify, preflight, build, qa, review) over the tier; a lane it
+   leaves out keeps the tier's choice. A bad value fails the wave before any agent runs.
 5. **Reconcile** (when the run completes) — read the returned `cards`
    summary. If `halted: true`, any card is `halted`, or the GitHub helper's `--check`
    fails, preserve claims and stop. For verification-readiness (exit 9), repair
@@ -287,6 +290,11 @@ Repeat until a done condition or halt gate fires:
    Append one line per card to the run manifest
    `docs/super-board/runs/<date>-<slug>.md`:
    `| #N | <lanesRun> | <finalStatus> | <column> | <detail> |`.
+   Then the scorecard: save the returned `cards` to a temp file and run
+   `python3 .claude/bin/super-board-scorecard.py record --results <file> --logs <the wave's transcript folder> --scorecard docs/super-board/runs/scorecard.jsonl --wave <date>-<N>`.
+   The transcript folder is the one the Workflow result names; agent logs inside it
+   give tokens and minutes per card. `cardsWithoutLogs` above 0 means the logs were not
+   found: say so once in the report, the rest of the row still counts.
    Then the GitHub-limit step-down: save the returned `cards` to a temp file and run
    `bash .claude/bin/super-board-throttle.sh --config <config-path> --results <file>`.
    `hit: true` (GraphQL at 0, or a lane failed on the limit) has already written
@@ -301,6 +309,12 @@ Repeat until a done condition or halt gate fires:
      ❌ #18 failed: build lane returned no result — retried next wave
    Next: wave 4 (3 cards)   |   ⏸ paused until 14:05   |   ✅ board drained
    ```
+   Add the scorecard as the block's last line(s):
+   `python3 .claude/bin/super-board-scorecard.py summary --scorecard docs/super-board/runs/scorecard.jsonl`
+   prints one line per build model (🟢 working · 🟡 watch · 🔴 not working). Review's
+   `score.cause` says why a card needed fixes: mostly `build` → the builder model is
+   short for those cards, so ask the owner before moving it up; mostly `ticket` →
+   sharpen tickets first, keep the model.
    A throttle hit adds one line: `🐢 GitHub hourly limit hit — max_workers 3 → 2 (config saved)`.
    Merged and bounced cards are counts, not lines — they need nobody. Every
    `human-gate`/`blocked` card gets its line and its owner: that is the
@@ -362,6 +376,7 @@ don't stall on prompts:
     "Bash(python3 .claude/bin/super-board-skills-ready.py:*)",
     "Bash(bash .claude/bin/super-board-usage.sh:*)",
     "Bash(bash .claude/bin/super-board-throttle.sh:*)",
+    "Bash(python3 .claude/bin/super-board-scorecard.py:*)",
     "Bash(bash .claude/bin/super-board-codex-lane.sh:*)",
     "Bash(bash .claude/bin/super-board-codex-wave.sh:*)",
     "Bash(bash .claude/bin/super-board-host.sh:*)",

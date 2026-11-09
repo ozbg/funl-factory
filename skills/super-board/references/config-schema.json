@@ -59,6 +59,19 @@
   //   "high"   — opus for every card
   "model_tier": "medium",
 
+  // Optional per-lane models for Claude waves, over model_tier (factory #25).
+  // Each lane is a model name, "session" (this orchestrator session's model),
+  // or {"low","medium","high"} picked by the card's complexity (a card that
+  // enters past Ready uses "medium"). A lane left out keeps model_tier's choice.
+  // Codex runs ignore it. Moving a lane to a stronger model is the owner's call.
+  "lane_models": {
+    "classify": "haiku",
+    "preflight": "haiku",
+    "build": "haiku",
+    "qa": "haiku",
+    "review": "session"
+  },
+
   // Optional Codex lane settings. Used by explicit `run --codex` and usage
   // fallback; never selects the backend or grants Review/merge ownership.
   "codex": {

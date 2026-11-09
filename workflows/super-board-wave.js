@@ -17,6 +17,9 @@ export const meta = {
 //     lane: 'build' | 'qa' | 'review' — a Ready card labelled `qa` has lane 'qa'
 //     and skips the Builder; every other Ready card is built first (v3.0.0).
 //   tier: 'low' | 'medium' | 'high' (optional, default 'medium'),  // run model ladder
+//   laneModels: config `lane_models` (optional) — per-lane model, over the tier:
+//     { classify, preflight, build, qa, review }, each a model name, 'session'
+//     (inherit the session model), or { low, medium, high } by card complexity.
 // }
 // The harness can deliver `args` as a JSON-encoded string (the tool param is
 // untyped) — normalize before validating.
@@ -37,6 +40,33 @@ const labelsOf = (card) => (card.labels || []).map((l) => String(l).toLowerCase(
 const readyLane = (card) => card.lane || (labelsOf(card).includes('qa') ? 'qa' : 'build')
 if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
   throw new Error(`super-board-wave: unknown tier "${input.tier}" — use low | medium | high`)
+}
+
+// Per-lane models (config `lane_models`, factory #25). Validated up front so a
+// typo fails the wave before any agent runs, never mid-card.
+const LANE_KEYS = ['classify', 'preflight', 'build', 'qa', 'review']
+const LEVELS = ['low', 'medium', 'high']
+const laneModels = input.laneModels || {}
+if (typeof laneModels !== 'object' || Array.isArray(laneModels)) {
+  throw new Error('super-board-wave: laneModels must be an object keyed by lane')
+}
+for (const [k, v] of Object.entries(laneModels)) {
+  if (!LANE_KEYS.includes(k)) throw new Error(`super-board-wave: unknown lane "${k}" in laneModels — use ${LANE_KEYS.join(' | ')}`)
+  const ok = (m) => typeof m === 'string' && m.length > 0
+  const okMap = v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0 &&
+    Object.keys(v).every((l) => LEVELS.includes(l)) && Object.values(v).every(ok)
+  if (!ok(v) && !okMap) throw new Error(`super-board-wave: laneModels.${k} must be a model name, "session", or {low,medium,high}`)
+}
+// The model for a lane: its lane_models setting when there is one, else the
+// tier's choice (`fallback`). 'session' → undefined, so agent() inherits the
+// session model. A complexity map with no class (a card that entered past
+// Ready, never classified) uses its medium cell.
+const pick = (lane, cls, fallback) => {
+  const v = laneModels[lane]
+  if (v === undefined) return fallback
+  const m = typeof v === 'string' ? v : v[(cls && cls.complexity) || 'medium']
+  if (m === undefined) return fallback
+  return m === 'session' ? undefined : m
 }
 
 let halted = false
@@ -83,6 +113,19 @@ const STAGE_SCHEMA = {
         noLongerApplies: { type: 'integer' },
       },
     },
+    // Review lane only: the scorecard (factory #25). Optional, so a missing
+    // score never fails the lane.
+    score: {
+      type: 'object',
+      properties: {
+        verdict: { type: 'string', enum: ['clean', 'fixes', 'rework'] },
+        acsProven: { type: 'integer' },
+        acsTotal: { type: 'integer' },
+        blockers: { type: 'integer' },
+        round: { type: 'integer' },
+        cause: { type: 'string', enum: ['build', 'ticket', 'none'] },
+      },
+    },
   },
   required: ['status', 'column', 'detail'],
 }
@@ -126,6 +169,10 @@ const REVIEW_MEMORY = [
   // Merge policy + migrations live in the gate (run.md → Merge protocol step 5).
   `Merge only via super-board-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema/size): Blocked with the 🙋 template quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve.`,
   `Exit 8 = 🙋 needs you (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked with the 🙋 template, exact commands from its needs-you lines, label needs-you.`,
+  // Scorecard (factory #25): a by-product of the review above, never extra work.
+  `Also return score, from what you already checked: verdict (clean = merge as is · fixes = should-fix only · rework = any blocker),`,
+  `acsProven/acsTotal (ACs a test or probe proved / ACs on the issue), blockers (count), round (1 = first review of this PR, +1 per prior report),`,
+  `cause (none when clean; else build = the code missed a clear AC · ticket = the AC was missing, vague or wrong).`,
 ]
 
 // GitHub budget (rate-limit-etiquette.md → "Price list"). Measured 2026-10-04: a
@@ -182,8 +229,9 @@ const LADDERS = {
 }
 const ladder = LADDERS[input.tier || 'medium']
 const tierFor = (cls) => (cls ? ladder[cls.complexity] : undefined)
+const modelFor = (lane, cls) => pick(lane, cls, tierFor(cls))
 // The classify router writes no code — haiku is fine except on --high runs.
-const classifyModel = (input.tier || 'medium') === 'high' ? 'sonnet' : 'haiku'
+const classifyModel = pick('classify', null, (input.tier || 'medium') === 'high' ? 'sonnet' : 'haiku')
 
 const runLane = async (lane, card, model, history) => {
   if (halted) {
@@ -199,7 +247,7 @@ const runLane = async (lane, card, model, history) => {
   })
   const result = r || { status: 'failed', column: 'unknown', detail: `${lane} agent returned no result` }
   if (result.status === 'halted') halted = true
-  history.push({ lane, ...result })
+  history.push({ lane, model: model || 'session', ...result })
   return result
 }
 
@@ -234,7 +282,7 @@ const PREFLIGHT_SCHEMA = {
   required: ['verdicts'],
 }
 const PREFLIGHT_BATCH = 5
-const preflightModel = (input.tier || 'medium') === 'low' ? 'haiku' : 'sonnet'
+const preflightModel = pick('preflight', null, (input.tier || 'medium') === 'low' ? 'haiku' : 'sonnet')
 const preflightPrompt = (batch) => [
   SKILLS_CHECK(batch),
   READ_FAILURE,
@@ -313,7 +361,7 @@ const results = await pipeline(
   async (prev, card) => {
     const history = []
     if (halted) return { number: card.number, history: [{ lane: 'none', status: 'halted', column: card.status, detail: 'run halted; preserve current work and resume explicitly' }] }
-    const model = tierFor(prev && prev.cls)
+    const cls = prev && prev.cls
     let at = card.status
 
     if (at === 'Ready' && readyLane(card) === 'build') {
@@ -321,7 +369,7 @@ const results = await pipeline(
         history.push(preflightExit(card))
         return { number: card.number, history }
       }
-      const b = await runLane('build', card, model, history)
+      const b = await runLane('build', card, modelFor('build', cls), history)
       if (b.status !== 'advanced') return { number: card.number, history }
       at = 'QA'
     }
@@ -329,24 +377,32 @@ const results = await pipeline(
     // (run.md "Lanes and label routing").
     if (at === 'Ready' && readyLane(card) === 'qa') at = 'QA'
     if (at === 'QA') {
-      const q = await runLane('qa', card, model, history)
+      const q = await runLane('qa', card, modelFor('qa', cls), history)
       if (q.status !== 'advanced') return { number: card.number, history }
       at = 'Review'
     }
     if (at === 'Review') {
-      // Reviewer always on session model. No lane-level serialisation: the merge
-      // gate holds the mutex for the merge alone (see the note above).
-      await runLane('review', card, undefined, history)
+      // Reviewer on the session model unless lane_models.review says otherwise.
+      // No lane-level serialisation: the merge gate holds the mutex for the
+      // merge alone (see the note above).
+      await runLane('review', card, pick('review', cls, undefined), history)
     }
-    return { number: card.number, history }
+    return { number: card.number, complexity: (cls && cls.complexity) || null, history }
   }
 )
 
 const summary = results.filter(Boolean).map((r) => {
   const last = r.history[r.history.length - 1] ||
     { lane: 'none', status: 'failed', column: 'unknown', detail: 'no lane ran' }
+  const modelOf = (lane) => (r.history.find((h) => h.lane === lane) || {}).model || null
+  const review = [...r.history].reverse().find((h) => h.lane === 'review')
   return {
     number: r.number,
+    complexity: r.complexity || null,
+    buildModel: modelOf('build'),
+    qaModel: modelOf('qa'),
+    reviewModel: modelOf('review'),
+    score: (review && review.score) || null,
     finalStatus: last.status,
     lastLane: last.lane,
     column: last.column,

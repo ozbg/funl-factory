@@ -208,21 +208,21 @@ while IFS= read -r BAD; do
   RC=0; SB_CODEX_TEST_RESULT="$BAD" lane build --codex >"$T/out" || RC=$?
   [ "$RC" -eq 1 ] && jq -e '.status == "failed" and .column == "Ready"' "$T/out" >/dev/null || fail "malformed result must fail: $BAD"
 done <<'BAD'
-{"status":"advanced","column":"QA","detail":"d","prUrl":7,"branch":null,"priorFindings":null}
+{"status":"advanced","column":"QA","detail":"d","prUrl":7,"branch":null,"priorFindings":null,"score":null}
 {"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":null,"extra":1}
-{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":{"fixed":1,"noLongerApplies":0}}
-{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":{"fixed":1,"notFixed":true,"noLongerApplies":0}}
-{"status":"advanced","column":"QA","detail":"d","prUrl":null,"priorFindings":null}
-{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":["b"],"priorFindings":null}
-{"status":"done","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":null}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":{"fixed":1,"noLongerApplies":0},"score":null}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":{"fixed":1,"notFixed":true,"noLongerApplies":0},"score":null}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"priorFindings":null,"score":null}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":["b"],"priorFindings":null,"score":null}
+{"status":"done","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":null,"score":null}
 ["status","advanced"]
 BAD
 while IFS= read -r GOOD; do
   SB_CODEX_TEST_RESULT="$GOOD" lane build --codex >"$T/out" || fail "valid result must exit 0: $GOOD"
   [ "$(cat "$T/out")" = "$(jq -c . <<<"$GOOD" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)))')" ] || fail "valid result must print unchanged: $GOOD"
 done <<'GOOD'
-{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":null}
-{"status":"advanced","column":"QA","detail":"d","prUrl":"https://github.com/o/r/pull/2","branch":"sb/1","priorFindings":{"fixed":2,"notFixed":0,"noLongerApplies":1}}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":null,"score":null}
+{"status":"advanced","column":"QA","detail":"d","prUrl":"https://github.com/o/r/pull/2","branch":"sb/1","priorFindings":{"fixed":2,"notFixed":0,"noLongerApplies":1},"score":null}
 GOOD
 
 CARDS='[{"number":1,"status":"Ready"},{"number":2,"status":"Ready","labels":["qa"]},{"number":3,"status":"QA"},{"number":4,"status":"Review"}]'
