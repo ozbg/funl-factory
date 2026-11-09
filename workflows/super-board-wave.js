@@ -360,34 +360,44 @@ const results = await pipeline(
   // from wherever it landed (the board is the loop state, not this script).
   async (prev, card) => {
     const history = []
-    if (halted) return { number: card.number, history: [{ lane: 'none', status: 'halted', column: card.status, detail: 'run halted; preserve current work and resume explicitly' }] }
     const cls = prev && prev.cls
+    // Every exit carries the classified complexity (#33).
+    const done = () => ({ number: card.number, complexity: (cls && cls.complexity) || null, history })
+    if (halted) {
+      history.push({ lane: 'none', status: 'halted', column: card.status, detail: 'run halted; preserve current work and resume explicitly' })
+      return done()
+    }
     let at = card.status
+    // Each lane sees the card where it is now, not where the wave found it (#32):
+    // a card that just built is in QA, never a qa-labelled Ready card.
+    const now = () => ({ ...card, status: at })
 
     if (at === 'Ready' && readyLane(card) === 'build') {
       if (!preflightGo(card)) {
         history.push(preflightExit(card))
-        return { number: card.number, history }
+        return done()
       }
-      const b = await runLane('build', card, modelFor('build', cls), history)
-      if (b.status !== 'advanced') return { number: card.number, history }
+      const b = await runLane('build', now(), modelFor('build', cls), history)
+      if (b.status !== 'advanced') return done()
       at = 'QA'
     }
     // A `qa`-labelled card skips Building: Ready → QA, Tester first
     // (run.md "Lanes and label routing").
-    if (at === 'Ready' && readyLane(card) === 'qa') at = 'QA'
+    // A qa card keeps status Ready for its Tester prompt (the skip-Building instruction).
+    const qaEntry = at === 'Ready' && readyLane(card) === 'qa'
+    if (qaEntry) at = 'QA'
     if (at === 'QA') {
-      const q = await runLane('qa', card, modelFor('qa', cls), history)
-      if (q.status !== 'advanced') return { number: card.number, history }
+      const q = await runLane('qa', qaEntry ? card : now(), modelFor('qa', cls), history)
+      if (q.status !== 'advanced') return done()
       at = 'Review'
     }
     if (at === 'Review') {
       // Reviewer on the session model unless lane_models.review says otherwise.
       // No lane-level serialisation: the merge gate holds the mutex for the
       // merge alone (see the note above).
-      await runLane('review', card, pick('review', cls, undefined), history)
+      await runLane('review', now(), pick('review', cls, undefined), history)
     }
-    return { number: card.number, complexity: (cls && cls.complexity) || null, history }
+    return done()
   }
 )
 

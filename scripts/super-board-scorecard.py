@@ -168,7 +168,7 @@ def summary(a):
         by_card.setdefault(r["card"], []).append(r)
     groups = {}
     for card, rs in by_card.items():
-        model = next((r["buildModel"] for r in rs if r.get("buildModel")), None) or "unbuilt (qa cards)"
+        model = next((r["buildModel"] for r in rs if r.get("buildModel")), None) or "not built in these waves"
         groups.setdefault(model, []).append(rs)
     for model in sorted(groups):
         cards = groups[model]
