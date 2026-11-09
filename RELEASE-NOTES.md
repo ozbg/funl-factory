@@ -19,6 +19,10 @@ Each lane gets its own model, and Review keeps a scorecard that shows whether ch
   `verification-before-completion` and `testing-strategy` fall back to short checklists in
   `decision-policy.md` ("Verify before done", "Testing strategy"), as `ponytail` does. An
   installed skill still wins.
+- 🐛 **QA after Build in the same wave no longer reads as a qa card** (#32). Each lane gets
+  the card at its current column, so a just-built card's Tester is not told to skip Building.
+- 🐛 **Every summary row keeps its complexity** (#33), including cards held, bounced or failed
+  mid-chain. The scorecard groups cards built before these waves as "not built in these waves".
 - 🧪 `test-wave-lane-models.sh` and `test_scorecard.py`; the Codex schema and summary
   contract tests cover the new fields.
 
