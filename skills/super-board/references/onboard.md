@@ -418,6 +418,7 @@ don't stall on prompts:
     "Bash(bash .claude/bin/super-board-throttle.sh:*)",
     "Bash(python3 .claude/bin/super-board-scorecard.py:*)",
     "Bash(python3 .claude/bin/super-board-zone.py:*)",
+    "Bash(python3 .claude/bin/super-board-coverage.py:*)",
     "Bash(.claude/bin/super-qa-file-bug.sh:*)", "Bash(.claude/bin/super-review-file-refactor.sh:*)",
     "Bash(bash .claude/bin/super-board-host.sh:*)",
     "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",

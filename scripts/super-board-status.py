@@ -512,6 +512,31 @@ def render_kanban(
     return "\n".join(boxes)
 
 
+def coverage_line(items: list[dict[str, Any]], milestone: str) -> str | None:
+    """One-line milestone summary from super-board-coverage.py, or None.
+
+    None when coverage.md is missing, the helper is absent, or it fails —
+    status never breaks over coverage.
+    """
+    if not Path("docs/shape/coverage.md").is_file():
+        return None
+    helper = Path(__file__).with_name("super-board-coverage.py")
+    if not helper.is_file():
+        return None
+    board = json.dumps([{"number": i["number"], "status": i["status"]} for i in items])
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(helper), "status", "--repo-path", ".",
+             "--board-json", "-", "--milestone", milestone, "--json"],
+            input=board, capture_output=True, text=True, timeout=30,
+        )
+        if proc.returncode != 0:
+            return None
+        return json.loads(proc.stdout).get("line")
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
 def main() -> int:
     config_slug = resolve_config_slug(sys.argv)
     if not valid_slug(config_slug):
@@ -768,6 +793,15 @@ def main() -> int:
     health_line = latest_health(Path(runs_dir) / "scorecard.jsonl")
     if health_line:
         print(f"   {health_line}")
+
+    # ── milestone coverage (silent when docs/shape/coverage.md is missing) ──
+    line = coverage_line(
+        items, (cfg.get("goal") or {}).get("milestone") or "M1"
+    )
+    if line:
+        print()
+        print("▎Milestone")
+        print(f"   {line}")
 
     return 0
 
