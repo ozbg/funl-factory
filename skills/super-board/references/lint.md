@@ -53,7 +53,10 @@ PHASE 2 — Read the project, then ask "do I understand it?"
 PHASE 3 — Scan summary (flag only what needs work)
   ├─ Score each issue (silent pass): clear / vague / missing
   ├─ Show one-line goal: "🎯 What this board is collectively trying to do: ..."
-  └─ Show flagged count + IDs: "4 issues need your attention: #12, #19, #23, #31"
+  ├─ Show flagged count + IDs: "4 issues need your attention: #12, #19, #23, #31"
+  └─ Show the planner's verdict: run `super-board-wave-plan.sh --config <cfg>` and list
+     each `refused` card with its reason and each `deferred` card ("overlap"); every
+     other free Ready card is admitted. Lint shows this, it never recomputes it.
 
 PHASE 4 — Deep-dive flagged issues (skill-routed, PM voice, one at a time)
 
@@ -79,7 +82,7 @@ PHASE 7 — Final summary + session-reset nudge
 
 ---
 
-## Lint criteria — 20-criterion table
+## Lint criteria — 22-criterion table
 
 An issue is flagged if any of these apply. An issue can fail multiple criteria; all firing criteria are surfaced in Phase 4.
 
@@ -105,6 +108,8 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 18 | Context steps not lettered under Where, more than one step per line, or chained with arrows | "Where: /x — sign in → open Receipts → drop file" | Rewrite as `- **Where:** …` then `  - a. Sign in` / `  - b. …`, one per line; embed the screenshot (raw URL pinned to a sha), never link it |
 | 19 | Unsettled new ownership boundary, new/changed public interface, or architecture expensive to reverse; no adequate applicable design record | Two callers could each own the new shared state, with no recorded choice | Follow [design preflight](design-preflight.md); compare two sketches and propose a choice in Context |
 | 20 | Ready card with no milestone, or not on the config's `goal.milestone` (factory #40) | A refactor in Ready with no milestone | Ask the owner which goal it serves; with none, move it to Backlog |
+| 21 | No `Must-have served:` line, or it names a number not under `## Must have` in `docs/shape/north-star.md` (bug and qa cards exempt); or 0 AC checkboxes | Planner `refused` reason | Ask which must-have it serves; with none, move it to Backlog |
+| 22 | Card lines missing (ticket-format.md): `Scenario:`, `Zone:` (green/amber/red), `Files:`, `Fit for purpose:`, `Out of scope:` | No `Files:` line, so the card runs alone | Draft each one line under Context |
 
 Criterion 19 is conditional. Read the current flow, owners/callers and applicable specs/ADRs
 before flagging it. Labels alone do not trigger it. Ordinary bugs, mechanical refactors and
@@ -273,7 +278,7 @@ Before declaring lint complete, the worker MUST verify all three:
 
 - [ ] `docs/super-board/pre-flight.md` exists and lists every credential / tool / env signal encountered while scanning issues + PROJECT.md.
 - [ ] Every issue in active-pipeline columns (Ready, Building, QA, Review) either:
-  - has a populated `## Acceptance Criteria` section that passes all 20 criteria (conditional #19 only when triggered), OR
+  - has a populated `## Acceptance Criteria` section that passes all 22 criteria (conditional #19 only when triggered), OR
   - was dropped on purpose (closed as not planned, Done, `🤷 dropped` comment), OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
 - [ ] No issue is left in an in-between state (flagged but not resolved, partially edited, or awaiting user input that never came).

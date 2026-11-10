@@ -118,4 +118,13 @@ get 2  '.needsYou == false and .needsYouDone == false' || fail "an ordinary card
 get 29 '.parseable == true and .blockers == [] and .humanGated == false and .runnable == true' || fail "#29: blocked-by: none must free the card"
 get 30 '.parseable == true and .blockers == [] and .runnable == true' || fail "#30: blocked-by: Nothing must free the card"
 
-echo "PASS: test-deps.sh (20 scenarios)"
+# 20 — card lines the planner gates on: ACs counted under the AC heading only,
+#      `Must-have served:` numbers, `Files:` prefixes (bullet, bold, backticks allowed).
+CARD=$(mktemp); trap 'rm -f "$CARD"' EXIT
+jq -n '[{number:1,title:"t",state:"OPEN",body:"## Context\n- **Files:** `src/a/`, docs/x.md\n- **Must-have served:** 1, 3\n\n## Acceptance Criteria\n- [ ] one\n- [x] two\n- plain\n\n## Risk\n- [ ] not an AC\n\n## Blocked by\n- None."},
+        {number:2,title:"u",state:"OPEN",body:"## Acceptance Criteria\n(none yet)\n\n## Blocked by\n- None."}]' > "$CARD"
+OUT=$("$DEPS" --from "$CARD")
+get 1 '.acs == 2 and .mustHave == [1,3] and .files == ["src/a/","docs/x.md"]' || fail "card lines: $(echo "$OUT" | jq -c '.["1"]')"
+get 2 '.acs == 0 and .mustHave == null and .files == null' || fail "absent card lines: $(echo "$OUT" | jq -c '.["2"]')"
+
+echo "PASS: test-deps.sh (21 scenarios)"
