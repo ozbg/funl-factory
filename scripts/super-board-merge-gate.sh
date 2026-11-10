@@ -88,6 +88,13 @@
 #      commit. Stdout has one `deep-review: <why>` line. Nothing ran, nothing
 #      merged, no human: the Reviewer runs the full review on its strongest
 #      model (truth-check included), posts it, adds the label, and re-runs.
+#  13  acceptance checklist not met: the PR body's `ac` block (lanes/common.md) has
+#      no checklist, an unticked AC, or a ticked AC whose proof line does not cite
+#      `path` / `path:line` of a file that exists at the pinned head SHA. Proof must
+#      be a file or test path; "manual: screenshot" is refused. Stdout has one line
+#      per failing AC (`AC2: unticked`, `AC3: proof tests/x.ts not in <sha>`) or
+#      `no acceptance checklist`. Nothing merged: the card → Build, citing the AC.
+#      Checked inside the lock after the build proof; --dry-run checks it too.
 #  11  the PR is a draft: run `gh pr ready <PR>` and re-run. Never halts.
 #  12  a GitHub read came back empty or malformed (the head read): retry the
 #      gate next wave; the card stays in Review. Never halts.
@@ -348,6 +355,41 @@ done
 say "verified green against ${BASE} (${#VERIFY[@]} command(s))"
 
 python3 "$GITHUB_READ" --check
+
+# ---- acceptance checklist (inside the lock, after the build proof) ----------
+# No partial merge: every AC in the PR body's `ac` block must be ticked and cite
+# a file that exists at the pinned head. The verify run above is the "tests
+# passed" proof; this checks the claim names something real. Script, no judgement.
+AC_OUT=$(jq -r '.body // ""' "$META" | python3 -c '
+import re, subprocess, sys
+repo, sha = sys.argv[1], sys.argv[2]
+body = sys.stdin.read()
+m = re.search(r"<!-- sb:ac -->(.*?)<!-- /sb:ac -->", body, re.S)
+lines = m.group(1).splitlines() if m else []
+items = []
+for ln in lines:
+    t = re.match(r"\s*- \[( |x|X)\]", ln)
+    if t: items.append([t.group(1) != " ", ""])
+    elif items and "\u21b3" in ln and not items[-1][1]: items[-1][1] = ln.split("\u21b3", 1)[1].strip()
+if not items:
+    print("no acceptance checklist"); sys.exit(0)
+for i, (ticked, proof) in enumerate(items, 1):
+    if not ticked: print("AC%d: unticked" % i); continue
+    b = re.search(r"`([^`]+)`", proof)
+    cand = (b.group(1) if b else (proof.split() or [""])[0]).strip().rstrip(",;.")
+    pm = re.fullmatch(r"([^\s:`]+?)(?::\d+(?:[-:]\d+)*)?", cand)
+    if not pm or not re.search(r"[/.]", pm.group(1)):
+        print("AC%d: proof is not a file path (%s)" % (i, proof[:60] or "none")); continue
+    path = pm.group(1)
+    if subprocess.run(["git", "-C", repo, "cat-file", "-e", sha + ":" + path], capture_output=True).returncode != 0:
+        print("AC%d: proof %s not in %s" % (i, path, sha))
+' "$REPO_PATH" "$HEAD_SHA")
+if [ -n "$AC_OUT" ]; then
+  echo "$AC_OUT"
+  say "acceptance checklist not met — send it back to Build citing each AC (no partial merge: build it or split it)"
+  exit 13
+fi
+say "acceptance checklist: every AC ticked and proven at ${HEAD_SHA}"
 
 # ---- migrations (inside the lock, after the build proof) -------------------
 # Run the configured migrate command for every allowed env, from the verified

@@ -114,7 +114,8 @@ head_setup() {
   git -C "$TMP" -c user.email=t@t -c user.name=t commit -q --allow-empty -m base
   git -C "$TMP" remote add origin "$ORIGIN"; git -C "$TMP" push -q origin staging
   git -C "$TMP" checkout -q -b feat
-  git -C "$TMP" -c user.email=t@t -c user.name=t commit -q --allow-empty -m feat
+  echo proof > "$TMP/proof.txt"; git -C "$TMP" add proof.txt
+  git -C "$TMP" -c user.email=t@t -c user.name=t commit -q -m feat
   git -C "$TMP" push -q origin feat; git -C "$TMP" checkout -q staging
   SHA=$(git -C "$TMP" rev-parse feat)
   mkdir -p "$TMP/bin"; export GH_LOG="$TMP/gh.log"; : > "$GH_LOG"
@@ -131,7 +132,8 @@ case "$1 $2" in
     esac
     case "$*" in *labels*)
       if [ -n "${STUB_META_AFTER:-}" ] && [ -f "$STUB_VERIFIED" ]; then printf '%s\n' "$STUB_META_AFTER"; exit 0; fi
-      if [ -n "${STUB_META:-}" ]; then printf '%s\n' "$STUB_META"; else echo '{"files":[],"labels":[],"body":"","additions":0,"deletions":0,"changedFiles":0}'; fi
+      { if [ -n "${STUB_META:-}" ]; then printf '%s\n' "$STUB_META"; else echo '{"files":[],"labels":[],"body":"","additions":0,"deletions":0,"changedFiles":0}'; fi; } \
+        | jq -c --arg raw "${STUB_RAW_BODY:-}" 'if $raw != "" or ((.body // "") | contains("sb:ac")) then . else .body = ((.body // "") + "\n<!-- sb:ac -->\n- [x] done\\\n  ↳ `proof.txt:1`\n<!-- /sb:ac -->") end'
       exit 0 ;; esac
     if [ -n "${STUB_HEAD+x}" ]; then printf '%s' "$STUB_HEAD"; exit 0; fi
     oid="$STUB_OID"; grep -q '^pr merge' "$GH_LOG" && oid="${STUB_OID_AFTER:-$STUB_OID}"
@@ -632,6 +634,33 @@ jq '.verify_commands = ["", " ", "git rev-parse --verify nonexistent-ref"]' "$TM
 RC=0; STUB_OID="$SHA" "$GATE" --config "$TMP/failing.json" --pr 1 --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 2 ] || fail "failed configured project check must exit 2, got $RC"
 grep -q '^pr merge' "$GH_LOG" && fail "failed check must not merge"
+teardown
+
+# 26 — acceptance checklist (exit 13): unticked, missing proof file, no block, non-path proof
+#      are refused with the AC named; every AC ticked and proven merges.
+ac_meta() { meta "" "src/a.ts" "$1"; }
+ac_run() { RC=0; OUT=$(STUB_RAW_BODY=1 STUB_OID="$SHA" STUB_META="$(ac_meta "$1")" gate --expect-head "$SHA" 2>&1) || RC=$?; }
+head_setup
+ac_run $'<!-- sb:ac -->\n- [x] one\\\n  ↳ `proof.txt:1`\n- [ ] two\\\n  ↳ not verified yet\n<!-- /sb:ac -->'
+[ "$RC" -eq 13 ] || fail "an unticked AC must exit 13, got $RC: $OUT"
+echo "$OUT" | grep -q '^AC2: unticked$' || fail "should name AC2, got: $OUT"
+echo "$OUT" | grep -q '^AC1' && fail "a proven AC must not be listed"
+grep -q '^pr merge' "$GH_LOG" && fail "an unticked AC must not merge"
+[ ! -d "$LOCK" ] || fail "the lock must be released on exit 13"
+ac_run $'<!-- sb:ac -->\n- [x] one\\\n  ↳ `tests/x.test.ts:3`\n<!-- /sb:ac -->'
+[ "$RC" -eq 13 ] || fail "a missing proof file must exit 13, got $RC"
+echo "$OUT" | grep -q "^AC1: proof tests/x.test.ts not in $SHA\$" || fail "should name the missing file, got: $OUT"
+ac_run $'<!-- sb:ac -->\n- [x] one\\\n  ↳ manual: screenshot\n<!-- /sb:ac -->'
+[ "$RC" -eq 13 ] || fail "a non-path proof must exit 13, got $RC"
+ac_run "no checklist here"
+[ "$RC" -eq 13 ] || fail "no ac block must exit 13, got $RC"
+echo "$OUT" | grep -q 'no acceptance checklist' || fail "should say no acceptance checklist, got: $OUT"
+grep -q '^pr merge' "$GH_LOG" && fail "a refused checklist must not merge"
+RC=0; STUB_RAW_BODY=1 STUB_OID="$SHA" STUB_META="$(ac_meta "no checklist")" gate --expect-head "$SHA" --dry-run >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 13 ] || fail "--dry-run must check the checklist too, got $RC"
+ac_run $'<!-- sb:ac -->\n- [x] one\\\n  ↳ `proof.txt:1` · passes\n- [X] two\\\n  ↳ `proof.txt`\n<!-- /sb:ac -->'
+[ "$RC" -eq 0 ] || fail "every AC ticked and proven should merge, got $RC: $OUT"
+grep -q '^pr merge' "$GH_LOG" || fail "a proven checklist must merge"
 teardown
 
 echo "PASS: test-merge-gate.sh (merge, policy and approval scenarios)"

@@ -101,6 +101,7 @@ on the base branch**.
     10 → deep review: a non-red PR over `auto_max_lines` (600 source lines). Stdout
           has a `deep-review: <why>` line. No human. Run the **deep review** below,
           then re-run the gate with the same `--expect-head`
+    13 → acceptance checklist not met (no `ac` block, an unticked AC, or a proof that is not a file at the head). Stdout names each AC. Bounce to Build citing it; never Blocked, never merge around it
     11 → the PR is a draft: `gh pr ready <PR>`, then re-run the gate. Never Blocked
     12 → a GitHub read came back empty or malformed: leave the card in Review, the
           next wave re-runs the gate. Never Blocked, never a halt

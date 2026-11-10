@@ -117,6 +117,12 @@ Status card lines: `> [!NOTE]` + `🔨 Building` / `⏳ In QA` / `⏳ In review 
 `> [!TIP]` + `✅ Merged · <sha>` · `> [!WARNING]` + `🛑 Blocked · <reason>`. Each names the AC
 count and the head commit, so evidence is never read against a different one.
 
+**No partial merge.** The gate (exit 13) refuses a PR whose `ac` block has an unticked AC, or a
+ticked one whose proof line does not cite `path` or `path:line` of a file at the head (a test or
+file, never "manual"). An AC that cannot be met is built, or split: the builder files a Backlog
+card holding that AC (`super-qa-file-bug.sh --column Backlog --kind feature`, body links `#<this>`),
+deletes the AC from this card's checklist and writes one line `AC<n> moved to #<N>` in `solution`.
+
 No "Not verified" and no "Next" section: an unchecked AC with its one-line reason says what is
 not proven. Merged with a failing check (the 💳 CI-budget bypass) → the Reviewer writes the
 `redcheck` block first:

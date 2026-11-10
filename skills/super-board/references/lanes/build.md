@@ -71,6 +71,7 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
    moving code, never by editing the lint config or `zones.yaml`. A `foundation` card runs alone.
    Over `merge_policy.auto_max_lines` (600) → deeper review, the owner only if red. Far past it
    mid-build → stop, push, propose the split (`/to-tickets`) in a PR comment, Blocked `❓`.
+4b. **No partial merge.** Every AC is built, or split off (common.md → "No partial merge"): file a linked Backlog card with that AC, remove it here, note `AC<n> moved to #<N>`. Never leave one unticked for the gate to find.
 5. Commit + push (always). Commits follow writing-standard.md § 1 (`✨ [feat] chat: stream replies` + short bullets).
 6. Open draft PR linked to the issue with the PR description template (title in commit-subject format, every block filled).
 7. Follow [PR author notes](pr-author-notes.md), then post the `[builder] [report]` PR comment (see "Commenting cadence").
