@@ -323,6 +323,21 @@ def test_paginate_items_stops_when_cursor_missing() -> None:
     assert hit_cap is False  # we returned early, not at the cap
 
 
+def test_latest_health_line() -> None:
+    import json
+    import tempfile
+    d = Path(tempfile.mkdtemp())
+    sc = d / "scorecard.jsonl"
+    assert sbs.latest_health(sc) is None
+    sc.write_text("\n".join(json.dumps(r) for r in [
+        {"card": 1, "wave": "w1"},
+        {"event": "health", "wave": "w1", "action": "continue", "breaches": []},
+        {"event": "health", "wave": "w2", "action": "pause-new", "breaches": ["round-capped"]},
+        {"event": "demo", "accepted": True},
+    ]) + "\n")
+    assert sbs.latest_health(sc) == "health: pause-new · round-capped · wave w2"
+
+
 def test_board_order_matches_github_columns() -> None:
     """Kanban columns run left to right as on the board, Backlog included."""
     assert sbs.BOARD_ORDER == (
