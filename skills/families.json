@@ -51,7 +51,7 @@
     "title": "Retired — pruned from apps on install",
     "install": "prune",
     "sources": ["mattpocock/skills", "cloudflare/security-audit-skill"],
-    "user_wide": "npx skills add -g mattpocock/skills --skill setup-matt-pocock-skills --skill setup-ts-deep-modules --skill setup-pre-commit --skill git-guardrails-claude-code; npx skills add -g ozbg/funl-factory --skill visual",
+    "user_wide": "npx skills add -g mattpocock/skills --skill setup-matt-pocock-skills --skill setup-ts-deep-modules --skill setup-pre-commit --skill git-guardrails-claude-code; npx skills add -g ozbg/funl-factory-master --skill visual",
     "names": {
       "to-spec": "replaced by to-board",
       "to-tickets": "replaced by to-board",
