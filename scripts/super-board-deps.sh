@@ -45,12 +45,14 @@
 #             "blockers": [32,36], "openBlockers": [32],
 #             "parseable": true, "humanGated": false, "runnable": false, "why": "",
 #             "needsYou": false, "needsYouDone": false,
-#             "acs": 3, "mustHave": [1,3], "files": ["src/a/","docs/x.md"] } }
+#             "acs": 3, "mustHave": [1,3], "files": ["src/a/","docs/x.md"],
+#             "judgement": false } }
 #
 # Card lines the wave planner gates on (ticket-format.md):
 # `acs` — `- [ ]` / `- [x]` lines under the last `## Acceptance Criteria`.
 # `mustHave` — numbers on the last `Must-have served:` line; null with no line.
 # `files` — comma-separated path prefixes on the last `Files:` line; null with no line.
+# `judgement` — true when the last `Needs judgement:` line starts with `yes` (any case).
 #
 # `needsYou` — the newest Block comment carries the 🙋 reason tag, or the issue
 # has the `needs-you` label: a human-only command is waiting (block-template.md).
@@ -219,7 +221,9 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
                       | if . == null then null else [ scan("[0-9]+") | tonumber ] end ),
           files: ( ($i.body // "") | card_line("Files")
                    | if . == null then null
-                     else [ split(",")[] | gsub("^[ \t`]+|[ \t`]+$"; "") | select(. != "") ] end ) }
+                     else [ split(",")[] | gsub("^[ \t`]+|[ \t`]+$"; "") | select(. != "") ] end ),
+          judgement: ( ($i.body // "") | card_line("Needs judgement")
+                       | . != null and test("^[ \t]*yes([^a-zA-Z]|$)"; "i") ) }
     ]
   | ( if $filter == null then . else map(select(.number as $n | $filter | index($n))) end )
   | INDEX(.number | tostring)' | python3 "$(dirname "${BASH_SOURCE[0]}")/super-board-approval.py" --deps --repo "$APPROVAL_REPO"

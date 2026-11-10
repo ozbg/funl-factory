@@ -25,6 +25,9 @@ export const meta = {
 //   laneModelsByTier: config `lane_models_by_tier` (optional) — per zone tier,
 //     over laneModels: { green, amber, red }, each { build, qa, review } → a model
 //     name or 'session'. Absent = today's choices. E.g. { red: { build: 'session' } }.
+//   laneModelsJudgement: config `lane_models_judgement` (optional) — { build, qa, review }
+//     → a model name or 'session', for a card with `judgement: true` (the planner's
+//     read of `**Needs judgement:** yes`). Wins over laneModelsByTier.
 // }
 // The harness can deliver `args` as a JSON-encoded string (the tool param is
 // untyped) — normalize before validating.
@@ -79,15 +82,27 @@ for (const [t, lanes] of Object.entries(byTier)) {
     if (typeof m !== 'string' || !m) throw new Error(`super-board-wave: laneModelsByTier.${t}.${k} must be a model name or "session"`)
   }
 }
-const pick = (lane, cls, fallback, tier) => {
-  const t = tier && byTier[tier] && byTier[tier][lane]
-  if (t) return t === 'session' ? undefined : t
-  const v = laneModels[lane]
-  if (v === undefined) return fallback
-  const m = typeof v === 'string' ? v : v[(cls && cls.complexity) || 'medium']
-  if (m === undefined) return fallback
-  return m === 'session' ? undefined : m
+const byJudgement = input.laneModelsJudgement || {}
+if (typeof byJudgement !== 'object' || Array.isArray(byJudgement)) {
+  throw new Error('super-board-wave: laneModelsJudgement must be an object keyed by lane')
 }
+for (const [k, m] of Object.entries(byJudgement)) {
+  if (!['build', 'qa', 'review'].includes(k)) throw new Error(`super-board-wave: unknown lane "${k}" in laneModelsJudgement — use build | qa | review`)
+  if (typeof m !== 'string' || !m) throw new Error(`super-board-wave: laneModelsJudgement.${k} must be a model name or "session"`)
+}
+// Precedence: judgement map (flagged card, lane present) > tier map > laneModels > fallback.
+// Returns the model and the rule that chose it: 'judgement' | 'tier' | 'default'.
+const pickRule = (lane, cls, fallback, tier, judgement) => {
+  const j = judgement === true && byJudgement[lane]
+  if (j) return { model: j === 'session' ? undefined : j, rule: 'judgement' }
+  const t = tier && byTier[tier] && byTier[tier][lane]
+  if (t) return { model: t === 'session' ? undefined : t, rule: 'tier' }
+  const v = laneModels[lane]
+  const m = v === undefined ? undefined : typeof v === 'string' ? v : v[(cls && cls.complexity) || 'medium']
+  if (m === undefined) return { model: fallback, rule: 'default' }
+  return { model: m === 'session' ? undefined : m, rule: 'default' }
+}
+const pick = (lane, cls, fallback, tier, judgement) => pickRule(lane, cls, fallback, tier, judgement).model
 
 let halted = false
 // Valid form per --kind, from validate() in scripts/super-board-github-read.py (#32).
@@ -282,11 +297,12 @@ const LADDERS = {
 }
 const ladder = LADDERS[input.tier || 'medium']
 const tierFor = (cls) => (cls ? ladder[cls.complexity] : undefined)
-const modelFor = (lane, cls, zone) => pick(lane, cls, tierFor(cls), zone)
+const modelFor = (lane, cls, zone, card) => pickRule(lane, cls, tierFor(cls), zone, card && card.judgement)
 // The classify router writes no code — haiku is fine except on --high runs.
 const classifyModel = pick('classify', null, (input.tier || 'medium') === 'high' ? 'sonnet' : 'haiku')
 
-const runLane = async (lane, card, model, history, opts) => {
+const runLane = async (lane, card, chosen, history, opts) => {
+  const { model, rule: modelRule } = chosen || {}
   if (halted) {
     const result = { status: 'halted', column: card.status, detail: 'run halted; preserve work and repair the reported readiness or evidence problem' }
     history.push({ lane, ...result })
@@ -300,7 +316,7 @@ const runLane = async (lane, card, model, history, opts) => {
   })
   const result = r || { status: 'failed', column: 'unknown', detail: `${lane} agent returned no result` }
   if (result.status === 'halted') halted = true
-  history.push({ lane, model: model || 'session', ...result })
+  history.push({ lane, model: model || 'session', modelRule: modelRule || 'default', ...result })
   return result
 }
 
@@ -511,7 +527,7 @@ const results = await pipeline(
         history.push(preflightExit(card))
         return done()
       }
-      const b = await runLane('build', now(), modelFor('build', cls, zone), history)
+      const b = await runLane('build', now(), modelFor('build', cls, zone, card), history)
       if (b.status !== 'advanced') return done()
       zone = highest(zone, b.tier)
       // Green skips QA (lanes/qa.md step 4): Build → Review. Only on the
@@ -525,7 +541,7 @@ const results = await pipeline(
     const qaEntry = at === 'Ready' && readyLane(card) === 'qa'
     if (qaEntry) at = 'QA'
     if (at === 'QA') {
-      const q = await runLane('qa', qaEntry ? card : now(), modelFor('qa', cls, zone), history)
+      const q = await runLane('qa', qaEntry ? card : now(), modelFor('qa', cls, zone, card), history)
       if (q.status === 'bounced') {
         if (!(await judgeBounce('qa', card, q, history))) return done()
       } else if (q.status !== 'advanced') return done()
@@ -536,7 +552,7 @@ const results = await pipeline(
       // Reviewer on the session model unless lane_models.review says otherwise.
       // No lane-level serialisation: the merge gate holds the mutex for the
       // merge alone (see the note above).
-      const r = await runLane('review', now(), pick('review', cls, undefined, zone), history, { greenEntry })
+      const r = await runLane('review', now(), pickRule('review', cls, undefined, zone, card.judgement), history, { greenEntry })
       if (r.status === 'bounced') await judgeBounce('review', card, r, history)
       zone = highest(zone, r.tier)
     }
@@ -562,6 +578,7 @@ const summary = results.filter(Boolean).map((r) => {
     buildModel: modelOf('build'),
     qaModel: modelOf('qa'),
     reviewModel: modelOf('review'),
+    modelRules: Object.fromEntries(['build', 'qa', 'review'].map((l) => [l, (r.history.find((h) => h.lane === l) || {}).modelRule || null])),
     score: (review && review.score) || null,
     finalStatus: last.status,
     lastLane: last.lane,
