@@ -35,36 +35,6 @@ class VerificationReadiness(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "")
 
-    def test_codex_entry_points_halt_before_launching_or_touching_owned_state(self):
-        for launcher in ("super-board-codex-lane.sh", "super-board-lane.sh", "super-board-codex-wave.sh"):
-            with self.subTest(launcher=launcher), tempfile.TemporaryDirectory() as tmp:
-                root = pathlib.Path(tmp)
-                subprocess.run(["git", "init", "-q", str(root)], check=True)
-                config = root / "config.json"
-                config.write_text(json.dumps({"verify_commands": []}))
-                lock = root / ".claude/super-board/inflight/1"
-                lock.parent.mkdir(parents=True)
-                lock.write_text("owned state")
-                binary = root / "bin/codex"
-                binary.parent.mkdir()
-                binary.write_text("#!/bin/sh\ntouch called\nexit 9\n")
-                binary.chmod(0o755)
-                card = {"number": 1, "status": "Review", "title": "example"}
-                args = (["--card", json.dumps(card), "--lane", "review"] if "lane" in launcher
-                        else ["--cards", json.dumps([card])])
-                if launcher == "super-board-lane.sh":
-                    args = ["--backend", "codex"] + args
-                result = subprocess.run(["bash", str(ROOT / "scripts" / launcher),
-                                         "--config", str(config), "--codex"] + args,
-                                        cwd=root, env=dict(os.environ, PATH=str(binary.parent) + ":" + os.environ["PATH"]),
-                                        capture_output=True, text=True)
-                self.assertEqual(result.returncode, 9, result.stderr)
-                self.assertTrue(json.loads(result.stdout)["status"] == "halted" if "lane" in launcher
-                                else json.loads(result.stdout)["halted"])
-                self.assertEqual(lock.read_text(), "owned state")
-                self.assertFalse((root / "called").exists())
-                self.assertFalse((root / ".claude/super-board/codex-wave.pid").exists())
-
     def test_setup_reports_configuration_error_without_inventing_checks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
@@ -80,18 +50,6 @@ class VerificationReadiness(unittest.TestCase):
             text = subprocess.run(command + ["--text"], capture_output=True, text=True)
             self.assertIn("verification-readiness", text.stdout)
             self.assertEqual(json.loads(cfg.read_text())["verify_commands"], [" "])
-
-    def test_legacy_run_stops_before_creating_run_state(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = pathlib.Path(tmp)
-            cfg = root / ".claude/super-board/configs/app.json"
-            cfg.parent.mkdir(parents=True)
-            cfg.write_text(json.dumps({"worker_backend": "claude-p", "verify_commands": []}))
-            result = subprocess.run(["bash", str(ROOT / "scripts/super-board-run.sh"), "app"],
-                                    cwd=root, capture_output=True, text=True)
-            self.assertEqual(result.returncode, 9, result.stderr)
-            self.assertFalse((root / "docs").exists())
-            self.assertFalse((root / ".claude/super-board/inflight").exists())
 
 
 if __name__ == "__main__":

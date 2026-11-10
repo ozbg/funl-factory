@@ -302,7 +302,7 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 - **`qa` card:** review the QA report quality and any test diff; there is no product-code diff.
 
 ### Lifecycle (Reviewer)
-See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the sub-steps:
+See `.claude/skills/super-board/references/lanes/review.md` → Reviewer. Summary of the sub-steps:
 
 1. Worktree from current state of `issue-<N>-<slug>`.
 2. **Gate 1 — thread scan.** Read threads and replies. [PR author notes](../super-board/references/pr-author-notes.md)

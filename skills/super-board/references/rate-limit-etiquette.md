@@ -1,6 +1,6 @@
 # Worker rate-limit etiquette
 
-The dispatcher's `gh_rate_guard` only protects the dispatcher's own ticks. Workers (Builder / Tester / Reviewer) run as independent `claude -p` sessions and **share the same gh-auth token bucket** — 5000 GraphQL points/hr for a PAT, 15000/hr for a GitHub App. The #381 worker storm (2026-05-21) drained the bucket because nothing in the worker contract told workers to watch the quota.
+Workers (Builder / Tester / Reviewer) run as independent lane agents and **share the same gh-auth token bucket** — 5000 GraphQL points/hr for a PAT, 15000/hr for a GitHub App. The #381 worker storm (2026-05-21) drained the bucket because nothing in the worker contract told workers to watch the quota.
 
 This file is the worker-side contract. Every worker MUST follow it.
 
@@ -96,8 +96,8 @@ Use `sb_gh_guard_summary` to grab the snapshot. This gives the run manifest visi
 
 ## 7. Per-worker hard cap
 
-`sb_gh_budget_spend` decrements a per-worker call counter. Default 150. If exhausted, the helper returns non-zero — the worker should write a halt comment ("worker-budget exhausted, releasing claim") and exit gracefully. The orphan-scan and reaper will recover the lock; the dispatcher re-tries on next tick when quota has recovered.
+`sb_gh_budget_spend` decrements a per-worker call counter. Default 150. If exhausted, the helper returns non-zero — the worker should write a halt comment ("worker-budget exhausted, releasing claim") and exit gracefully. The next run's crash-recovery sweep releases the claim; the card is picked up again once quota has recovered.
 
 ---
 
-Pointer: dispatcher-side guard lives in `super-board-run.sh::gh_rate_guard`. The two together are defense in depth — dispatcher pauses before the next tick, worker pauses before its next burst.
+Pointer: the orchestrator's rate guard runs before each wave (`run-workflow.md` → wave loop step 1). The two together are defense in depth — the orchestrator pauses before the next wave, the worker pauses before its next burst.

@@ -133,7 +133,7 @@ handoff complete. Add file summaries and critical inline notes on the PR, not in
 
 **On dispatcher exit 0 (success):**
 - `git -C .claude/worktrees/issue-N push -u origin loop/issue-N`
-- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<emoji> [<type>] <scope>: <subject>" --body-file <body.md>` — title in commit-subject format, body = the marker-block template from `skills/super-board/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution, Door + Blast radius in Risk
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<emoji> [<type>] <scope>: <subject>" --body-file <body.md>` — title in commit-subject format, body = the marker-block template from `skills/super-board/references/lanes/common.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution, Door + Blast radius in Risk
 - `gh issue edit N --remove-label loop:in-progress`
 - `gh issue comment N --body "[builder] [report] ✅ built · PR <URL>"` (Next line: `qa`)
 - Move the project card to `QA`. The Tester and Reviewer take it from there; the issue closes when the Reviewer merges through the merge gate.
@@ -237,13 +237,13 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` set by the runner, or invoc
 - Respect the single branch super-board hands you (`issue-<N>-<slug>`). Don't create alternate branches.
 
 ### Lifecycle (Builder, first pass)
-Follow spec `.claude/skills/super-board/references/run.md` → Builder (first pass). Summary:
+Follow spec `.claude/skills/super-board/references/lanes/build.md` → Builder (first pass). Summary:
 1. Worktree off `config.base_branch`.
 2. Branch `issue-<N>-<slug>` from `config.base_branch`.
 3. Docs check (section below) — if the ticket touches a third-party surface, an upgrade, or auth/billing, read the current official docs first.
 4. Implement smallest safe change covering ACs — under the PR size cap (section below).
 5. Commit + push (always).
-6. Open **draft PR** with the PR description template from `run.md` — title in commit-subject format, every marker block filled, `Docs:` bullets in Solution, Door + Blast radius in Risk.
+6. Open **draft PR** with the PR description template from `lanes/common.md` — title in commit-subject format, every marker block filled, `Docs:` bullets in Solution, Door + Blast radius in Risk.
 7. Follow [PR author notes](../super-board/references/pr-author-notes.md), then post the `[builder] [report]` PR comment + the short issue comment with the PR URL (writing-standard.md § 4).
 8. Move card Ready/Building → QA.
 
@@ -294,7 +294,7 @@ On any failure-handoff comment, include:
 ```
 root-cause-hash: <sha256 first 12 hex chars>
 ```
-Hash inputs (joined with `|`): lane (`build`) | error class | first 3 unique normalized file:line frames. See `.claude/skills/super-board/references/run.md` → Root-cause hash.
+Hash inputs (joined with `|`): lane (`build`) | error class | first 3 unique normalized file:line frames. See `.claude/skills/super-board/references/lanes/common.md` → Root-cause hash.
 
 ### Never merge
 Builder NEVER squash-merges. Reviewer owns merge.

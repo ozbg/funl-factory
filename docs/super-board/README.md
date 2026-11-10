@@ -16,7 +16,7 @@ column each card is in.
 | **What you get** | Merged PRs with evidence: screenshots, test reruns, review findings on the PR |
 | **How you start** | `/super-board run <slug>`, then drag cards into `Ready` |
 | **What holds state** | The board. Cards pick up from their column after any stop |
-| **Backend** | In-session dynamic workflow waves by default; headless `claude -p` on opt-in |
+| **Backend** | In-session dynamic workflow waves |
 
 ## Workflow at a glance
 
@@ -76,7 +76,7 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 - Or install from a checkout: `./install.sh [--no-hooks] [--protect-main] /path/to/your-project`.
 - The board is a GitHub Project (v2) with a `Status` field: `Backlog, Ready, Building, QA, Review, Blocked, Done`. `onboard` reuses your best-matching board (adding what is missing, keeping every card) or creates one.
 - Three labels route cards: `qa` skips Building (test what exists), `bug` and `feature` are built first; no label is built too.
-- Default backend is in-session dynamic workflows: turn them on in `/config`. Headless `claude -p` is opt-in (`worker_backend: "claude-p"`).
+- The backend is in-session dynamic workflows: turn them on in `/config`.
 - Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
 - `onboard` fixes what the board needs without asking (skills, scripts, workflows, guards, settings, old folders, config keys) and asks only to install a system tool or sign in. An older super-board is upgraded in place (see [Upgrading from 2.x](../../RELEASE-NOTES.md#upgrading-from-2x)).
 - `onboard` asks once what the robot may do: auto-merge normal changes up to 400 changed lines (money, auth, destructive schema like DROP/TRUNCATE/RENAME, and bigger PRs wait for you; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
@@ -100,21 +100,14 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 | `/git-sync` | Secondary helper: commit per logical change, merge-pull, push without force. |
 | `/visual` | Secondary helper: a visual recap or plan. Merged-worktree cleanup is a hook (`hooks/cleanup-wt.py`): the merge gate runs it after each merge and SessionStart runs it when a base moved. |
 
-## Backends
+## Backend
 
-Lane lifecycles are identical in both.
-
-| | `workflow` (default since 1.6.0) | `claude-p` (opt-in) |
-|---|---|---|
-| Runs as | in-session dynamic workflow waves | headless `claude -p` workers |
-| Needs | dynamic workflows on in `/config` | nothing extra |
-| Reference | `skills/super-board/references/run-workflow.md` | `scripts/super-board-run.sh` |
-
-The legacy dispatcher refuses to run (exit 78) unless the config sets it.
+One backend: in-session dynamic workflow waves (needs dynamic workflows on in `/config`).
+Reference: `skills/super-board/references/run-workflow.md`. Each lane agent loads its own file in
+`skills/super-board/references/lanes/`.
 
 **Stop and resume.** `/super-board stop` posts a "stopped mid-flight" comment on every in-flight
-issue and PR (lane, last commit, resume hint), releases the assignee mutex, and kills workers and
-the dispatcher. Resume with `/super-board run <slug>`. A card stranded in `Building` by a stopped
+issue and PR (lane, last commit, resume hint), releases the assignee mutex, and kills workers. Resume with `/super-board run <slug>`. A card stranded in `Building` by a stopped
 wave goes back to `Ready`; its branch is kept and the next Builder continues on it.
 
 ## How a wave runs
@@ -161,7 +154,7 @@ needed a human before the loop started.
 ```
   workflows/super-board-wave.js   the conductor: owns the patterns
   skills/super-{build,qa,review}  the sheet music: one lane agent each
-  the prompt it spawns            "Run super-build on #N, follow run.md exactly"
+  the prompt it spawns            "Run super-build on #N, follow lanes/build.md exactly"
 ```
 
 | Pattern | When |
@@ -191,23 +184,8 @@ Review run in parallel.
 
 ## Safety controls
 
-**Worker storms**, 30 `Ready` cards starting 30 Builders, were the failure that bit early users of
-the headless backend. On `claude-p`, six gates stand in the way before any spawn:
-
-```
-  1  orphan scan ........... workers alive from a crashed run?  → refuse to start
-  2  in-flight lockfile .... .claude/super-board/inflight/<N>   → skip (survives restart)
-  3  assignee claim ........ atomic, BEFORE spawn               → skip (closes the cold-start race)
-  4  worker cap ............ max_workers (default 3)            → wait
-  5  GraphQL quota <200 .... sleep until reset                  → wait
-  6  tick not elapsed? ..... tick_seconds, 120s floor           → wait
-```
-
-The 120-second tick holds ProjectsV2 query cost (~103 GraphQL points per tick) to about 3.1k/hr
-against a 5k budget; raise `tick_seconds` if you have headroom. The workflow backend has its own
-equivalents: a wave lock that keeps the two backends from running at once, assignee claims, a
-crash-recovery sweep of leaked assignees, the rate guard and the usage guard
-(`references/run-workflow.md`).
+**Worker storms** are held off by a wave lock, assignee claims, a crash-recovery sweep of
+leaked assignees, the rate guard and the usage guard (`references/run-workflow.md`).
 
 Guard hooks, installed by `install.sh` unless `--no-hooks`: worktrees only under
 `.claude/worktrees/`, no reading of secret files, no API keys written into source, no deleting
@@ -253,15 +231,13 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 ```
 
 ```
-  worker_backend        workflow | claude-p
   columns               Backlog · Ready · Building · QA · Review · Blocked · Done (always all seven)
   human_approves_merge  legacy: true = never auto-merge (prefer merge_policy.default "human")
   merge_policy          default auto|human · auto_max_lines (400) · size_exclude · always_human {money, auth, schema}
   migrations            globs · allowed_envs (test, staging, live) · target_env · commands
   verify_commands       run by the merge gate against the current base before every merge
   rebuild_cap           bounces allowed before a card goes Blocked
-  max_workers           optional wave throttle; absent or 0 = unlimited (claude-p defaults to 3)
-  tick_seconds          claude-p GraphQL budget floor, default 120
+  max_workers           optional wave throttle; absent or 0 = unlimited
   usage_pause_pct       pause new waves at this % of the Claude usage window, default 95
   refine, collect       optional blocks for ui-refine-loop and super-collect (collect.custom = extra sources)
 ```
@@ -331,7 +307,7 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 ```
   skills/<name>/   SKILL.md (agent prompt) · README.md · references/ · scripts/
   workflows/       super-board-wave.js, ui-refine-loop.js
-  scripts/         dispatcher, planner, merge gate, usage check, filers, README sync
+  scripts/         planner, merge gate, usage check, filers, README sync
   hooks/           guard hooks, cleanup-wt, settings snippets; dev/ = skill-eval gate (never installed)
   tests/           bash/python tests, no network: bash tests/test-*.sh
   evals/           behavioural evals for `claude plugin eval` (evals/README.md)

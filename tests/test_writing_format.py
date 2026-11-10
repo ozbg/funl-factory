@@ -43,6 +43,12 @@ def subject_ok(s: str) -> bool:
     return bool(m) and EMOJI[m["type"]] == m["emoji"] and len(s) <= 72
 
 
+def run_docs():
+    """run.md plus the lane files split out of it (lanes/*.md)."""
+    paths = [REF / "run.md", *sorted((REF / "lanes").glob("*.md"))]
+    return "\n".join(p.read_text(encoding="utf-8") for p in paths)
+
+
 def fenced(text: str) -> list[str]:
     return re.findall(r"```[a-z]*\n(.*?)```", text, flags=re.S)
 
@@ -91,28 +97,10 @@ def test_standard_examples_are_valid_subjects():
     assert seen >= 1, "expected a commit example in writing-standard.md"
 
 
-def test_dispatcher_greps_the_standard_loop_subjects():
-    src = (ROOT / "skills" / "super-build" / "scripts" / "super-build-dispatch.sh").read_text(encoding="utf-8")
-    pats = re.findall(r'grep -E "\^\[0-9a-f\]\+ (.*?)" \| head', src)
-    assert len(pats) == 2, f"expected the close and wip greps, found {pats}"
-    close_pat, wip_pat = (p.replace("$N", "42").replace("\\\\", "\\") for p in pats)
-
-    def grep(pat: str, subject: str) -> bool:
-        r = subprocess.run(["grep", "-E", "^[0-9a-f]+ " + pat], input=f"abc123 {subject}\n",
-                           capture_output=True, text=True)
-        return r.returncode == 0
-
-    assert grep(close_pat, "🔧 [chore] loop: close #42 — add streaming")
-    assert not grep(close_pat, "🔧 [chore] loop: close #421 — other card")
-    assert grep(wip_pat, "🚧 [wip] loop: #42 partial — schema only")
-    assert grep(close_pat, "chore(loop): close #42 — legacy branch")
-
-
 def test_no_old_commit_shapes_in_templates():
     old = re.compile(r"chore\(loop\)|wip\(loop\)|fix\(super-qa\)|feat\(super-qa\)|refine\(\$?\{?[a-z<]")
-    allowed = {"super-build-dispatch.sh"}  # documents and still accepts the legacy shapes
     for p in list((ROOT / "skills").rglob("*.md")) + list((ROOT / "skills").rglob("*.sh")) + list((ROOT / "workflows").glob("*.js")):
-        if p.name in allowed or "visual" in p.parts:
+        if "visual" in p.parts:
             continue
         for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
             assert not old.search(line), f"old commit shape at {p.relative_to(ROOT)}:{n}: {line.strip()}"
@@ -165,7 +153,7 @@ def test_comment_header_regex():
 def test_comment_examples_follow_the_header():
     """Lane comments have headers; author notes use three labels without a routing prefix."""
     machine = re.compile(r"^(Local tests|gh-quota-on-exit|blocked-by|root-cause-hash):|^\||^$|^<!--")
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = run_docs()
     checked = 0
     author_notes = 0
     for text in (STANDARD, run_md):
@@ -221,7 +209,7 @@ def test_pr_body_markers():
                          capture_output=True, text=True, check=True).stdout
     for b in PR_BLOCKS:
         assert f"<!-- sb:{b} -->" in out and f"<!-- /sb:{b} -->" in out, f"skeleton lacks {b}"
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = run_docs()
     for b in ["status", "problem", "solution", "ac", "history", "risk"]:
         assert f"<!-- sb:{b} -->" in run_md and f"<!-- /sb:{b} -->" in run_md, f"run.md PR template lacks {b}"
     assert "## Not verified" not in run_md and "**Status:**" not in run_md
@@ -229,7 +217,7 @@ def test_pr_body_markers():
 
 def test_history_is_folded_and_needs_you_sits_in_the_status_alert():
     """From the pr-skill template: history folds in <details>; a human step can ride the status alert."""
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = run_docs()
     for name, text in (("writing-standard.md", STANDARD), ("run.md", run_md)):
         hist = text[text.index("<!-- sb:history -->"):text.index("<!-- /sb:history -->")] if "<!-- sb:history -->\n" in text else \
             next(b for b in fenced(text) if "Iteration history" in b)
@@ -240,7 +228,7 @@ def test_history_is_folded_and_needs_you_sits_in_the_status_alert():
 
 def test_risk_names_door_and_blast_radius():
     """Risk carries the merge danger: a two-way or one-way door and a blast radius."""
-    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    run_md = run_docs()
     std_risk = next(b for b in fenced(STANDARD) if b.startswith("## Risk\n🟢"))
     run_risk = run_md[run_md.index("<!-- sb:risk -->\n## Risk"):run_md.index("<!-- /sb:risk -->")]
     for name, risk in (("writing-standard.md", std_risk), ("run.md", run_risk)):
