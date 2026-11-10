@@ -175,6 +175,26 @@ const amber = '## Context\n- **Zone:** amber\n'
     await run({ laneModelsByTier: bad, cards: [card(16)] }).catch(() => { threw = true })
     threw || fail(`laneModelsByTier ${JSON.stringify(bad)} must throw`)
   }
+
+  // 7 — judgement map beats tier beats laneModels; modelRule names the winner.
+  const jm = { build: 'sonnet', qa: 'sonnet' }
+  const rules = (r) => r.card.modelRules
+  const fl = await run({ laneModels: lm, laneModelsByTier: { amber: { build: 'opus' } }, laneModelsJudgement: jm, cards: [card(17, { body: amber, judgement: true })] })
+  eq(fl.models['build:#17'], 'sonnet', 'flagged build beats tier')
+  eq(fl.models['qa:#17'], 'sonnet', 'flagged qa')
+  eq(fl.models['review:#17'], undefined, 'flagged review: lane absent from judgement map → session')
+  eq(rules(fl).build, 'judgement', 'build rule judgement')
+  eq(rules(fl).review, 'default', 'review rule default')
+  const nf = await run({ laneModels: lm, laneModelsByTier: { amber: { build: 'opus' } }, laneModelsJudgement: jm, cards: [card(18, { body: amber, judgement: false })] })
+  eq(nf.models['build:#18'], 'opus', 'unflagged build uses tier')
+  eq(rules(nf).build, 'tier', 'build rule tier')
+  eq(nf.models['qa:#18'], 'haiku', 'unflagged qa uses laneModels')
+  eq(rules(nf).qa, 'default', 'qa rule default')
+  for (const bad of [{ classify: 'opus' }, { build: '' }, ['x']]) {
+    let threw = false
+    await run({ laneModelsJudgement: bad, cards: [card(19)] }).catch(() => { threw = true })
+    threw || fail(`laneModelsJudgement ${JSON.stringify(bad)} must throw`)
+  }
 })().catch((e) => fail(e.stack))
 JS
-echo "PASS: test-wave-rules.sh (citation, round cap, green skip, classify skip, tier models)"
+echo "PASS: test-wave-rules.sh (citation, round cap, green skip, classify skip, tier + judgement models)"

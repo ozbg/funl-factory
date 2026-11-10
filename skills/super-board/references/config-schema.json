@@ -103,7 +103,13 @@
 
   // Optional (v2): per zone tier, then per lane. Wins over `lane_models` for that tier,
   // e.g. {"red": {"build": "opus", "review": "opus"}}. Omit to keep `lane_models`.
-  "lane_models_by_tier": {},
+  // Onboard writes {"red": {"build": "sonnet", "qa": "sonnet"}} for new apps.
+  "lane_models_by_tier": {"red": {"build": "sonnet", "qa": "sonnet"}},
+
+  // Optional: lanes build|qa|review -> model name or "session", for a card whose ticket
+  // has `**Needs judgement:** yes` under Context. Wins over `lane_models_by_tier`.
+  // e.g. {"build": "sonnet", "qa": "sonnet"}. Omit to keep tier / `lane_models`.
+  "lane_models_judgement": {"build": "sonnet", "qa": "sonnet"},
 
   // DEPRECATED (v2): the `codex` block. Still accepted so old configs load.
   // Optional Codex lane settings. Used by explicit `run --codex` and usage

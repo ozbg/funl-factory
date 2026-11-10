@@ -368,7 +368,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    │    {type: repo | repo+url}, repo, base_branch, timezone, columns (the seven), labels,
    │    │    paths, merge_policy, migrations, collect (incl. custom), notifications {channel:
    │    │    "session", bot_identity}, worker_backend "workflow", host (always: `bash $SB/super-board-host.sh`;
-   │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks). No `variant`.
+   │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks), model defaults
+   │    │    `lane_models_by_tier: {"red": {"build": "sonnet", "qa": "sonnet"}}` and
+   │    │    `lane_models_judgement: {"build": "sonnet", "qa": "sonnet"}`. No `variant`.
    │    ├─ .claude/super-board/active ← <slug>
    │    ├─ .gitignore += .claude/super-board/active, onboard-answers.json, onboard-staged/,
    │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/super-board/)
@@ -418,6 +420,7 @@ don't stall on prompts:
     "Bash(bash .claude/bin/super-board-throttle.sh:*)",
     "Bash(python3 .claude/bin/super-board-scorecard.py:*)",
     "Bash(python3 .claude/bin/super-board-zone.py:*)",
+    "Bash(python3 .claude/bin/super-board-coverage.py:*)",
     "Bash(.claude/bin/super-qa-file-bug.sh:*)", "Bash(.claude/bin/super-review-file-refactor.sh:*)",
     "Bash(bash .claude/bin/super-board-host.sh:*)",
     "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",

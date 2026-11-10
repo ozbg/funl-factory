@@ -8,7 +8,7 @@
 
 <p>Stop babysitting coding agents: cards you drop in Ready come back as tested, reviewed PRs.</p>
 
-<p>8 skills (4 you type, 4 the board runs) · 9 commands · 6 guard hooks</p>
+<p>10 skills (6 you type, 4 the board runs) · 9 commands · 6 guard hooks</p>
 
 <p>
 <img alt="Version" src="https://img.shields.io/badge/version-3.3.0-1f883d?style=flat-square">
@@ -106,17 +106,19 @@ Add cards to `Ready`. The board drains on its own.
 
 ## Skills
 
-**8 skills (4 you type, 4 the board runs).** Uses [Matt Pocock skills](https://github.com/mattpocock/skills), ponytail, impeccable, humanizer, [Anthropic's security review](https://github.com/anthropics/claude-code-security-review).
+**10 skills (6 you type, 4 the board runs).** Uses [Matt Pocock skills](https://github.com/mattpocock/skills), ponytail, impeccable, humanizer, [Anthropic's security review](https://github.com/anthropics/claude-code-security-review).
 
 <!-- skills:start -->
-**You type — 4 skills**
+**You type — 6 skills**
 
 | Skill | What it does |
 |---|---|
 | [`/super-board`](skills/super-board/README.md) | Orchestrator: plans waves, runs Build → QA → Review, merges when green. |
-| [`/super-collect`](skills/super-collect/README.md) | Finds problems, verifies them, writes a findings doc for /to-spec and /to-tickets. |
+| [`/super-collect`](skills/super-collect/README.md) | Finds problems, verifies them, files them into Backlog. |
 | [`/git-sync`](skills/git-sync/README.md) | Commit per logical change, merge-pull, push without force, report. |
 | [`/north-star`](skills/north-star/SKILL.md) | One short interview that fixes an app's why, must-haves and destination. |
+| [`/to-board`](skills/to-board/SKILL.md) | North star to one-page spec and Haiku-ready cards in Backlog. |
+| [`/mockup`](skills/mockup/SKILL.md) | One-hour clickable mock-up of the core loop. |
 
 **The board runs — 4 skills**
 
@@ -134,7 +136,7 @@ Add cards to `Ready`. The board drains on its own.
 | [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
 
-**Helpers installed beside the pack — 18 skills**
+**Helpers installed beside the pack — 16 skills**
 
 | Skill | What it does |
 |---|---|
@@ -144,9 +146,7 @@ Add cards to `Ready`. The board drains on its own.
 | `/codebase-design` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Review lane and refactors: deep-module design vocabulary. |
 | `/domain-modeling` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Build lane when a card touches domain terms, glossary or ADRs. |
 | `/verification-before-completion` ([obra/superpowers](https://github.com/obra/superpowers)) | Every lane: run the checks before claiming done. |
-| `/prototype` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Throwaway prototype that settles a design question before a ticket. |
-| `/to-spec` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Turns a findings doc or idea into a spec; super-collect hands off here. |
-| `/to-tickets` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Splits a spec into board tickets with acceptance criteria. |
+| `/prototype` ([mattpocock/skills](https://github.com/mattpocock/skills)) | In-app UI or logic variants for later work; /mockup does Define. |
 | `/grilling` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Stress-tests a plan with hard questions before it becomes tickets. |
 | `/research` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Primary-source research written up as a Markdown file in the repo. |
 | `/triage` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Sorts incoming issues into actionable, duplicate or won't-fix. |

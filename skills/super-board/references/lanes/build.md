@@ -46,7 +46,7 @@ The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanic
 | `hold` — done | move card to Blocked | `👯` · names the merged PR / closed issue · Owner: Eric (close as duplicate) · `blocked-by: -` |
 | `hold` — in progress | move card to Blocked | `👯` · names the open PR / card · `blocked-by: <the issue that PR or card closes>` — the sweep returns it when that closes, and pre-flight then finds it done |
 | `hold` — unclear | move card to Blocked | `❓` · the missing AC or the contradiction with `file:line` · `blocked-by: -` |
-| `hold` — too big | move card to Blocked | `❓` · "too big — likely over <cap> source lines / spans <areas>" · suggests splitting with `/to-tickets` into vertical slices, each under the cap · `blocked-by: -` |
+| `hold` — too big | move card to Blocked | `❓` · "too big — likely over <cap> source lines / spans <areas>" · suggests splitting with `/to-board` into vertical slices, each under the cap · `blocked-by: -` |
 | `sequence` — `blockedBy` non-empty | move card to Blocked | `⏳` · the overlapping PR and files · `blocked-by: <blockedBy>` — the wave-start sweep frees it |
 | `sequence` — `blockedBy` empty | proceed (card stays Ready, return column `Ready`), comment `⚠️ expected conflict with PR #<P> on <files> — the merge gate will rebase` | — |
 | `halted` | script exit 79: required evidence unavailable; leave the card untouched, stop this run, resume explicitly after recovery | — |
@@ -70,7 +70,8 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
    count). File writes, DB writes and model calls stay in red paths: fix a lint failure by
    moving code, never by editing the lint config or `zones.yaml`. A `foundation` card runs alone.
    Over `merge_policy.auto_max_lines` (600) → deeper review, the owner only if red. Far past it
-   mid-build → stop, push, propose the split (`/to-tickets`) in a PR comment, Blocked `❓`.
+   mid-build → stop, push, propose the split (`/to-board`) in a PR comment, Blocked `❓`.
+4b. **No partial merge.** Every AC is built, or split off (common.md → "No partial merge"): file a linked Backlog card with that AC, remove it here, note `AC<n> moved to #<N>`. Never leave one unticked for the gate to find.
 5. Commit + push (always). Commits follow writing-standard.md § 1 (`✨ [feat] chat: stream replies` + short bullets).
 6. Open draft PR linked to the issue with the PR description template (title in commit-subject format, every block filled).
 7. Follow [PR author notes](pr-author-notes.md), then post the `[builder] [report]` PR comment (see "Commenting cadence").

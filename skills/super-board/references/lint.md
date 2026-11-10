@@ -58,6 +58,12 @@ PHASE 3 — Scan summary (flag only what needs work)
      each `refused` card with its reason and each `deferred` card ("overlap"); every
      other free Ready card is admitted. Lint shows this, it never recomputes it.
 
+PHASE 3b — Coverage check (factory #58)
+  └─ Run `python3 .claude/bin/super-board-coverage.py lint --repo-path .`. Exit non-zero
+     (a must-have with no row or no cards, or no `Demo:` line) is a lint failure: show its
+     lines, do not print the Phase 7 success banner, and send the owner to `/to-board`.
+     A missing `docs/shape/coverage.md` prints a warning and exits 0 — an old app is not failed.
+
 PHASE 4 — Deep-dive flagged issues (skill-routed, PM voice, one at a time)
 
 PHASE 5 — Per-issue summary
@@ -102,7 +108,7 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 12 | Sub-agent ambiguity flag | "this could mean ≥2 different things" | Surface both interpretations |
 | 13 | `## Blocked by` missing, empty, or unparseable | No section; or `- None — but #26 must merge first` | Rewrite to `- #N — why` bullets, or a bare `- None.` |
 | 14 | An AC proves behaviour against a fake, and no card owns the real thing | "proven with a fake repository, no database" | Name the ticket that builds it, or offer to file one |
-| 15 | Too big: likely over ~600 source lines (`merge_policy.auto_max_lines`), or spans many areas | "Add billing page, webhook handler, admin UI and email templates" | Hold with ❓ and split via `/to-tickets` into vertical slices |
+| 15 | Too big: likely over ~600 source lines (`merge_policy.auto_max_lines`), or spans many areas | "Add billing page, webhook handler, admin UI and email templates" | Hold with ❓ and split via `/to-board` into vertical slices |
 | 16 | Ticket sections missing (writing-standard.md § 3): `## Problem`, `## Context`, `## Fix`, `## Risk` — and `## Evidence` (the folded 12-row table) on a bug | Body has "What to build" and ACs only | Rewrite into the ticket format; draft Problem/Fix from the body, ask for Who and Risk |
 | 17 | Acceptance Criteria not a checklist | ACs as prose or plain `-` bullets | Rewrite as `- [ ] <checkable outcome>`, one per line |
 | 18 | Context steps not lettered under Where, more than one step per line, or chained with arrows | "Where: /x — sign in → open Receipts → drop file" | Rewrite as `- **Where:** …` then `  - a. Sign in` / `  - b. …`, one per line; embed the screenshot (raw URL pinned to a sha), never link it |
@@ -132,7 +138,7 @@ sweep cards whose blockers have closed. Three shapes defeat it, and all three we
 | `- None — but #26 must merge first` | **one blocker** | **no blockers** — starts it early |
 
 The third is the dangerous one, because the two readings disagree and the planner's is the one that
-acts. Note the source: the `to-tickets` template offers *"None — can start immediately"* as its
+acts. Note the source: an older planning template offered *"None — can start immediately"* as its
 example, so this shape is produced by following the instructions. Lint must catch it on the way in.
 
 Accept exactly two forms. Bullets — `- #32 — the price feed` — or a single `- None.` on its own.
@@ -165,7 +171,7 @@ Flag a ticket as **too big** when either holds:
   job, email) where each could ship and be checked alone.
 
 What lint does: hold the ticket with ❓ (Blocked, `block-template.md`, reason "too big — split
-first") and offer to split it with `/to-tickets` into vertical slices — each slice thin end to end,
+first") and offer to split it with `/to-board` into vertical slices — each slice thin end to end,
 independently mergeable, under the cap, with its own ACs and a `## Blocked by` line. The original
 ticket closes, or becomes the first slice, once the user approves the split.
 
@@ -179,7 +185,7 @@ ticket closes, or becomes the first slice, once the user approves the split.
 | Bug ticket, no repro steps | `mattpocock-skills:diagnosing-bugs` |
 | Issue needing fundamental rethink (criteria #10, #11) | `mattpocock-skills:grilling` |
 | Issue with multiple interpretations (criterion #12) | `mattpocock-skills:grilling` |
-| Ticket too big (criterion #15) | `/to-tickets` (split into vertical slices) |
+| Ticket too big (criterion #15) | `/to-board` (split into vertical slices) |
 | Ticket format (criteria #16–18) | Inline rewrite into `ticket-format.md` (sub-agent in lint itself) |
 | Unsettled expensive design (criterion #19) | [Design preflight](design-preflight.md) with `mattpocock-skills:codebase-design`; `mattpocock-skills:domain-modeling` only for terminology/ADR work |
 | Catch-all (none of above) | Inline draft (sub-agent in lint itself) |
@@ -282,6 +288,7 @@ Before declaring lint complete, the worker MUST verify all three:
   - has a populated `## Acceptance Criteria` section that passes all 22 criteria (conditional #19 only when triggered), OR
   - was dropped on purpose (closed as not planned, Done, `🤷 dropped` comment), OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
+- [ ] `super-board-coverage.py lint` exits 0 (or warns that coverage.md is missing).
 - [ ] No issue is left in an in-between state (flagged but not resolved, partially edited, or awaiting user input that never came).
 
 If any check fails, do **not** print the Phase 7 success banner. Re-enter the loop on the unresolved issues, or halt with a clear "N issues still need attention" message so the user can re-run `super-board lint`.

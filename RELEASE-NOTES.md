@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+The pack now ships `/to-board` and `/mockup`; `/to-spec` and `/to-tickets` are retired.
+
+- ✨ **`/to-board` and `/mockup` install into apps.** Both join the pack (10 skills). Install prunes
+  `to-spec` and `to-tickets` from apps, with a backup; `prototype` stays.
+- ✨ **`/super-collect` files straight into Backlog.** Verified findings go to the board in the
+  ticket format; the `/to-spec` → `/to-tickets` hand-off is gone.
+- 🔧 **The merge gate refuses unticked ACs** (exit 13), and a coverage check runs before merge.
+- 🔧 **Sonnet builds flagged and red cards.**
+
 Each lane gets its own model, and Review keeps a scorecard that shows whether cheap lanes are landing good work (#25).
 
 - ✨ **`lane_models` in the board config.** One model per lane (classify, preflight, build,

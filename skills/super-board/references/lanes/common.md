@@ -54,7 +54,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 | `status` (alert card) | writes | rewrites on exit | rewrites on exit |
 | `problem` (lettered steps under Where, screenshot embedded) | writes from the ticket's Context | — | — |
 | `solution` (plain bullets, `Docs:` bullets last) | writes, updates on rebuild | — | — |
-| `ac` (checklist + one proof line each) | writes all unchecked | ticks with proof, or leaves unchecked with the reason | unticks one it disproved |
+| `ac` (checklist + one proof line each) | writes all unchecked | ticks with proof, or leaves unchecked with the reason | unticks one it disproved · on a green card (no QA) ticks each it confirmed, with proof |
 | `history` (Lane · Done · Time · Details) | appends a row | appends a row | appends a row |
 | `visual` (Before \| After, UI only) | — | writes | — |
 | `risk` (🟢/🟡/🔴 + one line, Door, Blast radius) | writes | — | adjusts |
@@ -116,6 +116,12 @@ from `super-board-pr-body.sh --time --config <cfg>` (config `timezone`).
 Status card lines: `> [!NOTE]` + `🔨 Building` / `⏳ In QA` / `⏳ In review · round N` ·
 `> [!TIP]` + `✅ Merged · <sha>` · `> [!WARNING]` + `🛑 Blocked · <reason>`. Each names the AC
 count and the head commit, so evidence is never read against a different one.
+
+**No partial merge.** The gate (exit 13) refuses a PR whose `ac` block has an unticked AC, or a
+ticked one whose proof line does not cite `path` or `path:line` of a file at the head (a test or
+file, never "manual"). An AC that cannot be met is built, or split: the builder files a Backlog
+card holding that AC (`super-qa-file-bug.sh --column Backlog --kind feature`, body links `#<this>`),
+deletes the AC from this card's checklist and writes one line `AC<n> moved to #<N>` in `solution`.
 
 No "Not verified" and no "Next" section: an unchecked AC with its one-line reason says what is
 not proven. Merged with a failing check (the 💳 CI-budget bypass) → the Reviewer writes the

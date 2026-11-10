@@ -227,10 +227,10 @@ status alert.
 | Section | Content | Required |
 |---|---|---|
 | `## Problem` | 1–3 sentences: what is wrong or missing, from the user's side | yes |
-| `## Context` | `- **Where:**` + lettered steps (one per line), `- **Who:**`, the six card lines ([ticket-format](ticket-format.md)), screenshot embedded | yes · screenshot for UI |
+| `## Context` | `- **Where:**` + lettered steps (one per line), `- **Who:**`, the six card lines, then Mock-up · Pattern · Needs judgement when they apply ([ticket-format](ticket-format.md)), screenshot embedded | yes · screenshot for UI |
 | `## Evidence` | the folded 12-row table below | bugs |
 | `## Fix` | the intended change in 1–3 lines. No implementation plan | yes |
-| `## Acceptance Criteria` | 2–5 `- [ ]` items, each checkable by a test | yes |
+| `## Acceptance Criteria` | 2–5 `- [ ]` items, each checkable by a test; may end `— test: <path>` ([ticket-format](ticket-format.md)) | yes |
 | `## Risk` | 🟢/🟡/🔴 level + one line | yes |
 | `## Blocked by` | `- #N — why` bullets, or exactly `- None.` | yes |
 

@@ -229,6 +229,9 @@ Repeat until a done condition, a halt or a stop:
    leaves out keeps the tier's choice. A bad value fails the wave before any agent runs.
    `laneModelsByTier` is the config's `lane_models_by_tier` (omit when unset): per zone tier,
    then per lane, for example the strongest model on red build and review.
+   `laneModelsJudgement` is the config's `lane_models_judgement` (omit when unset): per lane, for
+   cards the planner flags `judgement: true` (`**Needs judgement:** yes`); wins over the tier map.
+   Each lane's history entry records `modelRule`: `judgement`, `tier` or `default`.
 5. **Reconcile** (when the run completes) — read the returned `cards`
    summary. If `halted: true`, any card is `halted`, or the GitHub helper's `--check`
    fails, preserve claims and stop. For verification-readiness (exit 9), repair

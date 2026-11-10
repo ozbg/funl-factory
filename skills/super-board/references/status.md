@@ -197,6 +197,9 @@ mode:   auto-merge                 truth gate: non-trivial (≥70)
 6. `▎Block reasons`
 7. `▎Recent`
 8. `▎Health`
+9. `▎Milestone` — only when `docs/shape/coverage.md` exists; silent otherwise. One line from
+   `super-board-coverage.py status`, e.g. `M1: 9/12 cards done · demo #20 not run`, or
+   `M1 done: all cards and demo #20 Done`. Done = every listed card and the Demo card in Done.
 
 **Empty-state strings (locked):**
 

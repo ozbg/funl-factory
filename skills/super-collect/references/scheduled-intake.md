@@ -26,8 +26,7 @@ Confirm the active config matches the intended repo/board, then test a dry run.
 > and stop; do not clear the halt or blindly retry create/comment.
 
 Adapt invocation to the host: Claude uses `/super-collect --yes --direct`; Codex uses
-`$super-collect --yes --direct`. `--direct` skips the `/to-spec` → `/to-tickets` hand-off,
-which asks questions no one is there to answer. A local timer can start that host's normal agent runner
+`$super-collect --yes --direct`. `--direct` is accepted for old jobs; filing straight into Backlog is the only path. A local timer can start that host's normal agent runner
 with this prompt. A cloud job needs equivalent repo, tool, skill and credential
 access. No universal scheduler service is bundled.
 

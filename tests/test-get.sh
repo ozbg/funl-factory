@@ -45,8 +45,8 @@ WANT=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("\n".j
 HELPERS=$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["helpers"]["skills"]))' "$M")
 MATT_HELPERS=$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["helpers"]["sources"]["mattpocock/skills"]))' "$M")
 
-# 1 — default install into --target: the 8 pack skills land, hooks wired, and the
-#     18 helpers are fetched by name (never --skill '*'). Exactly 26 skills result.
+# 1 — default install into --target: the 10 pack skills land, hooks wired, and the
+#     16 helpers are fetched by name (never --skill '*'). Exactly 26 skills result.
 T="$WORK/t1"; mkdir -p "$T"; : > "$NPX_LOG"
 out=$(bash "$GET" --target "$T" 2>&1) || fail "default install exited non-zero: $out"
 for s in super-board super-build super-qa super-review super-collect git-sync pr-security-review north-star; do
@@ -97,7 +97,7 @@ grep -q 'obra/superpowers --skill verification-before-completion' "$NPX_LOG" || 
 # 4c — upgrade over an app with 49 skills (old pack + Matt's whole set + security-audit,
 #      as a lock says): ends with exactly the 26, pruned ones backed up.
 T="$WORK/t4c"; mkdir -p "$T/.claude/skills"; : > "$NPX_LOG"
-OLD="ask-matt chief-of-staff git-guardrails-claude-code grill-me grill-with-docs implement implement-spec loop-me migrate-to-shoehorn pr scaffold-exercises setup-matt-pocock-skills setup-pre-commit setup-ts-deep-modules teach wait-what wayfinder writing-beats writing-for-agents writing-fragments writing-shape"
+OLD="to-spec to-tickets ask-matt chief-of-staff git-guardrails-claude-code grill-me grill-with-docs implement implement-spec loop-me migrate-to-shoehorn pr scaffold-exercises setup-matt-pocock-skills setup-pre-commit setup-ts-deep-modules teach wait-what wayfinder writing-beats writing-for-agents writing-fragments writing-shape"
 for s in $OLD $MATT_HELPERS security-audit verification-before-completion ui-refine-loop visual super-board super-build super-qa super-review super-collect git-sync pr-security-review; do
   mkdir -p "$T/.claude/skills/$s"; echo x > "$T/.claude/skills/$s/SKILL.md"
 done
