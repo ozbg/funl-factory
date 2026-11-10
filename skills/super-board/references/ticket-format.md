@@ -13,6 +13,12 @@ it into the target's `docs/agents/issue-tracker.md` under `## Ticket format` (th
   - a. <step>
   - b. <step>
 - **Who:** <who sees it>
+- **Scenario:** <the one user journey this card makes work>
+- **Zone:** <green | amber | red>
+- **Files:** <path prefixes this card touches, comma-separated>
+- **Fit for purpose:** <what "good enough" means for this card>
+- **Out of scope:** <what this card leaves alone>
+- **Must-have served:** <number(s) from `docs/shape/north-star.md` § Must have>
 
 ![<page> · desktop](https://github.com/<owner>/<repo>/raw/<sha>/<path>.png)
 
@@ -35,6 +41,8 @@ it into the target's `docs/agents/issue-tracker.md` under `## Ticket format` (th
 | Title | `<emoji> [<kind>] <scope>: <what>` · ≤ 70 chars · no ticket number · e.g. `🐛 [bug] receipts: spinner never stops over 10 MB` |
 | Context | lettered steps under Where, ONE per line · NEVER arrows · screenshot embedded for UI, NEVER linked |
 | Bugs | add `## Evidence`: the folded 12-row table (writing-standard.md § 3) · a missing row says `n/a — why` |
+| Card lines | Scenario · Zone · Files · Fit for purpose · Out of scope · Must-have served — one line each under Context |
+| Planner gate | a Ready card with 0 ACs, or no `Must-have served:` number listed in `docs/shape/north-star.md`, is refused to Backlog · `bug` and `qa` cards skip the must-have check · no `Files:` line = runs alone |
 | Acceptance Criteria | 2–5 `- [ ]` lines · each checkable · NEVER "works well", "is fast" |
 | Risk | 🟢 Low · 🟡 Medium · 🔴 High + one line |
 | Blocked by | `- #N — why` bullets, or a bare `- None.` · NEVER "None — but #N first" |

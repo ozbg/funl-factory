@@ -22,16 +22,18 @@
 #     [--area <area>] [--route <route>] [--spec <path>] [--iter <n>] \
 #     [--fingerprint "<slug>|<tc>|<signature>"] \
 #     [--suggested-skill super-build|super-qa|ui-refine-loop|super-review] \
+#     [--column <Status>] # board column, default Backlog
 #     [--check-body]      # run the body checks only, then exit (no gh calls)
 #       (ui-refine-loop only labels a UI ticket; a human can run /ui-refine-loop —
 #        the board never triggers it)
 #
-# Project resolution (per super-qa/SKILL.md → "Project resolution"):
+# Project resolution (per super-qa/references/standalone-crawl.md → "Project resolution"):
 #   owner  $SUPER_QA_PROJECT_OWNER, else the current repo's owner
 #   title  $SUPER_QA_PROJECT_TITLE, else "Super Ultimate QA"
 # Never falls back to the repo's primary project — column semantics differ.
 #
-# Column: "Bug", override with $SUPER_QA_TARGET_OPTION_NAME.
+# Column: --column, else $SUPER_QA_TARGET_OPTION_NAME, else Backlog. Missing on the
+# board → Bug, Todo, Triage in that order. Never Ready: a finding waits for lint.
 # Body checks bypass: SUPER_QA_ALLOW_WEAK_BODY=1 (not during autonomous runs).
 #
 # Stdout: the issue number — new, or the existing one on a fingerprint hit.
@@ -40,7 +42,7 @@
 set -uo pipefail
 
 TITLE=""; BODY_FILE=""; KIND="bug"; PRIORITY="medium"; CATEGORY=""
-AREA=""; ROUTE=""; SPEC=""; ITER=""; FINGERPRINT=""; SUGGESTED_SKILL=""; CHECK_ONLY=0
+AREA=""; ROUTE=""; SPEC=""; ITER=""; FINGERPRINT=""; SUGGESTED_SKILL=""; CHECK_ONLY=0; COLUMN=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -55,6 +57,7 @@ while [ $# -gt 0 ]; do
     --iter)            ITER="$2"; shift 2 ;;
     --fingerprint)     FINGERPRINT="$2"; shift 2 ;;
     --suggested-skill) SUGGESTED_SKILL="$2"; shift 2 ;;
+    --column)          COLUMN="$2"; shift 2 ;;
     --check-body)      CHECK_ONLY=1; shift ;;
     *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
@@ -153,7 +156,7 @@ if [ -z "$OWNER" ]; then
   OWNER=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json owner -q .owner.login) || exit $?
 fi
 PROJECT_TITLE="${SUPER_QA_PROJECT_TITLE:-Super Ultimate QA}"
-TARGET_COLUMN="${SUPER_QA_TARGET_OPTION_NAME:-Bug}"
+TARGET_COLUMN="${COLUMN:-${SUPER_QA_TARGET_OPTION_NAME:-Backlog}}"
 
 PROJECT_LIST=$(python3 "$GITHUB_READ" --kind projects -- project list --owner "$OWNER" --format json) || exit $?
 NUMBER=$(echo "$PROJECT_LIST" | jq -r --arg t "$PROJECT_TITLE" \
@@ -261,15 +264,11 @@ promote() {
   project_id=$(python3 "$GITHUB_READ" --kind scalar -- project view "$NUMBER" --owner "$OWNER" --format json --jq '.id') || return $?
   field_json=$(python3 "$GITHUB_READ" --kind fields -- project field-list "$NUMBER" --owner "$OWNER" --format json) || return $?
   field_id=$(echo "$field_json" | jq -r '.fields[] | select(.name=="Status") | .id')
-  # The requested name first, then the conventional aliases. A QA bug arrives
-  # WITH a repro and evidence, so Ready is an honest fallback for it — unlike a
-  # reviewer-filed refactor, which has neither and must wait for lint.
-  #
-  # Without this, a board whose columns do not include `Bug` lost every finding
-  # to exit 71. Observed on a real board on 2026-08-20, whose Status options are
-  # Todo/Ready/Building/QA/Review/Done/Blocked — no `Bug` among them.
+  # The requested name first, then holding-column aliases. Never Ready: a finding
+  # filed mid-run is off the card's scope and waits for lint like any ticket (#45).
+  # The standalone QA board has no Backlog, so Bug catches it there.
   local candidate
-  for candidate in "$TARGET_COLUMN" Bug Ready Todo Backlog Triage; do
+  for candidate in "$TARGET_COLUMN" Backlog Bug Todo Triage; do
     option_id=$(echo "$field_json" | jq -r --arg c "$candidate" \
       '.fields[] | select(.name=="Status") | .options[]? | select(.name==$c) | .id')
     if [ -n "$option_id" ] && [ "$option_id" != "null" ]; then
@@ -278,7 +277,7 @@ promote() {
       break
     fi
   done
-  [ -n "$option_id" ] && [ "$option_id" != "null" ] || { echo "warn: no '${TARGET_COLUMN}' column and no alias (Bug, Ready, Todo, Backlog, Triage) on the Status field" >&2; return 1; }
+  [ -n "$option_id" ] && [ "$option_id" != "null" ] || { echo "warn: no '${TARGET_COLUMN}' column and no alias (Backlog, Bug, Todo, Triage) on the Status field" >&2; return 1; }
   python3 "$GITHUB_READ" --check || return $?
   gh project item-edit --id "$item_id" --project-id "$project_id" \
     --field-id "$field_id" --single-select-option-id "$option_id" >/dev/null || { python3 "$GITHUB_READ" --halt "Project column move outcome unknown for issue #${ISSUE_N}; reconcile before retrying"; return 79; }

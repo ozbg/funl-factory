@@ -167,6 +167,11 @@ Repeat until a done condition or halt gate fires:
    `Ready` (below). Swept, resumed, approval-refresh and stranded cards are NOT in this pass's
    `cards`; they join the next wave.
 
+   **Refused cards.** The planner also returns `refused` (`{number, reason}`) and
+   `deferred` (`reason: "overlap"`). Before launching, move each refused card to
+   `Backlog` with one comment naming the missing field from its `reason`; never
+   dispatch it. Deferred cards stay in Ready and join a later wave.
+
    **Stranded Building cards.** A card in Building with no assignee between
    waves has no live worker — a stopped or crashed wave left it mid-build. For
    each: find its branch (`git ls-remote --heads origin 'issue-<N>-*'`) and any

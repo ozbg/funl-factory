@@ -13,15 +13,22 @@ cd "$(dirname "$0")"
 PLAN="../scripts/super-board-wave-plan.sh"
 CFG=fixtures/wave-config.json
 ITEMS=fixtures/wave-items.json
-DEPS=fixtures/wave-deps.json
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 TMPDIR_GOAL=$(mktemp -d); trap 'rm -rf "$TMPDIR_GOAL"' EXIT
 plan() { "$PLAN" --config "$1" --items "$ITEMS" --deps "$DEPS"; }
 
-# Uncapped is the default shape, so every scenario runs without a cap unless it
-# is specifically testing the throttle.
-NOCAP=$(jq 'del(.max_workers)' "$CFG")
+# The v2 gate needs a north star and well-formed cards: every card in the shared
+# fixture gets 2 ACs, must-have 1 and its own files, so the older scenarios
+# below keep testing what they always tested.
+REPO="$TMPDIR_GOAL/repo"; mkdir -p "$REPO/docs/shape"
+printf '# North star\n\n## Must have\n1. **Charter, front and centre.** x\n2. **Second.** y\n\n## Later\n9. not a must-have\n' > "$REPO/docs/shape/north-star.md"
+DEPS="$TMPDIR_GOAL/deps.json"
+jq 'with_entries(if (.value | type) == "object" then .value += {acs: 2, mustHave: [1], files: ["src/\(.key)/"]} else . end)' fixtures/wave-deps.json > "$DEPS"
+
+# Ramp stage 3 and no max_workers, so the scenarios below see the full
+# graph-filtered wave unless they test the cap itself.
+NOCAP=$(jq --arg r "$REPO" 'del(.max_workers) | .ramp.stage = 3 | .repo.path = $r' "$CFG")
 OUT=$(plan <(echo "$NOCAP"))
 
 # 1 — width follows the graph, not a knob. Free Ready cards are #12 alone:
@@ -64,7 +71,7 @@ echo "$OUT" | jq -e '[.cards[].number] | index(16) == null' >/dev/null \
 
 # 7 — max_workers still throttles when set. It is a safety valve now, not the
 #     wave-sizing mechanism.
-OUT7=$(plan <(jq '.max_workers = 1' "$CFG"))
+OUT7=$(plan <(echo "$NOCAP" | jq '.max_workers = 1'))
 echo "$OUT7" | jq -e '(.cards | length) == 1 and .cards[0].number == 10' >/dev/null \
   || fail "max_workers=1 should keep only the leading in-flight card, got: $OUT7"
 
@@ -91,7 +98,7 @@ RC=0; "$PLAN" --config <(echo "$NOCAP" | jq '.variant = "qa-only"') --items "$IT
 [ "$RC" -eq 65 ] || fail "a legacy qa-only config should exit 65, got $RC"
 
 # 12 — an invalid variant fails loudly (exit 65); an absent one is the normal case.
-RC=0; "$PLAN" --config <(jq '.variant = "fulll"' "$CFG") --items "$ITEMS" --deps "$DEPS" >/dev/null 2>&1 || RC=$?
+RC=0; "$PLAN" --config <(echo "$NOCAP" | jq '.variant = "fulll"') --items "$ITEMS" --deps "$DEPS" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 65 ] || fail "invalid variant should exit 65, got $RC"
 "$PLAN" --config <(echo "$NOCAP" | jq 'del(.variant)') --items "$ITEMS" --deps "$DEPS" >/dev/null \
   || fail "a config with no variant must plan normally"
@@ -111,7 +118,7 @@ echo "$OUT14" | jq -e '[.cards[] | select(.status == "Ready")] | length == 0' >/
 
 # 15 — a graph that cannot be derived is a hard failure, not an empty graph.
 #      Without --deps and without config.repo.remote there is nothing to derive from.
-RC=0; "$PLAN" --config <(jq 'del(.repo)' "$CFG") --items "$ITEMS" >/dev/null 2>&1 || RC=$?
+RC=0; "$PLAN" --config <(echo "$NOCAP" | jq 'del(.repo)') --items "$ITEMS" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 66 ] || fail "a missing repo remote should exit 66, got $RC"
 
 # 16 — a Building card with no claim is stranded: a stopped wave left it there and
@@ -130,9 +137,10 @@ LBL_ITEMS=$(jq -n '{items: [
   {status:"Ready", content:{type:"Issue", number:13, title:"no label", assignees:[], labels:[{name:"feature"}]}},
   {status:"Ready", content:{type:"Issue", number:9, title:"bare", assignees:[]}},
   {status:"QA", labels:["qa"], content:{type:"Issue", number:11, title:"in qa", assignees:[]}}]}')
-LBL_DEPS=$(jq -n '[9,10,12,13] | map({(tostring): {runnable:true, parseable:true, blockers:[]}}) | add')
-OUT17=$("$PLAN" --config <(echo "$NOCAP") --items <(echo "$LBL_ITEMS") --deps <(echo "$LBL_DEPS"))
-lane() { echo "$OUT17" | jq -r --argjson n "$1" '.cards[] | select(.number == $n) | .lane'; }
+LBL_DEPS=$(jq -n '[9,10,11,12,13] | map({(tostring): {runnable:true, parseable:true, blockers:[], acs:1, mustHave:[1], files:["f\(.)/"]}}) | add')
+OUT17=$("$PLAN" --config <(echo "$NOCAP" | jq '.ramp.stage = 3') --items <(echo "$LBL_ITEMS" | jq '.items |= map(select(.content.number | IN(9, 13) | not))') --deps <(echo "$LBL_DEPS"))
+OUT17B=$("$PLAN" --config <(echo "$NOCAP") --items <(echo "$LBL_ITEMS" | jq '.items |= map(select(.content.number | IN(9, 13)))') --deps <(echo "$LBL_DEPS"))
+lane() { printf '%s\n%s' "$OUT17" "$OUT17B" | jq -s '{cards: [.[].cards[]]}' | jq -r --argjson n "$1" '.cards[] | select(.number == $n) | .lane'; }
 [ "$(lane 12)" = qa ]    || fail "a qa-labelled Ready card must skip Building (lane qa), got: $OUT17"
 [ "$(lane 10)" = build ] || fail "a bug card is built first, got $(lane 10)"
 [ "$(lane 13)" = build ] || fail "a feature card (label on content) is built first, got $(lane 13)"
@@ -170,4 +178,50 @@ echo "$OUT" | jq -e '[.offGoal[].number] == [12]' >/dev/null || fail "a Ready ca
 # No goal: unchanged, and offGoal is empty.
 echo "$(plan <(echo "$NOCAP"))" | jq -e '(.offGoal // []) | length == 0' >/dev/null || fail "no goal must report no offGoal"
 
-echo "PASS: test-wave-plan.sh (19 scenarios)"
+# 20 — the gate (v2). A free Ready card with no ACs, no must-have, or a must-have
+#      the north star does not list is refused with a one-line reason naming the
+#      field, and never dispatched. bug/qa cards skip the must-have check only.
+G_ITEMS=$(jq -n '{items: [range(30;37) as $n | {status:"Ready", content:{type:"Issue", number:$n, title:"c\($n)", assignees:[]}}]
+                  | (.[5].labels = ["bug"]) | (.[6].labels = ["bug"])}')
+G_DEPS=$(jq -n '{"30":{acs:0,mustHave:[1]}, "31":{acs:2}, "32":{acs:2,mustHave:[1,9]},
+                 "33":{acs:2,mustHave:[2]}, "34":{acs:2,mustHave:[]}, "35":{acs:1}, "36":{acs:0}}
+                | map_values(. + {runnable:true, parseable:true, blockers:[], files:["g/"]}) | with_entries(.value.files = ["g\(.key)/"])')
+OUT20=$("$PLAN" --config <(echo "$NOCAP") --items <(echo "$G_ITEMS") --deps <(echo "$G_DEPS"))
+why() { echo "$OUT20" | jq -r --argjson n "$1" '.refused[] | select(.number == $n) | .reason'; }
+echo "$OUT20" | jq -e '([.cards[].number] | sort) == [33,35] and ([.refused[].number] | sort) == [30,31,32,34,36]' >/dev/null \
+  || fail "gate: only #33 (must-have 2) and #35 (bug, no must-have) admitted, got: $OUT20"
+why 30 | grep -q "Acceptance Criteria" || fail "#30 reason must name the ACs: $(why 30)"
+why 31 | grep -q "Must-have served"    || fail "#31 reason must name Must-have served: $(why 31)"
+why 32 | grep -q "names 9"             || fail "#32 reason must name the unknown must-have: $(why 32)"
+why 36 | grep -q "Acceptance Criteria" || fail "a bug card still needs ACs: $(why 36)"
+[ "$(echo "$OUT20" | jq '[.refused[].reason | select(test("\n"))] | length')" = 0 ] || fail "reasons must be one line"
+OUT20B=$("$PLAN" --config <(echo "$NOCAP" | jq --arg r "$TMPDIR_GOAL" '.repo.path = $r') --items <(echo "$G_ITEMS") --deps <(echo "$G_DEPS"))
+echo "$OUT20B" | jq -e '[.cards[].number] == [35] and (.refused | all(.number == 35 | not))
+                         and ([.refused[] | select(.number == 33) | .reason | test("north-star.md missing")] == [true])' >/dev/null \
+  || fail "no north star: every non-bug card refused naming the file, got: $OUT20B"
+
+# 21 — overlap. Two cards sharing a path prefix never land in one wave; a card
+#      with no Files: line overlaps everything; in-flight cards pick first.
+O_ITEMS=$(jq -n '{items: [{status:"Review", content:{type:"Issue", number:40, title:"r", assignees:[]}}]
+                  + [range(41;45) as $n | {status:"Ready", content:{type:"Issue", number:$n, title:"c\($n)", assignees:[]}}]}')
+O_DEPS=$(jq -n '{"40":{files:["src/api/"]}, "41":{files:["src/api/users.ts"]}, "42":{files:["docs/a.md"]},
+                 "43":{files:["docs/"]}, "44":{}}
+                | map_values(. + {runnable:true, parseable:true, blockers:[], acs:1, mustHave:[1]})')
+OUT21=$("$PLAN" --config <(echo "$NOCAP") --items <(echo "$O_ITEMS") --deps <(echo "$O_DEPS"))
+echo "$OUT21" | jq -e '[.cards[].number] == [40,42] and ([.deferred[] | [.number, .reason]] == [[41,"overlap"],[43,"overlap"],[44,"overlap"]])' >/dev/null \
+  || fail "overlap: expected cards [40,42], deferred 41 43 44, got: $OUT21"
+
+# 22 — ramp. Lanes never exceed ramp.stage or max_workers, whichever is lower;
+#      goal.foundation forces 1; no ramp key means stage 1; a bad stage exits 65.
+R_ITEMS=$(jq -n '{items: [range(50;55) as $n | {status:"Ready", content:{type:"Issue", number:$n, title:"c\($n)", assignees:[]}}]}')
+R_DEPS=$(jq -n '[range(50;55)] | map({(tostring): {runnable:true, parseable:true, blockers:[], acs:1, mustHave:[1], files:["r\(.)/"]}}) | add')
+width() { "$PLAN" --config <(echo "$NOCAP" | jq "$1") --items <(echo "$R_ITEMS") --deps <(echo "$R_DEPS") | jq '.cards | length'; }
+[ "$(width '.ramp.stage = 2')" = 2 ] || fail "stage 2 must cap at 2"
+[ "$(width '.ramp.stage = 3')" = 3 ] || fail "stage 3 must cap at 3"
+[ "$(width '.ramp.stage = 3 | .max_workers = 2')" = 2 ] || fail "max_workers below the stage must win"
+[ "$(width '.ramp.stage = 3 | .goal.foundation = true')" = 1 ] || fail "foundation must force 1"
+[ "$(width 'del(.ramp)')" = 1 ] || fail "no ramp key must mean stage 1"
+RC=0; "$PLAN" --config <(echo "$NOCAP" | jq '.ramp.stage = 4') --items <(echo "$R_ITEMS") --deps <(echo "$R_DEPS") >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 65 ] || fail "ramp.stage 4 should exit 65, got $RC"
+
+echo "PASS: test-wave-plan.sh (22 scenarios)"

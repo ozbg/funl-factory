@@ -302,24 +302,50 @@ RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/auth/session.ts)" gate --expect-h
 cfgset '.merge_policy = {default: "human"}'
 RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 7 ] || fail "merge_policy.default human should exit 7, got $RC"
+# A big PR gets a deeper review, never the owner — unless its tier is red.
 cfgset '.merge_policy = {default: "auto", auto_max_lines: 100}'
 RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
-[ "$RC" -eq 7 ] || fail "400 lines over auto_max_lines 100 should exit 7, got $RC"
-echo "$OUT" | grep -q "human-gate: size" || fail "the size gate must say so, got: $OUT"
+[ "$RC" -ne 7 ] || fail "a big amber PR must not wait for a human, got: $OUT"
+printf 'zones:\n  red:\n    paths: ["src/**"]\n' > "$TMP/zones.yaml"
+cfgset ".zones = \"$TMP/zones.yaml\""
+RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
+[ "$RC" -eq 7 ] || fail "a big red PR should exit 7, got $RC"
+echo "$OUT" | grep -q "human-gate: size — big PR — please review" || fail "the red size gate must say big PR, got: $OUT"
 teardown
 
-# 15b — the size cap defaults to 400 changed lines: 401 gates ("big PR"), 400
-#       merges, and auto_max_lines 0 turns the cap off.
-head_setup
-RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 401)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
-[ "$RC" -eq 7 ] || fail "401 lines over the default cap 400 should exit 7, got $RC"
-echo "$OUT" | grep -q "human-gate: size — big PR — please review" || fail "the size gate must say big PR, got: $OUT"
-RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 0 ] || fail "400 lines is at the default cap and should merge, got $RC"
-cfgset '.merge_policy = {auto_max_lines: 0}'
-RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 5000)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 0 ] || fail "auto_max_lines 0 should turn the size cap off, got $RC"
-teardown
+# 15b — merge-policy size outcomes: the cap defaults to 600 source lines; over it
+#       → "deep-review" (no human) unless red; tests do not count; 0 = no cap;
+#       tier comes from the zones file (none → amber, unreadable → red).
+T15=$(mktemp -d)
+policy() {  # $1 config json, $2 meta json → policy stdout
+  echo "$1" > "$T15/c.json"; echo "$2" > "$T15/m.json"
+  python3 ../scripts/super-board-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null
+}
+sz() { jq -cn --argjson s "$1" --argjson t "${2:-0}" '{labels: [], body: "", files: [
+  {path: "src/app.ts", additions: $s, deletions: 0},
+  {path: "src/app.test.ts", additions: $t, deletions: 0}]}'; }
+policy '{}' "$(sz 600)" | jq -e '.outcome == "auto" and .tier == "amber" and .human == []' >/dev/null \
+  || fail "600 source lines is at the default cap and should be auto"
+policy '{}' "$(sz 500 600)" | jq -e '.outcome == "auto" and .deep_review == null' >/dev/null \
+  || fail "500 source + 600 test lines must not count the tests"
+OUT=$(policy '{}' "$(sz 601)")
+echo "$OUT" | jq -e '.outcome == "deep-review" and .human == [] and (.deep_review | test("601 changed lines > auto_max_lines 600"))' >/dev/null \
+  || fail "601 source lines should be deep-review with no human, got: $OUT"
+policy '{"merge_policy":{"auto_max_lines":0}}' "$(sz 5000)" | jq -e '.outcome == "auto"' >/dev/null \
+  || fail "auto_max_lines 0 should turn the size cap off"
+printf 'zones:\n  red:\n    paths: ["src/app.ts"]\n' > "$T15/z.yaml"
+OUT=$(policy "{\"zones\":\"$T15/z.yaml\"}" "$(sz 601)")
+echo "$OUT" | jq -e '.tier == "red" and .outcome == "human" and .human[0].category == "size"' >/dev/null \
+  || fail "a big red PR should go to a human, got: $OUT"
+policy "{\"zones\":\"$T15/z.yaml\"}" "$(sz 10)" | jq -e '.tier == "red" and .outcome == "auto"' >/dev/null \
+  || fail "a small red PR is not gated for size"
+printf 'zones:\n  red:\n    paths: [a\n' > "$T15/bad.yaml"
+policy "{\"zones\":\"$T15/bad.yaml\"}" "$(sz 601)" | jq -e '.tier == "red" and .outcome == "human"' >/dev/null \
+  || fail "an unreadable zones file must fail safe to red"
+policy '{}' "$(jq -cn '{labels: [{name: "money"}], body: "", files: [{path: "src/a.ts", additions: 9000, deletions: 0}]}')" \
+  | jq -e '.outcome == "human" and ([.human[].category] == ["money"])' >/dev/null \
+  || fail "money stays human; a big amber PR adds no size entry"
+rm -rf "$T15"
 
 # 15d — a non-Claude host (config `host` only) merges by hand unless
 #       merge_policy.default is "auto"; claude, no host and an explicit auto merge.
@@ -362,14 +388,15 @@ BIG=$(jq -cn '{labels: [], body: "", additions: 2300, deletions: 0, files: [
 cfgset '.migrations = {allowed_envs: ["test"], target_env: "test", commands: {test: "true"}}'
 RC=0; STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 0 ] || fail "300 counted lines (rest excluded) should merge, got $RC"
+echo "$BIG" > "$TMP/big.json"
 cfgset '.merge_policy = {auto_max_lines: 250}'
-RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
-[ "$RC" -eq 7 ] || fail "300 counted lines over cap 250 should exit 7, got $RC"
-echo "$OUT" | grep -q "300 changed lines > auto_max_lines 250 (+200 migration lines counted separately)" \
-  || fail "size gate should count 300 and report migration lines separately, got: $OUT"
+OUT=$(python3 ../scripts/super-board-merge-policy.py --config "$TMP/c.json" --meta "$TMP/big.json" --diff /dev/null)
+echo "$OUT" | jq -e '.outcome == "deep-review" and (.deep_review | contains("300 changed lines > auto_max_lines 250 (+200 migration lines counted separately)"))' >/dev/null \
+  || fail "size check should count 300 and report migration lines separately, got: $OUT"
 cfgset '.merge_policy = {size_exclude: []}'
-RC=0; STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 7 ] || fail "size_exclude [] should count the lockfile and exit 7, got $RC"
+python3 ../scripts/super-board-merge-policy.py --config "$TMP/c.json" --meta "$TMP/big.json" --diff /dev/null \
+  | jq -e '.outcome == "deep-review" and (.deep_review | test("^big PR — deeper review: 2100 "))' >/dev/null \
+  || fail "size_exclude [] should count the lockfile"
 teardown
 
 # 16 — a destructive keyword counts in an ADDED line only. Deleting a DROP TABLE

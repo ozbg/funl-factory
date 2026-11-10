@@ -14,7 +14,15 @@ Stdout, one JSON object:
       "migrations": [ "supabase/migrations/2026_add_col.sql" ],
       "run":        [ {"env": "staging", "cmd": "npm run db:migrate:staging"} ],
       "needs_you":  [ "npm run db:migrate:live   # live: not in allowed_envs" ],
+      "tier":       "amber",
+      "outcome":    "human",
+      "deep_review": null,
       "done":       false }
+
+`outcome`: "human" (`human` non-empty), "deep-review" (over the size cap and
+not red: a deeper Opus review merges it, no human; `deep_review` says why) or
+"auto". `tier` comes from super-board-zone.py on the changed paths (config
+`zones`, default docs/agents/zones.yaml; no file → amber; unreadable → red).
 
 `human` non-empty → the gate exits 7 (a human merges). `needs_you` non-empty →
 exit 8 unless the gate verifies a head-bound approval. `done` stays false for
@@ -27,9 +35,10 @@ Rules, from references/config-schema.json → merge_policy / migrations:
   unset → everything waits for a human; an explicit "auto" merges as usual.
   Read from config only (no host detection). No `host` key → the Claude
   default ("auto"), so configs written before the key existed do not change.
-- merge_policy.auto_max_lines (default 400; 0 = no cap): changed lines
-  (additions + deletions) above it → human ("big PR — please review"). Files
-  matching merge_policy.size_exclude (default: lockfiles, generated output,
+- merge_policy.auto_max_lines (default 600; 0 = no cap): changed source lines
+  (additions + deletions) above it → outcome "deep-review"; a red-tier PR over
+  it → human ("big PR — please review"). Files matching
+  merge_policy.size_exclude (default: tests, lockfiles, generated output,
   snapshots) and migration files (migrations.globs) do not count; migration
   lines are reported separately. Per-file counts come from `files[].additions/
   deletions`; without them the PR totals are used.
@@ -47,9 +56,11 @@ segment, `?` one character.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import sys
+from pathlib import Path
 
 DEFAULT_ALWAYS_HUMAN = {
     "money": {
@@ -73,8 +84,11 @@ DEFAULT_MIGRATION_GLOBS = [
     "**/migrations/*.sql", "db/migrate/**", "alembic/versions/**",
 ]
 DEFAULT_ALLOWED_ENVS = ["test", "staging"]
-DEFAULT_AUTO_MAX_LINES = 400
+DEFAULT_AUTO_MAX_LINES = 600
 DEFAULT_SIZE_EXCLUDE = [
+    # tests: the cap counts source lines only
+    "**/tests/**", "**/test/**", "**/__tests__/**", "**/e2e/**",
+    "**/*.test.*", "**/*.spec.*", "**/test_*.py", "**/*_test.py", "**/*_test.go",
     # lockfiles
     "**/package-lock.json", "**/yarn.lock", "**/pnpm-lock.yaml", "**/bun.lockb", "**/bun.lock",
     "**/npm-shrinkwrap.json", "**/Cargo.lock", "**/poetry.lock", "**/uv.lock", "**/Pipfile.lock",
@@ -108,6 +122,22 @@ def matches(path: str, globs) -> str | None:
         if glob_re(g).match(path):
             return g
     return None
+
+
+def zone_tier(cfg, paths) -> str:
+    """Card tier from super-board-zone.py; an unreadable zones file fails safe to red."""
+    spec = importlib.util.spec_from_file_location(
+        "sb_zone", Path(__file__).resolve().parent / "super-board-zone.py")
+    zone = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(zone)
+    zpath = Path(cfg.get("zones") or "docs/agents/zones.yaml")
+    if not zpath.is_file():
+        return "amber"
+    try:
+        doc = zone.parse(zpath.read_text())
+        return zone.resolve(doc if isinstance(doc, dict) else {}, paths)["tier"]
+    except zone.ZoneError:
+        return "red"
 
 
 def main() -> int:
@@ -160,10 +190,15 @@ def main() -> int:
                 size += n
     else:
         size, mig_lines = int(meta.get("additions") or 0) + int(meta.get("deletions") or 0), 0
+    tier = zone_tier(cfg, paths)
+    deep = None
     if cap > 0 and size > cap:
         extra = f" (+{mig_lines} migration lines counted separately)" if mig_lines else ""
-        human.append({"category": "size",
-                      "why": f"big PR — please review: {size} changed lines > auto_max_lines {cap}{extra}"})
+        why = f"{size} changed lines > auto_max_lines {cap}{extra}"
+        if tier == "red":
+            human.append({"category": "size", "why": f"big PR — please review: {why} (red tier)"})
+        else:
+            deep = f"big PR — deeper review: {why}"
     always = policy["always_human"] if isinstance(policy.get("always_human"), dict) else DEFAULT_ALWAYS_HUMAN
     for cat, rule in always.items():
         rule = rule or {}
@@ -200,8 +235,10 @@ def main() -> int:
         if m and m.group(1).lower() != "done":
             needs.append(m.group(1).strip("`"))
 
+    outcome = "human" if human else "deep-review" if deep else "auto"
     print(json.dumps({"human": human, "migrations": mig_files, "run": run,
-                      "needs_you": needs, "done": False}))
+                      "needs_you": needs, "tier": tier, "outcome": outcome,
+                      "deep_review": deep, "done": False}))
     return 0
 
 
