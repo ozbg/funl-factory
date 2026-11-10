@@ -26,14 +26,14 @@ Write the body to a temp file, then:
 |---|---|
 | a. Create the issue (no `--label`) | `gh issue create --repo <repo> --title "<title>" --body-file <file> --milestone "<milestone>"` → prints the issue URL |
 | b. Put it on the board | `gh project item-add <number> --owner <owner> --url <issue URL> --format json --jq .id` |
-| c. Move it to Backlog | `bash .claude/bin/super-board-card.sh --config <cfg> move <N> Backlog` |
+| c. Move it to Ready | `bash .claude/bin/super-board-card.sh --config <cfg> move <N> Ready` |
 
 Run each write once. Never retry a create: a failed or unclear `gh issue create` means
 check with `python3 $R --kind json -- issue list --repo <repo> --search "<title> in:title" --json number,title`
 before trying again. Keep a list of title → number as you go; later cards' `## Blocked by`
 use those numbers.
 
-A board with no Backlog column: stop and tell the owner. Never file into Ready.
+A board with no Ready column: stop and tell the owner. File only after the owner's scope review (SKILL step 6).
 
 ## After the last card
 

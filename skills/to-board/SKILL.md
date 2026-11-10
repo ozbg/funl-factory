@@ -1,6 +1,6 @@
 ---
 name: to-board
-description: Second stage of Define. Turns a signed north star (and the mock-up, if there is one) into a one-page spec, a draft zone map and a set of cards a cheap model can build without making a design decision - foundation card first, a Demo card last - filed to the board Backlog in one pass. The owner reviews the card list once, for scope only. Use when the user says "to-board", "/to-board", "turn the north star into tickets", "plan the build", or after /north-star or /mockup on a new app or a rescope.
+description: Second stage of Define. Turns a signed north star (and the mock-up, if there is one) into a one-page spec, a draft zone map and a set of cards a cheap model can build without making a design decision - foundation card first, a Demo card last - filed to the board's Ready column in one pass. The owner reviews the card list once, for scope only. Use when the user says "to-board", "/to-board", "turn the north star into tickets", "plan the build", or after /north-star or /mockup on a new app or a rescope.
 disable-model-invocation: true
 ---
 
@@ -100,9 +100,9 @@ Then ask at most two things in one message:
 
 Apply the answer. Moving a feature in or out is the owner's; how it is cut is yours. Do not ask again unless they added something new. `--dry-run` stops here.
 
-### 7. File to Backlog
+### 7. File to Ready
 
-File in build order, so each `## Blocked by` can name real numbers. Commands: [references/filing.md](references/filing.md). Each card goes to the **Backlog** column, on the milestone, with **no label** (`bug` and `qa` change routing; slice cards are neither). Never move a card to Ready yourself.
+File in build order, so each `## Blocked by` can name real numbers. Commands: [references/filing.md](references/filing.md). Each card goes to the **Ready** column (the owner approved the scope in step 6), on the milestone, with **no label** (`bug` and `qa` change routing; slice cards are neither). `--dry-run` files nothing.
 
 ### 8. Write `docs/shape/coverage.md`
 
@@ -121,7 +121,7 @@ Demo: #20
 
 Report: the spec path, the card numbers, the zone map path and the Needs-judgement count. Then:
 
-"Cards are in Backlog. Next: sign `docs/agents/zones.yaml`, then `/super-board lint` moves the cards to Ready."
+"Cards are in Ready. Next: sign `docs/agents/zones.yaml`, run `/super-board lint`, then `/super-board run`."
 
 ## Rescope
 
