@@ -121,6 +121,12 @@ def test_ticket_template_has_required_sections_in_order():
         assert re.search(r"^- \*\*Where:\*\*.*\n(  - [a-z]\. .+\n)+", text, flags=re.M), f"{name}: Context needs lettered steps under Where"
 
 
+def test_ticket_template_has_card_lines():
+    text = (REF / "ticket-format.md").read_text(encoding="utf-8")
+    for line in ["Scenario", "Zone", "Files", "Fit for purpose", "Out of scope", "Must-have served"]:
+        assert re.search(rf"^- \*\*{line}:\*\* ", text, flags=re.M), f"ticket-format.md: missing {line}: line"
+
+
 def test_bug_filer_matches_the_standard():
     src = (ROOT / "scripts" / "super-qa-file-bug.sh").read_text(encoding="utf-8")
     for s in ["Problem", "Context", "Evidence", "Fix", "Acceptance Criteria", "Risk"]:

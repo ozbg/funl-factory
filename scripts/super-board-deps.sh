@@ -44,7 +44,13 @@
 #   { "40": { "number": 40, "title": "…", "state": "OPEN",
 #             "blockers": [32,36], "openBlockers": [32],
 #             "parseable": true, "humanGated": false, "runnable": false, "why": "",
-#             "needsYou": false, "needsYouDone": false } }
+#             "needsYou": false, "needsYouDone": false,
+#             "acs": 3, "mustHave": [1,3], "files": ["src/a/","docs/x.md"] } }
+#
+# Card lines the wave planner gates on (ticket-format.md):
+# `acs` — `- [ ]` / `- [x]` lines under the last `## Acceptance Criteria`.
+# `mustHave` — numbers on the last `Must-have served:` line; null with no line.
+# `files` — comma-separated path prefixes on the last `Files:` line; null with no line.
 #
 # `needsYou` — the newest Block comment carries the 🙋 reason tag, or the issue
 # has the `needs-you` label: a human-only command is waiting (block-template.md).
@@ -127,6 +133,20 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
 
   def blank: (map(select(test("[^ \t]"))) | length) == 0;
 
+  # Lines under the LAST heading named $name, up to the next "## " heading.
+  def under($name):
+    ( . / "\n" ) as $lines
+    | ( [ $lines | to_entries[] | select(.value | test("^##[ \t]+" + $name + "[ \t]*$")) | .key ] | last ) as $at
+    | if $at == null then [] else
+        [ $lines[($at + 1):][] ] as $tail
+        | ( [ $tail | to_entries[] | select(.value | test("^##[ \t]")) | .key ] | first ) as $end
+        | if $end == null then $tail else $tail[:$end] end
+      end;
+  # Value of the last `Name:` line, bullet and bold allowed: `- **Files:** a, b`.
+  def card_line($name):
+    [ split("\n")[]
+      | capture("^[ \t]*(-[ \t]+)?\\*{0,2}" + $name + "\\*{0,2}:\\*{0,2}[ \t]*(?<v>.*)$").v ] | last;
+
   # The lanes write `blocked-by: 32, 91` as the last line of a Block comment. The
   # most recent one wins over the issue body: a lane that just parked the card
   # knows why, and the `## Blocked by` in the body may be weeks older.
@@ -192,7 +212,14 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
           runnable: ($p.parseable and ($p.human_gated | not) and (($stillOpen | length) == 0)),
           why: $p.why,
           needsYou: ($i | needs_you),
-          needsYouDone: false }
+          needsYouDone: false,
+          acs: ( ($i.body // "") | under("Acceptance Criteria")
+                 | map(select(test("^[ \t]*- \\[[ xX]\\]"))) | length ),
+          mustHave: ( ($i.body // "") | card_line("Must-have served")
+                      | if . == null then null else [ scan("[0-9]+") | tonumber ] end ),
+          files: ( ($i.body // "") | card_line("Files")
+                   | if . == null then null
+                     else [ split(",")[] | gsub("^[ \t`]+|[ \t`]+$"; "") | select(. != "") ] end ) }
     ]
   | ( if $filter == null then . else map(select(.number as $n | $filter | index($n))) end )
   | INDEX(.number | tostring)' | python3 "$(dirname "${BASH_SOURCE[0]}")/super-board-approval.py" --deps --repo "$APPROVAL_REPO"

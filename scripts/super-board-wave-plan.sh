@@ -11,20 +11,11 @@
 #   plus every card already in flight in QA or Review,
 #   minus anything already claimed by an assignee.
 #
-# Width therefore follows the dependency graph rather than a tuning knob. On a
-# board with 19 free cards the wave is 19; on a board with 2 it is 2. The
-# workflow runtime caps *concurrent* agents (min(16, cpus-2)) and queues the
-# rest, so dispatching wide costs nothing and finishes sooner.
+# The graph filters first; the ramp then caps (v2, below). Up to 9 unrelated
+# cards once ran at once on the same files, so width is no longer unlimited.
 #
-# WHY THE OLD FIXED CAP WAS WRONG, MEASURED. On a real board on 2026-08-20,
-# `max_workers` was 7 and 23 of 32 Ready cards were waiting on an open blocker.
-# A cap that does not look at dependencies spends its slots on cards that will
-# hit their own preflight and park — so it throttled the free cards while doing
-# nothing about the blocked ones. Filtering first and then not capping is
-# strictly better: fewer wasted dispatches AND more real work per wave.
-#
-# `max_workers` is kept as a safety valve. Absent or 0 means unlimited, which is
-# the default. Set it only to deliberately throttle a machine.
+# `max_workers` is kept as a safety valve under the ramp cap. Absent or 0 means
+# the ramp alone decides. Set it only to deliberately throttle a machine.
 #
 # THE BLOCKED SWEEP. `Blocked` used to be terminal: a card parked naming the
 # issue it waited on, that issue later closed, and nothing ever read the note
@@ -56,6 +47,14 @@
 # "qa-only" is refused (exit 65) until `super-board onboard` upgrades it, because
 # reading it as "full" would start building on a board meant only for testing.
 #
+# GATE, RAMP, OVERLAP (v2). Free, on-goal Ready cards are admitted only with
+# ACs and, unless labelled bug or qa, a `Must-have served:` number listed under
+# `## Must have` in <repo.path>/docs/shape/north-star.md. The rest go to `refused`
+# with a one-line reason; the orchestrator moves them to Backlog. The wave is
+# capped at min(max_workers, ramp.stage); goal.foundation forces 1. In-flight
+# cards go first; a Ready card whose `Files:` prefixes overlap a picked card is
+# `deferred` (no `Files:` line overlaps everything).
+#
 # Usage:
 #   super-board-wave-plan.sh --config <config.json> [--items <project-items.json>]
 #                            [--deps <deps.json>]
@@ -70,6 +69,8 @@
 #     "sweep": [ {"number":37,"title":"…","clearedBy":[32]} ],
 #     "resume": [ {"number":51,"title":"…"} ],
 #     "refreshApproval": [ {"number":52,"title":"…","why":"PR head changed after review"} ],
+#     "refused": [ {"number":23,"reason":"no Acceptance Criteria checkboxes"} ],
+#     "deferred": [ {"number":24,"title":"…","reason":"overlap"} ],
 #     "flag":  [ {"number":82,"title":"…","why":"…"} ],
 #     "stranded": [ {"number":44,"title":"…"} ] }
 set -euo pipefail
@@ -98,6 +99,18 @@ MAX_WORKERS=$(echo "$CONFIG_JSON" | jq -r '.max_workers // 0')
 # The run's goal (factory #40): a milestone title. Set, only its Ready cards run;
 # in-flight cards always finish. Empty = no goal filter (old behaviour).
 GOAL=$(echo "$CONFIG_JSON" | jq -r '.goal.milestone // ""')
+# Ramp: lanes never exceed ramp.stage (1–3); a foundation goal runs one at a time.
+STAGE=$(echo "$CONFIG_JSON" | jq -r 'if .goal.foundation == true then 1 else (.ramp.stage // 1) end')
+case "$STAGE" in 1|2|3) ;; *) echo "invalid ramp.stage in config: ${STAGE} (1, 2 or 3)" >&2; exit 65 ;; esac
+CAP=$STAGE
+[ "$MAX_WORKERS" -gt 0 ] && [ "$MAX_WORKERS" -lt "$CAP" ] && CAP=$MAX_WORKERS
+# Must-have numbers from the north star; null when the file is missing.
+NORTH_STAR="$SB_REPO_PATH/docs/shape/north-star.md"
+if [ -f "$NORTH_STAR" ]; then
+  MUST=$(awk '/^## /{m = ($0 ~ /^## Must have[ \t]*$/)} m && /^[0-9]+\./{sub(/\..*/, ""); print}' "$NORTH_STAR" | jq -s -c .)
+else
+  MUST=null
+fi
 OWNER=$(echo "$CONFIG_JSON" | jq -r '.project.owner')
 NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
 
@@ -135,8 +148,23 @@ fi
 # auto-merges into one base branch race. That guard now lives where the race
 # actually is — the merge step takes a lock inside the wave workflow and the
 # freshness gate re-verifies under it — so reviews may run in parallel here.
-echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argjson deps "$DEPS" --arg goal "$GOAL" '
+echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$CAP" --argjson deps "$DEPS" --arg goal "$GOAL" \
+                  --argjson must "$MUST" '
   def dep($n): $deps[($n | tostring)];
+  # One-line reason a Ready card is refused, or "" when admitted.
+  def refusal:
+    dep(.number) as $d
+    | ( if ($d.acs // 0) == 0 then "no Acceptance Criteria checkboxes" else empty end ),
+      ( if (.labels | index("bug") or index("qa")) then empty
+        elif $must == null then "docs/shape/north-star.md missing, so no must-have can be served"
+        elif ($d.mustHave // []) == [] then "no `Must-have served:` line"
+        elif ([ $d.mustHave[] | select(. as $n | $must | index($n) | not) ] | length) > 0
+          then "`Must-have served:` names \([ $d.mustHave[] | select(. as $n | $must | index($n) | not) ] | map(tostring) | join(", ")), not in docs/shape/north-star.md"
+        else empty end );
+  def files_of($n): (dep($n).files // []);
+  # Prefix overlap; a card with no `Files:` overlaps everything.
+  def overlaps($a; $b): ($a == [] or $b == []) or
+    any($a[]; . as $x | any($b[]; . as $y | ($x | startswith($y)) or ($y | startswith($x))));
   # gh project item-list puts label names on the item (`labels`); some shapes put
   # them on the content, as strings or {name}. Lower-cased, names only.
   def labels_of: [ ((.labels // []) + (.content.labels // []))[]
@@ -164,15 +192,24 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
   # spends its slots on the work closest to Done.
   | [ $cols[] as $c | $all[] | select(.status == $c and $c != "Ready") ] as $flight
 
-  # Ready: only the ones the graph says are actually free.
-  | [ $all[] | select(.status == "Ready") | select(free(.number)) | select(on_goal) ] as $ready
+  # Ready: only the ones the graph says are actually free, then the gate.
+  | [ $all[] | select(.status == "Ready") | select(free(.number)) | select(on_goal)
+      | . + { reason: ([ refusal ] | join("; ")) } ] as $gated
+  | [ $gated[] | select(.reason == "") | del(.reason) ] as $ready
   # Free but not on the goal: reported so the report can say what is waiting, never run.
   | [ $all[] | select(.status == "Ready") | select(free(.number)) | select(on_goal | not)
       | { number, title, milestone } ] as $offgoal
 
   # Downstream-first, so work already begun finishes before new work starts.
-  | ($flight + $ready) as $picked
-  | { cards: (if $cap > 0 then ($picked | .[:$cap]) else $picked end | map(del(.milestone))),
+  # Ready cards then pick greedily: one that overlaps a picked card is deferred.
+  | reduce $ready[] as $c ({ picked: $flight[:$cap], deferred: [] };
+      if (.picked | length) >= $cap then .
+      elif any(.picked[]; overlaps(files_of(.number); files_of($c.number)))
+        then .deferred += [ { number: $c.number, title: $c.title, reason: "overlap" } ]
+      else .picked += [ $c ] end) as $pick
+  | { cards: ($pick.picked | map(del(.milestone))),
+      refused: [ $gated[] | select(.reason != "") | { number, reason } ],
+      deferred: $pick.deferred,
       offGoal: $offgoal,
 
       # Blocked cards whose blockers have all closed. The orchestrator moves
