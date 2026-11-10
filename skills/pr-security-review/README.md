@@ -10,7 +10,7 @@ A security pass on one PR: only high-confidence, exploitable vulnerabilities the
 
 ## When It Runs
 
-- **On every PR, in the QA lane.** `super-qa` runs it as its one security check; each finding fails QA and sends the card back to Super Build.
+- **In the QA lane, on red cards and amber cards on a boundary** (`zones.yaml`). `super-qa` runs it as its one security check; a finding in the card's scope fails QA and sends the card back to Super Build, one outside it becomes a Backlog card.
 - Standalone, as `/pr-security-review`, on any branch with a base.
 
 For a deep audit of the whole repository, run `security-audit` (installed alongside, never run by the board).

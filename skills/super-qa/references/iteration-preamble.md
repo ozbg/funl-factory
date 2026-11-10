@@ -332,7 +332,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    ```bash
    # /review — primary code review
    # /plan-eng-review — architectural sanity, regression risk
-   # /pr-security-review — the one security check, every PR (SKILL.md → "Security pass")
+   # /pr-security-review — the security check (SKILL.md → "Security pass")
    ```
    Capture each reviewer's verdict in the PR comments. If any reviewer
    flags a blocking issue, leave the PR open with `needs-human-review`
@@ -641,7 +641,7 @@ detection (do NOT batch at end of iter):
 
    The script prints the new issue number on stdout and drops the issue card
    in the `Bug` column of the resolved **Super Ultimate QA** project (see
-   `../SKILL.md` → "Project resolution"). Capture `$ISSUE_N` and reference it
+   `standalone-crawl.md` → "Project resolution"). Capture `$ISSUE_N` and reference it
    everywhere downstream:
    - In `queue.md` line: `[b] /foo → BUG-N.M → #${ISSUE_N} (iter:N)`
    - In `iteration-N.md` Section 3 YAML: `gh_issue: ${ISSUE_N}`

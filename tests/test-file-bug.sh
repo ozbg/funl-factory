@@ -184,6 +184,15 @@ is "honours SUPER_QA_PROJECT_TITLE" "77" "$OUT"
 OUT=$(STATUS_OPTS="Bug Triage" SUPER_QA_TARGET_OPTION_NAME="Triage" run "${BASE[@]}")
 has "honours SUPER_QA_TARGET_OPTION_NAME" "$(cat "$GH_LOG")" "opt_Triage"
 
+echo "── column"
+STATUS_OPTS="Ready Backlog Bug" run "${BASE[@]}" >/dev/null
+has   "defaults to Backlog"          "$(cat "$GH_LOG")" "opt_Backlog"
+STATUS_OPTS="Ready Backlog Triage" run "${BASE[@]}" --column Triage >/dev/null
+has   "honours --column"             "$(cat "$GH_LOG")" "opt_Triage"
+OUT=$(STATUS_OPTS="Ready Done" run "${BASE[@]}"; echo "rc=$?")
+has   "no holding column → exit 71"  "$OUT" "rc=71"
+hasnt "never falls back to Ready"    "$(cat "$GH_LOG")" "opt_Ready"
+
 echo "── dedupe"
 OUT=$(DEDUPE_HIT="55" run "${BASE[@]}" --fingerprint "imports|tc-1|silent-drop" --iter 4)
 is    "returns the existing issue"   "55" "$OUT"
