@@ -20,11 +20,12 @@
     }
   },
   "standalone": {
-    "title": "Kept here, not installed into apps — 2 skills",
+    "title": "Kept here, not installed into apps — 3 skills",
     "install": "none",
     "skills": {
       "ui-refine-loop": "Critique → refine loop that polishes one page or component.",
-      "visual": "One HTML page: branch recap, plan, or codebase map with diagrams."
+      "visual": "One HTML page: branch recap, plan, or codebase map with diagrams.",
+      "to-board": "North star to one-page spec and Haiku-ready cards in Backlog."
     }
   },
   "helpers": {
