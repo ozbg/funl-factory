@@ -33,7 +33,7 @@ check with `python3 $R --kind json -- issue list --repo <repo> --search "<title>
 before trying again. Keep a list of title → number as you go; later cards' `## Blocked by`
 use those numbers.
 
-A board with no Ready column: stop and tell the owner. File only after the owner's scope review (SKILL step 6).
+A board with no Ready column: stop and tell the owner. File only after the owner's scope review (SKILL step 7).
 
 ## After the last card
 
