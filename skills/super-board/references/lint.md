@@ -58,6 +58,12 @@ PHASE 3 — Scan summary (flag only what needs work)
      each `refused` card with its reason and each `deferred` card ("overlap"); every
      other free Ready card is admitted. Lint shows this, it never recomputes it.
 
+PHASE 3b — Coverage check (factory #58)
+  └─ Run `python3 .claude/bin/super-board-coverage.py lint --repo-path .`. Exit non-zero
+     (a must-have with no row or no cards, or no `Demo:` line) is a lint failure: show its
+     lines, do not print the Phase 7 success banner, and send the owner to `/to-board`.
+     A missing `docs/shape/coverage.md` prints a warning and exits 0 — an old app is not failed.
+
 PHASE 4 — Deep-dive flagged issues (skill-routed, PM voice, one at a time)
 
 PHASE 5 — Per-issue summary
@@ -282,6 +288,7 @@ Before declaring lint complete, the worker MUST verify all three:
   - has a populated `## Acceptance Criteria` section that passes all 22 criteria (conditional #19 only when triggered), OR
   - was dropped on purpose (closed as not planned, Done, `🤷 dropped` comment), OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
+- [ ] `super-board-coverage.py lint` exits 0 (or warns that coverage.md is missing).
 - [ ] No issue is left in an in-between state (flagged but not resolved, partially edited, or awaiting user input that never came).
 
 If any check fails, do **not** print the Phase 7 success banner. Re-enter the loop on the unresolved issues, or halt with a clear "N issues still need attention" message so the user can re-run `super-board lint`.
