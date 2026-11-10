@@ -7,8 +7,8 @@
 # Options (everything else that starts with "-" goes straight to install.sh):
 #   --target <dir>        project to install into (default: the current folder)
 #   --ref <tag|branch>    which version to fetch (default: the latest release)
-#   --no-helper-skills    skip `npx skills@latest add` for mattpocock/skills and
-#                         cloudflare/security-audit-skill
+#   --no-helper-skills    skip `npx skills@latest add` for the 18 helper skills
+#                         (skills/families.json → helpers)
 #   -h, --help            show this help
 # Passed through to install.sh: --no-hooks, --protect-main, --hosts=<list>.
 #
@@ -29,31 +29,26 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 usage() { sed -n '2,20p' "${BASH_SOURCE[0]:-$0}" 2>/dev/null | sed 's/^# \{0,1\}//' || true; }
 
-# Matt Pocock's skills count as present when the project's skills-lock.json
-# lists them, or two of their skills already sit in a skills folder Claude reads.
-helper_skills_present() {
-  local t="$1" d
-  if [ -f "$t/skills-lock.json" ] && grep -q 'mattpocock/skills' "$t/skills-lock.json" 2>/dev/null; then
-    return 0
-  fi
-  for d in "$t/.claude/skills" "${HOME:-/nonexistent}/.claude/skills"; do
-    if [ -f "$d/grilling/SKILL.md" ] && [ -f "$d/tdd/SKILL.md" ]; then return 0; fi
-  done
-  return 1
+# The helper skills (skills/families.json → "helpers", 18 of them) count as present
+# when every one has a SKILL.md in a skills folder Claude reads. A lock entry alone is
+# not enough: a pruned or partly installed set must be refreshed.
+# helper_commands <pack> <target> prints one `npx skills add` per source that still
+# has a missing helper, naming that source's whole helper list (so a re-run refreshes
+# it); nothing when all 18 are there. Never `--skill '*'`: that installs every skill.
+helper_commands() {
+  python3 - "$1/skills/families.json" "$2" "${HOME:-/nonexistent}" <<'PY'
+import json, os, sys
+helpers = json.load(open(sys.argv[1]))["helpers"]
+dirs = [os.path.join(sys.argv[2], ".claude/skills"), os.path.join(sys.argv[2], ".agents/skills"),
+        os.path.join(sys.argv[3], ".claude/skills")]
+for source, names in helpers["sources"].items():
+    missing = [n for n in names if not any(os.path.isfile(os.path.join(d, n, "SKILL.md")) for d in dirs)]
+    if missing:
+        print("npx -y skills@latest add " + source + "".join(" --skill " + n for n in names) + " -a claude-code -y")
+PY
 }
 
-# Cloudflare's security-audit counts as present when skills-lock.json lists it, or its
-# SKILL.md already sits in a skills folder Claude reads.
-security_audit_present() {
-  local t="$1" d
-  if [ -f "$t/skills-lock.json" ] && grep -q 'cloudflare/security-audit-skill' "$t/skills-lock.json" 2>/dev/null; then
-    return 0
-  fi
-  for d in "$t/.claude/skills" "$t/.agents/skills" "${HOME:-/nonexistent}/.claude/skills"; do
-    [ ! -f "$d/security-audit/SKILL.md" ] || return 0
-  done
-  return 1
-}
+helper_skills_present() { [ -z "$(helper_commands "$1" "$2")" ]; }
 
 main() {
   local target="" ref="${SUPER_BOARD_REF:-}" helpers=1
@@ -162,42 +157,27 @@ except Exception: print("")' 2>/dev/null || true)"
   SUPER_BOARD_QUIET_NEXT=1 bash "$src/install.sh" ${pass[@]+"${pass[@]}"} "$target" || die "install.sh stopped with an error (see above). Nothing else was changed after that point." 1
 
   # --- helper skills ----------------------------------------------------
-  local helper_note
+  local helper_note cmds
   if [ "$helpers" -eq 0 ]; then
     case " $later " in
       *" node "*) helper_note="skipped — 🔍 Checks will fix this" ;;
       *) helper_note="skipped (--no-helper-skills)" ;;
     esac
-  elif helper_skills_present "$target"; then
+  elif helper_skills_present "$src" "$target"; then
     helper_note="already installed"
   else
     # stdin is this script when piped into bash, so give npx nothing to read. npx's
     # own chatter goes to a log so the summary stays grouped.
-    if (cd "$target" && npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y </dev/null >"$tmp/npx.log" 2>&1); then
+    cmds="$(helper_commands "$src" "$target")"
+    if (cd "$target" && bash -ec "$cmds" </dev/null >"$tmp/npx.log" 2>&1); then
       helper_note="installed"
     else
-      helper_note="failed — 🔍 Checks retries it (or: npx skills@latest add mattpocock/skills)"
+      helper_note="failed — 🔍 Checks retries it (or: $(printf '%s' "$cmds" | tr '\n' ';'))"
     fi
-  fi
-
-  # --- security-audit (Cloudflare, standalone, run on demand) ------------
-  local audit_note
-  if [ "$helpers" -eq 0 ]; then
-    case " $later " in
-      *" node "*) audit_note="skipped — 🔍 Checks will fix this" ;;
-      *) audit_note="skipped (--no-helper-skills)" ;;
-    esac
-  elif security_audit_present "$target"; then
-    audit_note="already installed"
-  elif (cd "$target" && npx -y skills@latest add cloudflare/security-audit-skill --skill security-audit -a claude-code -y </dev/null >"$tmp/npx-audit.log" 2>&1); then
-    audit_note="installed"
-  else
-    audit_note="failed — 🔍 Checks retries it (or: npx skills@latest add cloudflare/security-audit-skill --skill security-audit)"
   fi
 
   # --- summary ----------------------------------------------------------
   say "🧠 helper skills: $helper_note"
-  say "🔒 security-audit: $audit_note"
   say "🎉 super-board $version is installed"
   say "👉 next: open Claude Code here and run /super-board onboard"
 }

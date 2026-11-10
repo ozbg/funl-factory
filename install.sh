@@ -21,6 +21,11 @@
 # link cannot be made (Windows without symlink rights) the file is copied.
 # Settings and run state (.claude/settings.json, .claude/super-board/) stay put.
 #
+# Pack skills come from the manifest, skills/families.json. Retired names in it are
+# pruned (scripts/super-board-prune.py): our own links and copies, or skills the
+# target's skills-lock.json says came from a retired source; backed up first to
+# .claude/super-board/backup/<ts>/. The owner's own skills are never touched.
+#
 # Output is grouped with emojis, one line per group of files (failures still name
 # the file). Environment: SUPER_BOARD_QUIET_NEXT=1 prints only the "🔧 installing"
 # group — get.sh sets it and prints its own header and summary around it.
@@ -44,7 +49,7 @@ for arg in "$@"; do
     --protect-main) PROTECT=1 ;;
     --hosts) want_hosts=1 ;;
     --hosts=*) ASKED_HOSTS="$ASKED_HOSTS,${arg#--hosts=}" ;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,35p' "$0"; exit 0 ;;
     -*) echo "unknown option: $arg" >&2; exit 64 ;;
     *) TARGET="$arg" ;;
   esac
@@ -52,11 +57,15 @@ done
 [ "$want_hosts" -eq 0 ] || { echo "--hosts needs a list, e.g. --hosts claude,codex" >&2; exit 64; }
 TARGET="${TARGET:-$PWD}"
 
-# Primary: the board and its lanes. Secondary: standalone helpers the lanes
-# can call (visual, git-sync, ui-refine-loop, pr-security-review). Worktree cleanup (cleanup-wt) is a
-# hook, not a skill: it ships with the guard hooks below.
-PRIMARY_SKILLS="super-board super-build super-qa super-review super-collect"
-SECONDARY_SKILLS="visual git-sync ui-refine-loop pr-security-review"
+# skills/families.json is the manifest: the pack skills to install (families marked
+# "install": "pack"), the helpers get.sh fetches, and the retired names the prune
+# step below removes. Worktree cleanup (cleanup-wt) is a hook, not a skill: it ships
+# with the guard hooks below.
+MANIFEST="$REPO_ROOT/skills/families.json"
+PACK_SKILLS="$(python3 -c 'import json, sys
+d = json.load(open(sys.argv[1]))
+print(" ".join(n for f in d.values() if f.get("install") == "pack" for n in f["skills"]))' "$MANIFEST")"
+[ -n "$PACK_SKILLS" ] || { echo "manifest has no pack skills: $MANIFEST" >&2; exit 66; }
 
 if [ ! -d "$TARGET" ]; then
   echo "target directory not found: $TARGET" >&2
@@ -102,7 +111,7 @@ for d in "$SHARED/skills/super-board" "$TARGET/.claude/skills/super-board"; do
 done
 ADDED_SKILLS=""
 if [ -n "$PREV_VERSION" ]; then
-  for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
+  for skill in $PACK_SKILLS; do
     [ -e "$SHARED/skills/$skill" ] || [ -e "$TARGET/.claude/skills/$skill" ] || ADDED_SKILLS="$ADDED_SKILLS $skill"
   done
 fi
@@ -113,7 +122,7 @@ echo "🔧 installing"
 # Resolve all skill paths before replacing anything. A destination can contain
 # the pack (or a linked source skill); clearing it would destroy our input.
 # A destination inside its source would instead recursively copy into itself.
-python3 - "$REPO_ROOT" "$TARGET" "$HOSTS" $PRIMARY_SKILLS $SECONDARY_SKILLS <<'PY'
+python3 - "$REPO_ROOT" "$TARGET" "$HOSTS" $PACK_SKILLS <<'PY'
 from pathlib import Path
 import sys
 
@@ -129,6 +138,12 @@ for skill in sys.argv[4:]:
         if dest == root or dest in root.parents or dest in src.parents or src in dest.parents:
             sys.exit(f"    ✗ refusing to install {skill}: source and destination overlap ({dest})")
 PY
+
+# Prune retired skills, scripts and workflows (the manifest's "retired" list): only our
+# own links and copies, or skills skills-lock.json says came from a retired source.
+# Backed up first to .claude/super-board/backup/<ts>/; the owner's own skills stay.
+# shellcheck disable=SC2086
+python3 "$REPO_ROOT/scripts/super-board-prune.py" "$REPO_ROOT" "$TARGET" $HOSTS
 
 mkdir -p "$SHARED/skills" "$SHARED/bin" "$SHARED/workflows"
 
@@ -218,7 +233,7 @@ link_entry() {
   if [ "$kind" = dir ]; then mkdir -p "$dest" && cp -R "$shared/." "$dest/"; else cp "$shared" "$dest"; fi
 }
 
-for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
+for skill in $PACK_SKILLS; do
   if [ ! -d "$REPO_ROOT/skills/$skill" ]; then
     echo "    ✗ missing $skill in repo — skipping" >&2
     continue
@@ -226,14 +241,16 @@ for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
   install_skill "$skill" "$SHARED/skills/$skill" || true
 done
 
-SCRIPTS="super-board-project-verifier.py super-board-skills-ready.py super-board-calibration.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-scorecard.py super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh"
+SCRIPTS="super-board-project-verifier.py super-board-skills-ready.py super-board-calibration.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-scorecard.py super-board-zone.py super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh"
 for script in $SCRIPTS; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     copy_file "$REPO_ROOT/scripts/$script" "$SHARED/bin/$script"
     chmod +x "$SHARED/bin/$script"
   fi
 done
-WORKFLOWS="super-board-wave.js ui-refine-loop.js"
+# The manifest rides along in bin/ so the installed setup script can read it.
+copy_file "$MANIFEST" "$SHARED/bin/super-board-manifest.json"
+WORKFLOWS="super-board-wave.js"
 for wf in $WORKFLOWS; do
   if [ -f "$REPO_ROOT/workflows/$wf" ]; then
     copy_file "$REPO_ROOT/workflows/$wf" "$SHARED/workflows/$wf"
@@ -264,9 +281,10 @@ for host in $HOSTS; do
     mkdir -p "$TARGET/.$host/$group"
     rel=$(relpath "$SHARED/$group" "$TARGET/.$host/$group")
     case "$group" in
-      skills) for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
+      skills) for skill in $PACK_SKILLS; do
                 link_entry "$host" skills "$skill" "$REPO_ROOT/skills/$skill" dir "$rel"; done ;;
-      bin) for script in $SCRIPTS; do link_entry "$host" bin "$script" "$REPO_ROOT/scripts/$script" file "$rel"; done ;;
+      bin) for script in $SCRIPTS; do link_entry "$host" bin "$script" "$REPO_ROOT/scripts/$script" file "$rel"; done
+           link_entry "$host" bin super-board-manifest.json "$MANIFEST" file "$rel" ;;
       workflows) for wf in $WORKFLOWS; do link_entry "$host" workflows "$wf" "$REPO_ROOT/workflows/$wf" file "$rel"; done ;;
       hooks) for h in $HOOK_FILES; do link_entry "$host" hooks "$h" "$REPO_ROOT/hooks/$h" file "$rel"; done ;;
     esac

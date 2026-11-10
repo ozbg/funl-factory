@@ -242,5 +242,4 @@ label the issue `human-gated`, leave the worktree intact, and exit non-zero when
   needed a human before the loop started.
 
 Halts here cost less than a regression in production. When the work so far is
-salvageable but the gate blocks completion, prefer `WIP-PARTIAL` over a halt —
-see `worker-preamble.md` §6.
+salvageable but the gate blocks completion, prefer `WIP-PARTIAL` over a halt.

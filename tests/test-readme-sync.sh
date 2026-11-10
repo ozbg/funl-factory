@@ -28,7 +28,7 @@ PY
 
 # 1 — a changed brief makes --check fail without writing; a sync fixes it.
 copy
-fam 'd["you_type"]["skills"]["visual"] = "A brand new brief."'
+fam 'd["you_type"]["skills"]["git-sync"] = "A brand new brief."'
 BEFORE=$(cat "$T/README.md")
 RC=0; python3 "$SYNC" --check 2>/dev/null || RC=$?
 [ "$RC" -eq 1 ] || fail "--check on a stale README should exit 1, got $RC"
@@ -68,13 +68,27 @@ RC=0; python3 "$SYNC" 2>/dev/null || RC=$?
 [ "$RC" -eq 2 ] || fail "a 15-word brief should exit 2, got $RC"
 rm -rf "$T"; ok
 
+# 3b — the manifest: helpers render with their source and never need a SKILL.md here;
+#      a helper with no source, or a retired name, is handled; standalone skills render
+#      but do not count towards the pack totals.
+copy
+python3 "$SYNC" >/dev/null
+grep -qF '| `/tdd` ([mattpocock/skills](https://github.com/mattpocock/skills)) |' "$T/README.md" || fail "helpers table should name each helper's source"
+sed -n '/skills:start/,/skills:end/p' "$T/README.md" | grep -qE 'security-audit|implement-spec' && fail "retired names must not render"
+read -r NY NB <<<"$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(len(d["you_type"]["skills"]), len(d["board_runs"]["skills"]))' "$T/skills/families.json")"
+grep -qF "$((NY + NB)) skills ($NY you type, $NB the board runs)" "$T/README.md" || fail "standalone skills must not count towards the pack total"
+fam 'd["helpers"]["skills"]["orphan-helper"] = "No source for this one."'
+RC=0; python3 "$SYNC" --check 2>/dev/null || RC=$?
+[ "$RC" -eq 2 ] || fail "a helper with no source should exit 2, got $RC"
+rm -rf "$T"; ok
+
 # 4 — --hook syncs only for an edit under skills/, and always exits 0.
 copy
-fam 'd["you_type"]["skills"]["visual"] = "Hook brief."'
+fam 'd["you_type"]["skills"]["git-sync"] = "Hook brief."'
 printf '{"tool_input":{"file_path":"%s/docs/x.md"}}' "$T" | python3 "$SYNC" --hook || fail "--hook must exit 0"
 grep -q "Hook brief." "$T/README.md" && fail "--hook must not sync for a path outside skills/"
 printf 'not json' | python3 "$SYNC" --hook || fail "--hook must exit 0 on bad input"
-printf '{"tool_input":{"file_path":"%s/skills/visual/SKILL.md"}}' "$T" | python3 "$SYNC" --hook || fail "--hook must exit 0"
+printf '{"tool_input":{"file_path":"%s/skills/git-sync/SKILL.md"}}' "$T" | python3 "$SYNC" --hook || fail "--hook must exit 0"
 grep -q "Hook brief." "$T/README.md" || fail "--hook should sync after an edit under skills/"
 mkdir -p "$T/skills/orphan"; printf -- '---\nname: orphan\ndescription: x\n---\n' > "$T/skills/orphan/SKILL.md"
 printf '{"tool_input":{"file_path":"%s/skills/orphan/SKILL.md"}}' "$T" | python3 "$SYNC" --hook 2>/dev/null || fail "--hook must exit 0 even on an input error"
@@ -84,7 +98,7 @@ rm -rf "$T"; ok
 #     commit and regenerates README; once staged, the next run passes.
 copy
 ( cd "$T" && git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -q -m init )
-fam 'd["you_type"]["skills"]["visual"] = "Pre-commit brief."'
+fam 'd["you_type"]["skills"]["git-sync"] = "Pre-commit brief."'
 ( cd "$T" && git add skills/families.json )
 RC=0; ( cd "$T" && sh hooks/pre-commit-readme.sh >/dev/null 2>&1 ) || RC=$?
 [ "$RC" -eq 1 ] || fail "pre-commit should stop a commit with a stale README, got $RC"

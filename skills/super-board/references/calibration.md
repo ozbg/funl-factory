@@ -17,8 +17,7 @@ approval, Blocked card, partial delivery, or halt. An empty board with no landed
 work does not trigger calibration. Closed-as-not-planned cards are not merges.
 After confirming all waves/tasks ended, the host releases only its own native
 `workflow-wave.lock`, matching the run identity it saved at creation. Numeric
-lane locks, the native workflow marker, or a Codex wave marker still present
-mean unfinished work. An uncertain/other host's marker is preserved and learning
+lane locks or the native workflow marker still present mean unfinished work. An uncertain/other host's marker is preserved and learning
 is skipped; the adapter never clears or reaps markers.
 
 The adapter validates these references and checks commit existence and ancestry
@@ -65,7 +64,7 @@ python3 .claude/bin/super-board-calibration.py --config "$BOARD_CONFIG" --receip
    skill, widen scope, or claim calibration ran. Product completion is unchanged.
 2. On `ready`, use the current host's normal delegation tool to start one separate
    learning task with the returned `brief`. The same host that supervises workflow
-   or explicit Codex waves supplies this tool. No new model launcher is required.
+   waves supplies this tool. No new model launcher is required.
    If delegation is unavailable, report skipped/unavailable.
 3. The learner follows the external skill's own learning process, confined to
    the supplied current-run evidence. It may automatically improve only the
@@ -91,11 +90,3 @@ or `~/...`). If unset, discovery checks only `calibrate/SKILL.md` in the project
 An invocation wrapper can lead to its installed canonical instructions; edit
 targets must already be the canonical files, with no wrappers or symlink aliases.
 The explicit list is capped at 20 files. Nothing is edited by the adapter itself.
-
-## Legacy headless runs
-
-An unsupervised `claude-p` runner reports calibration skipped: it has no host
-that can invoke an installed skill. Do not launch a new unconfigured provider or
-interpret the runner's clean exit as verified completion. A supervising host can
-perform the same final reconciliation, prepare the receipt and delegate afterward.
-Blocked-only, human-approval, partial and halted endings never run this hook.

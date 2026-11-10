@@ -29,4 +29,4 @@ One report per PR, edited in place each round. Findings keep stable ids (`R1`, `
 
 ## Install
 
-Part of the super-board pack: `./install.sh /path/to/project`. Set `human_approves_merge: true` in the config to keep a person on every merge. Lane details: `skills/super-board/references/run.md` → Reviewer.
+Part of the super-board pack: `./install.sh /path/to/project`. Set `human_approves_merge: true` in the config to keep a person on every merge. Lane details: `skills/super-board/references/lanes/review.md` → Reviewer.

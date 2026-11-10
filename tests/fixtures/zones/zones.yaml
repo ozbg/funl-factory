@@ -1,0 +1,151 @@
+# funl-hq zone map — DRAFT, not signed
+#
+# What this file is: which parts of the app are dangerous, what must always hold there,
+# and how hard each card is checked. The factory reads it; you sign it.
+# Card tier = the highest zone of any file the card touches. A reviewer may raise a tier,
+# never lower it. A file not listed here counts as amber until it is placed.
+#
+# How to change it: edit, then re-sign (comment `signed zones` on the zone-map issue).
+# Promote an area when real use shows bugs there; never demote one during a run.
+
+app_class: personal-tool   # one trusted user, one Mac, private business data. Not Fort Knox.
+stage: mvp                 # mvp: only red runs at full depth; amber is capped at "standard"
+
+zones:
+
+  red:
+    purpose: >
+      The hard core. Everything that can lose your data, leak it, or let the agent do
+      something only you may do. Kept small so the rest can move fast.
+    paths:
+      # one write path: every change to notes, rows and git goes through here
+      - core/src/vault-write.ts
+      - core/src/entity-write.ts
+      - core/src/document-writes.ts
+      - core/src/git.ts
+      - core/src/export/jsonl.ts
+      - core/src/frontmatter.ts          # rewrites your note headers; must never touch the body
+      # data model, migrations, backups
+      - core/src/db/index.ts
+      - core/src/db/schema.ts
+      - core/drizzle/**
+      # boundaries: where files may be written, what the agent may do, which models see data
+      - core/src/path-allowlist.ts
+      - core/src/agent-tools/guardrails.ts
+      - core/src/agent-tools/untrusted.ts
+      - core/src/embedding.ts            # the only core file that talks to a model host
+      - web/src/lib/provider-router.ts
+      - web/src/lib/anthropic-provider.ts
+      - web/src/lib/agent.ts             # holds the provider allowlist check
+      # the local web server's front door
+      - web/src/lib/security.ts
+      - web/src/lib/csrf.ts
+      - web/src/proxy.ts
+    invariants:   # each one is proven by a test in the invariant suite, run on every merge
+      - id: I1
+        rule: A failed write leaves the note, its database row and git exactly as they were. No half state.
+      - id: I2
+        rule: A write made against an out-of-date copy of a note is refused, never overwrites.
+      - id: I3
+        rule: Nothing is ever deleted. Archive is the only way out.
+      - id: I4
+        rule: The agent cannot make a document live, delete anything or send anything outside the app.
+      - id: I5
+        rule: Business text only reaches Anthropic, OpenAI or a model on this Mac. Any other provider stops the app at startup.
+      - id: I6
+        rule: Files are only written inside the registered vault folders. Symlinks and ".." cannot escape.
+      - id: I7
+        rule: Changing a note's frontmatter never changes a word of its body.
+      - id: I8
+        rule: Every write is attributed (ben or claude), logged in activity and committed to git.
+      - id: I9
+        rule: The latest backup restores to a working database.
+      - id: I10
+        rule: The web app answers only on 127.0.0.1 and refuses requests from other origins.
+      - id: I11
+        rule: Text from notes or captures reaches the model marked as untrusted data.
+    checks: [typecheck, tests, invariant-suite, scenario-run, security-pass, adversarial-review]
+    max_rounds: 3          # a design decision is required after round 2
+    owner_gate: [destructive-schema, live-database]
+
+  amber:
+    purpose: >
+      Features. They change data, but only by calling the red write path, so they
+      inherit its safety. Must work for the scenario, fail clearly, never go around red.
+    paths:
+      - core/src/crm.ts
+      - core/src/tasks.ts
+      - core/src/ledger.ts               # your own bookkeeping, not payments
+      - core/src/settings.ts
+      - core/src/activity.ts
+      - core/src/document-model.ts
+      - core/src/document-reads.ts
+      - core/src/documents.ts
+      - core/src/indexer.ts              # index is rebuildable, but a stall is visible to you
+      - core/src/reindex.ts
+      - core/src/watcher.ts              # must never write your files (covered by I1, I6)
+      - core/src/catch-up.ts
+      - core/src/search.ts
+      - core/src/links.ts
+      - core/src/embedding-index.ts
+      - core/src/db/vector.ts
+      - core/src/service.ts
+      - core/src/service-control.ts
+      - core/src/import-seed.ts
+      - core/src/import-source.ts
+      - core/src/init-vault.ts
+      - core/src/vault-config.ts
+      - core/src/agent-tools/**          # except guardrails.ts and untrusted.ts (red)
+      - core/src/bin/**
+      - mcp/**
+      - web/src/app/api/**
+      - web/src/app/actions/**
+      - web/src/lib/agent-stream.ts
+      - web/src/lib/panel-tools.ts
+      - web/src/lib/ui-tools.ts
+      - web/src/lib/edit-patch.ts
+      - web/src/lib/server/**
+    bar: >
+      The card's scenario works in the real app. Errors say what happened in one line.
+      No data path skips the red write path. Empty, error and loading states exist.
+    checks: [typecheck, tests, invariant-suite, scenario-run, review]
+    max_rounds: 2          # round 3 = split the card or ask the owner
+
+  green:
+    purpose: >
+      Looking, not changing. Screens, read-only summaries, ranking, copy.
+      Fast lane: if it looks wrong, it is fixed in minutes.
+    paths:
+      - web/src/components/**
+      - web/src/app/**/page.tsx
+      - web/src/app/layout.tsx
+      - web/src/lib/palette-*.ts
+      - web/src/lib/client-*.ts
+      - web/src/lib/markdown.ts
+      - web/src/lib/document-view-model.ts
+      - web/src/lib/select-text.ts
+      - web/src/lib/selection.ts
+      - core/src/today.ts
+      - core/src/context.ts
+      - core/src/related.ts
+      - core/src/document-list.ts
+      - core/src/recall-eval.ts
+      - docs/**
+    bar: Looks right, works on the happy path, no console errors.
+    checks: [typecheck, tests, invariant-suite, review-light]
+    max_rounds: 1
+
+# Things we have decided not to care about. No lane bounces a card for these.
+accepted_limits:
+  - Unusual Unicode in titles (lone surrogates, combining marks)
+  - Upper/lower-case variants of the same path on macOS
+  - Backups copied in from another machine or another funl-hq database
+  - Process-ID reuse leaving a stale lock (the write lock recovers on restart)
+  - Two edits to the same note within the same second
+  - Notes in a folder sealed during the watcher's settle window
+  - Very large vaults (over 10,000 notes) until real use gets near it
+
+# Enforcement, to build (app ticket, after sign-off):
+#   lint rule: file writes, database writes and model calls are only allowed in red paths
+#   gate: invariant suite runs on every merge, under 60 seconds
+#   planner: card tier computed from the paths in its plan; gate re-checks against the diff

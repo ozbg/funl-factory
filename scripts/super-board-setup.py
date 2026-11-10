@@ -25,7 +25,8 @@ What `fix` does, with NO question (all of it backed up first to
   - migrates every .claude/super-board/configs/*.json to the v3 keys (migrate-config), and
     writes a missing top-level `host` from --host (check flags a host outside claude/codex/opencode)
   - `git init` when the folder is not a repo
-  - adds Matt Pocock's helper skills with npx when Node is present and they are missing
+  - adds the 18 helper skills (skills/families.json → helpers) with npx when Node is present and any is missing
+  - prints a one-line fix (never a red check) for a config still naming a retired worker backend (claude-p, codex, --codex)
 It never installs a system tool or signs in: those come back in `needs` with the exact
 command for this OS, for onboard to ask about.
 
@@ -71,18 +72,35 @@ OLD_LABELS = {
     "bug-fix": "bug", "bugfix": "bug", "type:bug": "bug", "kind:bug": "bug",
     "qa-only": "qa", "type:qa": "qa", "kind:qa": "qa",
 }
-SKILLS = ["super-board", "super-build", "super-qa", "super-review", "super-collect", "visual", "git-sync", "ui-refine-loop", "pr-security-review"]
+
+
+def load_manifest():
+    """skills/families.json: in the pack checkout, or the copy install.sh puts beside this
+    script as super-board-manifest.json."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for path in (os.path.join(os.path.dirname(here), "skills", "families.json"),
+                 os.path.join(here, "super-board-manifest.json")):
+        if os.path.isfile(path):
+            with open(path) as f:
+                return json.load(f)
+    raise SystemExit("super-board-setup: manifest not found (skills/families.json or super-board-manifest.json)")
+
+
+MANIFEST = load_manifest()
+SKILLS = [n for fam in MANIFEST.values() if fam.get("install") == "pack" for n in fam["skills"]]
 OLD_SKILL_DIRS = ["super-refine", "cleanup-wt", "arch-loop"]
-BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-board-host.sh", "super-board-codex-wave.sh", "super-board-lane.sh", "super-board-codex-lane.sh", "super-board-calibration.py", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-collect-state.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
+BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-board-host.sh", "super-board-calibration.py", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-collect-state.py", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
        "super-board-deps.sh", "super-board-preflight.sh", "super-board-merge-gate.sh",
        "super-board-merge-policy.py", "super-board-approval.py", "super-board-env-check.sh", "super-board-agents-md.py",
        "super-board-settings.py", "super-board-setup.py", "super-board-usage.sh", "super-board-pr-body.sh",
-       "super-review-file-refactor.sh", "super-qa-file-bug.sh", "super-board-stop.sh"]
-WORKFLOWS = ["super-board-wave.js", "ui-refine-loop.js"]
-HELPERS_CMD = "npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y"
-# Cloudflare's standalone whole-repo audit. Optional: installed by default, never
-# required by a lane, so a missing copy is a note, not a red check.
-SECURITY_AUDIT_CMD = "npx -y skills@latest add cloudflare/security-audit-skill --skill security-audit -a claude-code -y"
+       "super-review-file-refactor.sh", "super-qa-file-bug.sh", "super-board-stop.sh", "super-board-manifest.json"]
+WORKFLOWS = ["super-board-wave.js"]
+# The 18 helper skills, named one by one per source (never --skill '*').
+HELPERS_CMD = " && ".join(
+    "npx -y skills@latest add " + source + "".join(" --skill " + n for n in names) + " -a claude-code -y"
+    for source, names in MANIFEST["helpers"]["sources"].items())
+# Retired worker backends: a config still naming one gets a one-line fix, never a red check.
+LEGACY_BACKENDS = ("claude-p", "codex")
 
 # System tools: why the board needs each, and the install command per OS family.
 TOOLS = {
@@ -189,13 +207,13 @@ def helper_readiness(root, host="claude", home=None, catalog=None):
     return result
 
 
-def security_audit_present(root, readiness):
-    """Cloudflare's security-audit counts as installed when skills-lock.json lists it or the
-    resolver found its SKILL.md (it is an optional QA entry in the registry)."""
-    if "cloudflare/security-audit-skill" in read(os.path.join(root, "skills-lock.json")):
-        return True
-    return any(e.get("name") == "security-audit" and e.get("status") == "resolved"
-               for e in (readiness or {}).get("entries", []))
+def legacy_backend(path, cfg):
+    """One-line fix when a config still names a retired worker backend, else None."""
+    backend = cfg.get("worker_backend") if isinstance(cfg, dict) else None
+    if backend in LEGACY_BACKENDS or "--codex" in read(path):
+        return (f"{os.path.basename(path)}: the {backend or '--codex'} backend is retired — "
+                f'set "worker_backend": "workflow" and drop any --codex flag')
+    return None
 
 
 def is_git_repo(root):
@@ -315,8 +333,12 @@ def check(root, pack, host="claude", home=None, catalog=None):
     configs = {}
     verification = {}
     host_errors = {}
+    legacy = []
     for p in sorted(glob.glob(os.path.join(claude, "super-board", "configs", "*.json"))):
         cfg = load_json(p)
+        note = legacy_backend(p, cfg)
+        if note:
+            legacy.append(note)
         ready = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__),
                                 "super-board-verification-ready.py"), "--config", p],
                                capture_output=True, text=True)
@@ -341,11 +363,10 @@ def check(root, pack, host="claude", home=None, catalog=None):
             why, cmds = TOOLS[t]
             cmd = cmds[fam]
             if t == "node":
-                cmd += " && " + HELPERS_CMD + " && " + SECURITY_AUDIT_CMD
+                cmd += " && " + HELPERS_CMD
             needs.append({"kind": "tool", "name": t, "why": why, "command": cmd})
     readiness = helper_readiness(root, host, home, catalog)
     helpers = readiness["ready"]
-    security_audit = security_audit_present(root, readiness)
     git = is_git_repo(root)
     ok = []
     if not missing:
@@ -356,8 +377,6 @@ def check(root, pack, host="claude", home=None, catalog=None):
         ok.append("git repo found")
     if helpers:
         ok.append("required worker skills resolved for " + host)
-    if security_audit:
-        ok.append("security-audit skill installed (optional, run on demand)")
     red = bool(missing or old_dirs or configs or verification or host_errors or not git or needs or not helpers)
     return {
         "root": root, "pack": pack, "pack_version": pack_version, "installed_version": have_v,
@@ -365,7 +384,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
         "added_skills": upgrade_rec.get("added_skills", []),
         "missing": missing, "old_dirs": old_dirs, "configs": configs, "verification": verification,
         "host_errors": host_errors, "git": git,
-        "helper_skills": helpers, "security_audit": security_audit, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
+        "helper_skills": helpers, "helper_readiness": readiness, "legacy_backend": legacy, "needs": needs, "os": fam, "ok": ok, "green": not red,
     }
 
 
@@ -455,16 +474,6 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
         else:
             notes.append("would attempt helper installation, then re-resolve actual host-visible files")
 
-    if helpers and not before["security_audit"] and have("npx"):
-        if not dry:
-            run(["bash", "-c", SECURITY_AUDIT_CMD], cwd=root, input="")
-            if security_audit_present(root, helper_readiness(root, host, home, catalog)):
-                fixed.append("security-audit skill installed (Cloudflare, optional)")
-            else:
-                notes.append("security-audit install attempted and not found; optional, retry: " + SECURITY_AUDIT_CMD)
-        else:
-            notes.append("would install the optional security-audit skill")
-
     if not dry:
         up = os.path.join(claude, "super-board", "upgrade.json")
         if os.path.exists(up):
@@ -499,6 +508,8 @@ def text_report(res):
         lines.append("  ✗ " + res["helper_readiness"]["error"])
     for path, error in {**res.get("verification", {}), **res.get("host_errors", {})}.items():
         lines.append(f"  ✗ {path}: {error}")
+    for note in res.get("legacy_backend", []):
+        lines.append(f"  ! {note}")
     for n in res.get("needs", []):
         lines.append(f"  Needs your machine: {n['name']} isn't installed. It's needed for {n['why']}.")
         lines.append(f"    {n['command']}")

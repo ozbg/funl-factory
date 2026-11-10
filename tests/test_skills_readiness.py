@@ -9,7 +9,8 @@ import unittest
 
 KIT = Path(__file__).resolve().parents[1]
 CLI = KIT / 'scripts/super-board-skills-ready.py'
-CORE = ['super-board','super-build','super-qa','super-review','super-collect','visual','git-sync','ui-refine-loop','pr-security-review']
+MANIFEST = json.loads((KIT / 'skills/families.json').read_text())
+CORE = [n for f in MANIFEST.values() if f.get('install') == 'pack' for n in f['skills']]
 
 class Readiness(unittest.TestCase):
     def setUp(self):
@@ -27,7 +28,7 @@ class Readiness(unittest.TestCase):
         return path
 
     def full(self, host='claude'):
-        names = CORE + ['tdd', 'implement', 'codebase-design', 'code-review', 'diagnosing-bugs',
+        names = CORE + ['tdd', 'codebase-design', 'code-review', 'diagnosing-bugs',
                                'verification-before-completion', 'testing-strategy']
         for name in names:
             self.put(name, host)
@@ -53,7 +54,7 @@ class Readiness(unittest.TestCase):
 
     def test_verification_and_testing_strategy_fall_back_when_absent(self):
         # Neither skill has an installer (factory #29): a built-in checklist stands in.
-        for name in CORE + ['tdd', 'implement', 'codebase-design', 'code-review', 'diagnosing-bugs']:
+        for name in CORE + ['tdd', 'codebase-design', 'code-review', 'diagnosing-bugs']:
             self.put(name)
         qa_card = dict(number=2, status='QA', labels=['bug'], body='')
         for card, lane in [(self.card, 'build'), (qa_card, 'qa')]:
@@ -86,11 +87,8 @@ class Readiness(unittest.TestCase):
         self.assertEqual(qa['pr-security-review']['requirement'], 'required')
         self.assertEqual(qa['pr-security-review']['status'], 'resolved')
         self.assertNotIn('pr-security-review', review)
-        self.assertEqual(qa['security-audit']['requirement'], 'optional')
-        self.assertEqual(qa['security-audit']['status'], 'skipped')
-        self.assertNotIn('security-audit', review)
-        self.put('security-audit')
-        self.assertEqual(next(e for e in self.run_cli()['entries'] if e['name'] == 'security-audit')['status'], 'resolved')
+        # security-audit is retired: no lane names it, even as optional.
+        self.assertNotIn('security-audit', [e['name'] for e in entries])
         (self.root / '.claude/skills/pr-security-review/SKILL.md').unlink()
         missing = [e for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing']
         self.assertEqual([('qa', 'pr-security-review')], [(e['lane'], e['name']) for e in missing if e['name'] == 'pr-security-review'])
@@ -99,7 +97,7 @@ class Readiness(unittest.TestCase):
         self.full()
         self.run_cli(host='codex', expected=10)
         directory = self.root / '.agents/skills'; directory.mkdir(parents=True)
-        for name in ['tdd', 'implement', 'codebase-design', 'code-review', 'diagnosing-bugs', 'verification-before-completion', 'testing-strategy']:
+        for name in ['tdd', 'codebase-design', 'code-review', 'diagnosing-bugs', 'verification-before-completion', 'testing-strategy']:
             (directory / name).symlink_to(self.root / '.claude/skills' / name, target_is_directory=True)
         result = self.run_cli(host='codex')
         self.assertTrue(all(Path(e['resolved_path']).is_file() for e in result['entries'] if e['status'] == 'resolved'))
@@ -123,9 +121,10 @@ class Readiness(unittest.TestCase):
         self.full()
         self.card['body'] = '```\nSkills: ignored\n```\nSkills: `custom`\n'
         self.put('custom'); self.run_cli()
-        (self.root / '.claude/skills/implement/SKILL.md').unlink()
-        result = self.run_cli()
-        self.assertNotIn('mattpocock-skills:implement', [e['name'] for e in result['entries']])
+        (self.root / '.claude/skills/tdd/SKILL.md').unlink()
+        result = self.run_cli(extra=['--lane', 'build'])
+        self.assertNotIn('mattpocock-skills:tdd', [e['name'] for e in result['entries']])
+        self.put('tdd')
         self.card['body'] = 'Skills: vendor:tdd'
         self.run_cli(expected=10)
         catalog = self.root / 'active.json'
@@ -169,7 +168,6 @@ class Readiness(unittest.TestCase):
 
     def test_qa_and_review_have_their_own_chain(self):
         self.full()
-        (self.root / '.claude/skills/implement/SKILL.md').unlink()
         self.card['labels'] = ['qa']
         result = self.run_cli()
         self.assertNotIn('build', [e['lane'] for e in result['entries']])
@@ -250,22 +248,22 @@ class Readiness(unittest.TestCase):
     def test_ordered_literal_policy_rows_and_activation_boundaries(self):
         self.full()
         cases = [(['bug'], ['mattpocock-skills:diagnosing-bugs','mattpocock-skills:tdd']),
-                 (['feature'], ['mattpocock-skills:implement','mattpocock-skills:tdd','mattpocock-skills:codebase-design']),
-                 (['ux'], ['mattpocock-skills:implement','mattpocock-skills:tdd']),
-                 (['refactor'], ['mattpocock-skills:codebase-design','mattpocock-skills:tdd']),
-                 (['tech-debt'], ['mattpocock-skills:codebase-design','mattpocock-skills:tdd']),
+                 (['feature'], ['mattpocock-skills:tdd']),
+                 (['ux'], ['mattpocock-skills:tdd']),
+                 (['refactor'], ['mattpocock-skills:tdd']),
+                 (['tech-debt'], ['mattpocock-skills:tdd']),
                  (['tests'], ['mattpocock-skills:tdd']), (['docs'], [])]
         for labels, expected in cases:
             self.card['labels'] = labels
             result = self.run_cli(extra=['--lane','build'])
             names = [e['name'] for e in result['entries'] if e['requirement']=='required']
-            self.assertEqual(names, ['super-board','super-build', *expected, 'ponytail:ponytail','verification-before-completion','mattpocock-skills:code-review'])
+            self.assertEqual(names, ['super-board','super-build', *expected, 'ponytail:ponytail','verification-before-completion'])
         # A docs chain can be ready while a proposed feature chain is incomplete.
-        (self.root / '.claude/skills/implement/SKILL.md').unlink()
-        self.card['labels'] = ['docs']; self.run_cli()
-        self.card['labels'] = ['feature']; self.run_cli(expected=10)
-        self.card['labels'] = ['docs']; self.run_cli(extra=['--require','verify-example'], expected=10)
-        self.put('verify-example'); self.run_cli(extra=['--require','verify-example'])
+        (self.root / '.claude/skills/tdd/SKILL.md').unlink()
+        self.card['labels'] = ['docs']; self.run_cli(extra=['--lane','build'])
+        self.card['labels'] = ['feature']; self.run_cli(extra=['--lane','build'], expected=10)
+        self.card['labels'] = ['docs']; self.run_cli(extra=['--lane','build','--require','verify-example'], expected=10)
+        self.put('verify-example'); self.run_cli(extra=['--lane','build','--require','verify-example'])
 
     def test_codex_discovery_stops_at_independent_repository_root(self):
         self.full('codex')
@@ -304,7 +302,7 @@ class Readiness(unittest.TestCase):
         catalog.write_text(json.dumps(dict(host='codex', skills=[])))
         self.run_cli(host='codex', extra=['--catalog',str(catalog)], expected=10)
         entries = [dict(name=name,path=str((self.root / '.agents/skills' / name / 'SKILL.md').resolve()),enabled=True,scope='project',project_root=str(self.root))
-                   for name in CORE + ['tdd','implement','codebase-design','code-review','diagnosing-bugs','verification-before-completion','testing-strategy']]
+                   for name in CORE + ['tdd','codebase-design','code-review','diagnosing-bugs','verification-before-completion','testing-strategy']]
         catalog.write_text(json.dumps(dict(host='codex',skills=entries)))
         self.run_cli(host='codex', extra=['--catalog',str(catalog)])
 
@@ -331,7 +329,7 @@ class Readiness(unittest.TestCase):
         catalog.write_text(json.dumps(dict(host='codex',skills=[])))
         self.run_cli(host='codex', extra=['--catalog',str(catalog)], expected=10)
         entries = [dict(name=name,path=str((self.root / '.agents/skills' / name / 'SKILL.md').resolve()),enabled=True,scope='project',project_root=str(self.root))
-                   for name in CORE + ['tdd','implement','codebase-design','code-review','diagnosing-bugs','verification-before-completion','testing-strategy'] if name != 'tdd']
+                   for name in CORE + ['tdd','codebase-design','code-review','diagnosing-bugs','verification-before-completion','testing-strategy'] if name != 'tdd']
         catalog.write_text(json.dumps(dict(host='codex',skills=entries)))
         self.run_cli(host='codex', extra=['--catalog',str(catalog)], expected=10)
         # A trusted effective inventory may enable it through a higher-priority layer.
@@ -364,6 +362,30 @@ class Readiness(unittest.TestCase):
         for name in CORE:
             self.assertIn(name, [e['name'] for e in result['entries']])
         self.assertTrue(any(e['name'] == 'mattpocock-skills:diagnosing-bugs' and e['requirement'] == 'required' for e in result['entries']))
+
+    def test_every_required_skill_is_in_the_manifest(self):
+        # A required name no installer fetches halts every lane: each must be a pack or
+        # helper skill in skills/families.json, or have a checklist fallback.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('sr', CLI)
+        sr = importlib.util.module_from_spec(spec); spec.loader.exec_module(sr)
+        installed = set(CORE) | set(MANIFEST['helpers']['skills'])
+        self.assertEqual(sorted(sr.CORE), sorted(CORE))
+        self.assertEqual(len(CORE) + len(MANIFEST['helpers']['skills']), 26)
+        names = set(sr.REGISTRY['default'])
+        for _, row in sr.REGISTRY['build_rows']:
+            names |= set(row)
+        for lane in sr.LANES:
+            names |= set(sr.REGISTRY['boundaries'][lane])
+        for name in names:
+            short = name.split(':', 1)[1] if name.startswith('mattpocock-skills:') else name
+            self.assertTrue(short in installed or name in sr.REGISTRY['fallbacks'], name)
+        retired = set(MANIFEST['retired']['names'])
+        for aliases in sr.REGISTRY['aliases'].values():
+            self.assertFalse(retired & set(aliases), aliases)
+        for group in ('conditional', 'optional'):
+            for lane in sr.LANES:
+                self.assertFalse(retired & {n.split(':')[-1] for n in sr.REGISTRY[group][lane]}, (group, lane))
 
 if __name__ == '__main__':
     unittest.main()

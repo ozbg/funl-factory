@@ -134,30 +134,6 @@ sys.exit(r.get('rc', 0))
         self.assertEqual(result.returncode, 79)
         self.assertEqual(self.halt.read_text(), original)
 
-    def test_legacy_read_failure_preserves_snapshot_and_prevents_dispatch(self):
-        self.env['READ_RESPONSES'] = json.dumps([{'rc': 1}])
-        script = """SB_LIB_ONLY=1 . "$1"
-set +e
-PROJECT_OWNER=acme PROJECT_NUMBER=1
-PROJECT_ITEMS_JSON='{"items":[{"id":"preserved"}]}'
-fetch_project_items; rc=$?
-printf '%s %s\n' "$rc" "$PROJECT_ITEMS_JSON"
-dispatch_lane build 7
-"""
-        result = subprocess.run(['bash', '-c', script, 'test', str(ROOT / 'scripts/super-board-run.sh')],
-                                cwd=self.root, env=self.env, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 79, result.stderr)
-        self.assertIn('79 {"items":[{"id":"preserved"}]}', result.stdout)
-        self.assertEqual(self.log.read_text(), '3', 'no claim/worker or extra API call after halt')
-
-    def test_unknown_issue_state_never_means_open(self):
-        self.env['READ_RESPONSES'] = json.dumps([{'rc': 1}])
-        script = 'SB_LIB_ONLY=1 . "$1"; issue_is_open 7'
-        result = subprocess.run(['bash', '-c', script, 'test', str(ROOT / 'scripts/super-board-run.sh')],
-                                cwd=self.root, env=self.env, capture_output=True)
-        self.assertEqual(result.returncode, 79)
-        self.assertEqual(self.log.read_text(), '3')
-
     def test_missing_quota_never_means_full_allowance(self):
         self.env['READ_RESPONSES'] = json.dumps([{'rc': 1}])
         result = subprocess.run(['bash', '-c', '. "$1"; sb_gh_guard_check 200', 'test',
@@ -228,21 +204,6 @@ dispatch_lane build 7
         self.assertEqual(len(records),1)
         self.assertEqual(records[0].read_text(),original)
 
-    def test_failed_closed_card_reconcile_keeps_claim_and_lock(self):
-        lock = self.root / 'inflight'; lock.mkdir()
-        # No lock initially: the card is eligible for the closed-card reconcile path.
-        self.env['READ_RESPONSES'] = json.dumps([{'out':'CLOSED'}, {'rc':1}])
-        script = """SB_LIB_ONLY=1 . "$1"
-INFLIGHT_DIR="$2/inflight"; RUN_MANIFEST="$2/run.log"; BOT_LOGIN=robot
-STATUS_FIELD_ID=field; STATUS_OPTIONS_JSON='[{"id":"done","name":"Done"}]'
-PROJECT_ITEMS_JSON='{"items":[{"id":"item","status":"Review","content":{"number":7,"type":"Issue","assignees":[]}}]}'
-top_card_in_column Review
-"""
-        result = subprocess.run(['bash','-c',script,'test',str(ROOT / 'scripts/super-board-run.sh'),str(self.root)],
-                                env=self.env,cwd=self.root,capture_output=True)
-        self.assertEqual(result.returncode,79,result.stderr)
-        self.assertEqual(self.log.read_text(),'4','one state read, three failed project reads, no claim release')
-
     def test_dedupe_capped_or_malformed_data_is_never_no_match(self):
         for data in [[{}], [{'number': n+1, 'body':'old'} for n in range(200)]]:
             self.halt.unlink(missing_ok=True); self.log.unlink(missing_ok=True)
@@ -250,18 +211,6 @@ top_card_in_column Review
             self.assertEqual(result.returncode,79)
             self.assertEqual(result.stdout,'')
             self.assertEqual(self.log.read_text(),'3')
-
-    def test_legacy_mutation_failure_pauses_without_retry_or_lock_removal(self):
-        inflight = self.root / 'inflight'; inflight.mkdir()
-        lock = inflight / '7'; lock.write_text('PID=\nLANE=build\n')
-        self.env['READ_RESPONSES'] = json.dumps([{'rc':1}])
-        script = 'SB_LIB_ONLY=1 . "$1"; INFLIGHT_DIR="$2/inflight"; RUN_MANIFEST="$2/run.log"; BOT_LOGIN=robot; reap_finished_locks'
-        result = subprocess.run(['bash','-c',script,'test',str(ROOT / 'scripts/super-board-run.sh'),str(self.root)],
-                                env=self.env,cwd=self.root,capture_output=True)
-        self.assertEqual(result.returncode,79)
-        self.assertEqual(self.log.read_text(),'1')
-        self.assertTrue(self.halt.exists())
-        self.assertTrue(lock.exists())
 
     def test_worktrees_share_halt_and_explicit_restart_preserves_reason(self):
         self.env.pop('SB_GITHUB_HALT_FILE')

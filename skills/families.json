@@ -1,21 +1,95 @@
 {
   "you_type": {
-    "title": "You type — 5 skills",
+    "title": "You type — 4 skills",
+    "install": "pack",
     "skills": {
       "super-board": "Orchestrator: plans waves, runs Build → QA → Review, merges when green.",
       "super-collect": "Finds problems, verifies them, writes a findings doc for /to-spec and /to-tickets.",
-      "ui-refine-loop": "Critique → refine loop that polishes one page or component.",
-      "visual": "One HTML page: branch recap, plan, or codebase map with diagrams.",
-      "git-sync": "Commit per logical change, merge-pull, push without force, report."
+      "git-sync": "Commit per logical change, merge-pull, push without force, report.",
+      "north-star": "One short interview that fixes an app's why, must-haves and destination."
     }
   },
   "board_runs": {
     "title": "The board runs — 4 skills",
+    "install": "pack",
     "skills": {
       "super-build": "Builder lane: worktree, smallest safe change, tests, draft PR.",
       "super-qa": "Tester lane: evidence, test-gap check, screenshots, or bounce to Build.",
       "super-review": "Reviewer lane: own hypotheses, remembers prior findings, merge gate.",
       "pr-security-review": "Security pass on every PR diff; super-qa runs it, findings fail QA."
     }
+  },
+  "standalone": {
+    "title": "Kept here, not installed into apps — 2 skills",
+    "install": "none",
+    "skills": {
+      "ui-refine-loop": "Critique → refine loop that polishes one page or component.",
+      "visual": "One HTML page: branch recap, plan, or codebase map with diagrams."
+    }
+  },
+  "helpers": {
+    "title": "Helpers installed beside the pack — 18 skills",
+    "install": "helper",
+    "sources": {
+      "mattpocock/skills": ["tdd", "diagnosing-bugs", "code-review", "codebase-design", "domain-modeling",
+                            "prototype", "to-spec", "to-tickets", "grilling", "research", "triage",
+                            "improve-codebase-architecture", "handoff", "claude-handoff", "to-questionnaire",
+                            "wizard", "retro"],
+      "obra/superpowers": ["verification-before-completion"]
+    },
+    "skills": {
+      "tdd": "Build lane: every change goes red, green, refactor.",
+      "diagnosing-bugs": "Build lane on bug cards: reproduce and pin the cause first.",
+      "code-review": "QA and Review lanes: standards and spec review of a diff.",
+      "codebase-design": "Review lane and refactors: deep-module design vocabulary.",
+      "domain-modeling": "Build lane when a card touches domain terms, glossary or ADRs.",
+      "verification-before-completion": "Every lane: run the checks before claiming done.",
+      "prototype": "Throwaway prototype that settles a design question before a ticket.",
+      "to-spec": "Turns a findings doc or idea into a spec; super-collect hands off here.",
+      "to-tickets": "Splits a spec into board tickets with acceptance criteria.",
+      "grilling": "Stress-tests a plan with hard questions before it becomes tickets.",
+      "research": "Primary-source research written up as a Markdown file in the repo.",
+      "triage": "Sorts incoming issues into actionable, duplicate or won't-fix.",
+      "improve-codebase-architecture": "Finds refactor candidates; feeds /super-collect architecture.",
+      "handoff": "Writes a handoff note so the next session picks up cleanly.",
+      "claude-handoff": "Hands the current task to a fresh Claude session.",
+      "to-questionnaire": "Turns open questions into a questionnaire the owner answers.",
+      "wizard": "Interactive bash wizard for steps only the owner can do.",
+      "retro": "Run retro: what worked, what broke, what to change next."
+    }
+  },
+  "retired": {
+    "title": "Retired — pruned from apps on install",
+    "install": "prune",
+    "sources": ["mattpocock/skills", "cloudflare/security-audit-skill"],
+    "user_wide": "npx skills add -g mattpocock/skills --skill setup-matt-pocock-skills --skill setup-ts-deep-modules --skill setup-pre-commit --skill git-guardrails-claude-code; npx skills add -g ozbg/funl-factory --skill visual",
+    "names": {
+      "ui-refine-loop": "kept in the factory repo for standalone use",
+      "visual": "kept in the factory repo; install it user-wide",
+      "security-audit": "pr-security-review covers PRs; no lane runs it",
+      "implement": "super-build routes to tdd",
+      "implement-spec": "super-collect files tickets on the board Backlog",
+      "grill-me": "replaced by grilling",
+      "grill-with-docs": "replaced by grilling",
+      "wayfinder": "north-star starts new work",
+      "pr": "super-board-pr-body.sh writes PR bodies",
+      "ask-matt": "no lane uses it",
+      "chief-of-staff": "no lane uses it",
+      "teach": "no lane uses it",
+      "wait-what": "no lane uses it",
+      "loop-me": "no lane uses it",
+      "writing-beats": "no lane uses it",
+      "writing-fragments": "no lane uses it",
+      "writing-shape": "no lane uses it",
+      "writing-for-agents": "for authoring skills; the factory repo has it, apps do not",
+      "scaffold-exercises": "no lane uses it",
+      "migrate-to-shoehorn": "no lane uses it",
+      "setup-matt-pocock-skills": "one-off setup; install it user-wide",
+      "setup-ts-deep-modules": "one-off setup; install it user-wide",
+      "setup-pre-commit": "one-off setup; install it user-wide",
+      "git-guardrails-claude-code": "the guard hooks cover it; install it user-wide"
+    },
+    "bin": ["super-board-lane.sh", "super-board-codex-lane.sh", "super-board-codex-wave.sh", "super-board-run.sh"],
+    "workflows": ["ui-refine-loop.js"]
   }
 }

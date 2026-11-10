@@ -4,7 +4,7 @@
 
 ## What stop does — the one-line version
 
-Tears down an in-flight `super-board run` cleanly: posts a "stopped here" comment on every claimed issue + PR, releases the assignee mutex, kills workers + dispatcher, removes lock files. **Run = resume**, so the next `super-board run` picks up where stop left off.
+Tears down an in-flight `super-board run` cleanly: posts a "stopped here" comment on every claimed issue + PR, releases the assignee mutex, kills workers, removes lock files. **Run = resume**, so the next `super-board run` picks up where stop left off.
 
 ## Intro shown when stop runs
 
@@ -31,8 +31,6 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 ## What stop reads
 
 - `.claude/super-board/inflight/<issue-N>` — one file per in-flight worker. New (v1.3.0+) format: `PID=…\nLANE=…\nSTARTED=…`. Legacy single-line PID format is also supported.
-- `pgrep -f 'super-board-run\.sh'` — dispatcher PID(s).
-- `pgrep -f 'claude -p .*super-board'` — orphan worker scan (workers without a lock file, e.g. from a crashed dispatcher).
 
 ## Per-worker wrap-up (run for each in-flight lock)
 
@@ -51,18 +49,16 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 
 ## After the per-worker loop
 
-6. **Sweep orphan workers** — `pgrep -f 'claude -p .*super-board'` catches any `claude -p` worker that wasn't in `inflight/` (defensive against crashed dispatchers).
-7. **Kill the dispatcher loop** — `pgrep -f 'super-board-run\.sh'`, SIGTERM → 1s → SIGKILL.
-8. **Clear in-flight locks** — `rm -f .claude/super-board/inflight/*`. The PIDs they reference are dead now.
-9. **Print summary** — workers stopped, dispatchers stopped, resume command.
+6. **Clear in-flight locks** — `rm -f .claude/super-board/inflight/*`. The PIDs they reference are dead now.
+7. **Print summary** — workers stopped, resume command.
 
 ## What stop does NOT do (deliberate)
 
-- **Does not wait for workers to finish.** `claude -p` workers have no SIGTERM handler that flushes a partial commit. Worktree files remain, but unsaved in-memory work may be lost. Inspect uncommitted edits before resuming; restart recovery keeps dirty worktrees for inspection.
+- **Does not wait for workers to finish.** Workers have no SIGTERM handler that flushes a partial commit. Worktree files remain, but unsaved in-memory work may be lost. Inspect uncommitted edits before resuming; restart recovery keeps dirty worktrees for inspection.
 - **Does not touch worktrees** under `.claude/worktrees/` or the legacy `.worktrees/` location. A legacy board worktree halts the next run until inspected/moved to the canonical folder; cleanup never force-removes it.
 - **Does not touch branches or PRs.** Both persist. State lives on the GitHub Project board — cards stay in whichever column they were in when stopped.
 - **Does not modify the config.** A stopped run is not a deactivated config; `.claude/super-board/active` is preserved.
-- **Does not bypass the GitHub assignee mutex.** It releases the mutex, then kills. If the GitHub API is unreachable, release is best-effort and the orphan-scan + reap-on-next-start covers the gap.
+- **Does not bypass the GitHub assignee mutex.** It releases the mutex, then kills. If the GitHub API is unreachable, release is best-effort and the next run's crash-recovery sweep covers the gap.
 
 ## Resume = run (no separate verb)
 
@@ -71,14 +67,14 @@ There is **no `super-board resume` verb on purpose**. The board is the state:
 - Cards sit in whichever column they were in when stopped.
 - Branches + PRs persist.
 - The wrap-up comment on each in-flight issue documents what was in progress.
-- `super-board run <slug>` claims the same cards on its next tick and re-runs the lane from scratch (Builder re-implements, Tester re-runs tests, Reviewer re-reviews — there's no per-lane checkpoint inside a worker).
+- `super-board run <slug>` claims the same cards on its next wave and re-runs the lane from scratch (Builder re-implements, Tester re-runs tests, Reviewer re-reviews — there's no per-lane checkpoint inside a worker).
 
 Resume cost: **one lane cycle per previously-in-flight card** (Builder ~5min, Tester ~10min, Reviewer ~3min on a typical card), after any required recovery. Inspect and preserve local edits first; dirty or legacy worktrees need attention before automatic recovery continues.
 
 ## When to use stop
 
 - Need to step away and don't want workers consuming gh quota / Claude budget while idle.
-- Discovered a bug in the dispatcher / a skill and need to fix it before more cards process.
+- Discovered a bug in the workflow / a skill and need to fix it before more cards process.
 - About to make a destructive board edit (column rename, project re-permission) that would break in-flight workers.
 - Rate limits, billing alerts, or any cross-cutting "stop everything" signal.
 - End of a work session — clean shutdown beats letting workers run unattended overnight.
@@ -86,7 +82,7 @@ Resume cost: **one lane cycle per previously-in-flight card** (Builder ~5min, Te
 ## When NOT to use stop
 
 - A single card is stuck → fix the card; the lane-zombie watchdog auto-recovers, and the rebuild-cap gate moves persistently-failing cards to Blocked.
-- The dispatcher's `no progress for 3 ticks` halt already fired → already stopped cleanly.
+- The run's no-progress halt gate already fired → already stopped cleanly.
 - You're just curious about status → use `super-board status` (read-only, no side effects).
 
 ## Orchestrator behavior (when Claude is asked to "stop super-board")
@@ -103,9 +99,9 @@ Per the cardinal orchestrator/worker rule:
 | Symptom | Cause | Recovery |
 |---|---|---|
 | `gh issue comment` fails | gh auth expired or network blip | Comments are best-effort. The kill + lock cleanup still happens. Manually note the stop in the issue later if needed. |
-| Assignee release fails (gh 403) | rate limit or auth | The next `super-board run` startup runs `reap_finished_locks` which sweeps stale assignees idempotently. No manual action needed. |
-| Worker PID survives SIGKILL | extremely rare (kernel-level stuck process) | `ps aux \| grep claude -p` to confirm, then escalate via OS tools. |
-| Stop reports "nothing to stop" but `ps` shows live workers | dispatcher and workers were started by a different repo / different inflight dir | Run stop in the right repo OR `pkill -f 'super-board-run\.sh'` manually + `pkill -f 'claude -p .*super-board'`. |
+| Assignee release fails (gh 403) | rate limit or auth | The next `super-board run` crash-recovery sweep releases stale assignees idempotently. No manual action needed. |
+| Worker PID survives SIGKILL | extremely rare (kernel-level stuck process) | `ps -p <pid>` to confirm, then escalate via OS tools. |
+| Stop reports "nothing to stop" but `ps` shows live workers | workers were started by a different repo / different inflight dir | Run stop in the right repo. |
 
 ## Lock file format (v1.3.0+)
 
