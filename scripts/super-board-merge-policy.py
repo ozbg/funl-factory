@@ -44,7 +44,9 @@ Rules, from references/config-schema.json → merge_policy / migrations:
   deletions`; without them the PR totals are used.
 - merge_policy.always_human.<category>: any label, path glob or added-line
   keyword match → human. Categories ship as money, auth, schema; setting
-  always_human replaces them all (`{}` turns category gating off).
+  always_human replaces them all (`{}` turns category gating off). The schema
+  keyword scan skips test files and fixtures (TEST_PATHS); migration and .sql
+  files are always scanned.
 - migrations: a changed path matching migrations.globs makes this a migration
   PR. Every env in allowed_envs with a command runs (a command of "-" means the
   deploy pipeline applies it: nothing to run). target_env not in allowed_envs, or
@@ -100,6 +102,11 @@ DEFAULT_SIZE_EXCLUDE = [
     "**/__snapshots__/**", "**/*.snap",
 ]
 
+# Test files and fixtures: a test asserting "drop table" never ran one (#21).
+TEST_PATHS = ["**/tests/**", "**/test/**", "**/__tests__/**", "**/e2e/**", "**/*.test.*", "**/*.spec.*",
+              "**/test_*.py", "**/*_test.py", "**/*_test.go",
+              "**/fixtures/**", "**/__fixtures__/**", "**/testdata/**"]
+
 
 def glob_re(pattern: str) -> re.Pattern:
     out, i = "", 0
@@ -122,6 +129,10 @@ def matches(path: str, globs) -> str | None:
         if glob_re(g).match(path):
             return g
     return None
+
+
+def mig_globs(cfg) -> list:
+    return (cfg.get("migrations") or {}).get("globs") or DEFAULT_MIGRATION_GLOBS
 
 
 def zone_tier(cfg, paths) -> str:
@@ -158,8 +169,18 @@ def main() -> int:
 
     labels = {(l.get("name") or "").lower() for l in meta.get("labels") or []}
     paths = [f.get("path") or "" for f in meta.get("files") or []]
-    added = "\n".join(l[1:] for l in diff.splitlines()
-                      if l.startswith("+") and not l.startswith("+++")).lower()
+    added_lines, src_lines, scan = [], [], True
+    for l in diff.splitlines():
+        m = re.match(r"^diff --git a/.* b/(.*)$", l)
+        if m:
+            p = m.group(1)
+            scan = not matches(p, TEST_PATHS) or p.endswith(".sql") or bool(matches(p, mig_globs(cfg)))
+        elif l.startswith("+") and not l.startswith("+++"):
+            added_lines.append(l[1:])
+            if scan:
+                src_lines.append(l[1:])
+    added = "\n".join(added_lines).lower()
+    added_src = "\n".join(src_lines).lower()
     body = meta.get("body") or ""
 
     policy = cfg.get("merge_policy") or {}
@@ -171,7 +192,7 @@ def main() -> int:
         human.append({"category": "default", "why": f"host {host}: auto-merge not turned on "
                       "(set merge_policy.default to \"auto\")"})
     mig = cfg.get("migrations") or {}
-    globs = mig.get("globs") or DEFAULT_MIGRATION_GLOBS
+    globs = mig_globs(cfg)
     mig_files = [p for p in paths if matches(p, globs)]
 
     cap = policy.get("auto_max_lines")
@@ -207,8 +228,9 @@ def main() -> int:
             hit = next((f"path {p} (matches {g})" for p in paths
                         for g in [matches(p, rule.get("paths"))] if g), None)
         if not hit:
+            text = added_src if cat == "schema" else added
             hit = next((f"keyword \"{k}\" in an added line" for k in rule.get("keywords") or []
-                        if k.lower() in added), None)
+                        if k.lower() in text), None)
         if hit:
             human.append({"category": cat, "why": hit})
 

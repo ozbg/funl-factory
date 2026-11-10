@@ -300,9 +300,10 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
     a. "Merge" — "Who merges a change that passes review?" [Robot merges normal changes
        (Recommended) / I merge everything]; production base: the order flips, and robot-merges
        sets merge_policy.allow_auto_on_production: true (run.md's guard needs it).
-       → merge_policy.default "auto" | "human"; auto_max_lines 400 (lockfiles, generated,
-         snapshots, migration SQL not counted); always_human = schema defaults (money, auth,
-         destructive schema). A matching PR parks in Blocked with 🙋.
+       → merge_policy.default "auto" | "human"; auto_max_lines 600 source lines (tests,
+         lockfiles, generated, snapshots, migration SQL not counted; over it → a deeper
+         review, not you, unless the tier is red); always_human = schema defaults (money,
+         auth, destructive schema). A matching PR parks in Blocked with 🙋.
     b. "Push guard" — "Block pushing straight to main?" [Yes (Recommended for a repo with
        commits) / No]. Skipped when settings.json already wires guard-protected-push.py. Script
        missing (--no-hooks install) → record the answer and say: "Run ./install.sh --no-hooks
@@ -421,10 +422,21 @@ don't stall on prompts:
     "Bash(bash .claude/bin/super-board-host.sh:*)",
     "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",
     "Bash(bash .claude/bin/super-board-stop.sh:*)",
+    "Bash(gh api graphql:*)", "Bash(gh label create:*)",
+    "Bash(source .claude/bin/super-board-gh-guard.sh:*)",
     plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
 
+A rule matches one plain command only. A lane command behind `cd … &&`, in a
+shell loop or chained with `;` misses every rule and goes to the permission
+checker, which denies GitHub writes (`lanes/common.md` → "Command shape").
+`"Bash(gh api graphql:*)"` is the lanes' one route to resolve a review thread, and
+`"Bash(gh api:*)"` covers editing their own comment (`lanes/common.md` → "Thread and
+comment writes"). `"Bash(gh label create:*)"` lets the Reviewer create the
+`deep-reviewed` label once.
+
 `tests/test_run_allowlist.py` fails when pre-flight or a lane calls a `.claude/bin`
-script this list does not cover. The read helper is listed in both forms: scripts call
+script this list does not cover, or a lane file puts a `gh` or board command
+behind `cd … &&`. The read helper is listed in both forms: scripts call
 `python3 .claude/bin/super-board-github-read.py`, lane prompts call it directly.
 
 **Headless runs (`claude -p "/super-board run"`).** Supported only where Claude Code may
@@ -450,7 +462,8 @@ up front (onboard → Permissions), so the first overnight run does not stall:
 
 Without them every Reviewer merge pauses for one interactive approval, so the
 backend is **attended-only**. With them, the gate still enforces
-`merge_policy` (money / auth / destructive schema / over `auto_max_lines` → human, exit 7) and `migrations`
+`merge_policy` (money / auth / destructive schema / a red-tier PR over `auto_max_lines` → human, exit 7;
+a non-red PR over it → deep review, exit 10, no human) and `migrations`
 (live DB → 🙋 needs you, exit 8), so the allowlist removes the prompt, not
 the policy. Pair auto-merge with a non-production `base_branch`.
 
