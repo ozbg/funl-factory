@@ -183,8 +183,8 @@ ticket closes, or becomes the first slice, once the user approves the split.
 | Feature ticket, undefined UX | `shape` |
 | Copy / microcopy / error message AC | `clarify` |
 | Bug ticket, no repro steps | `mattpocock-skills:diagnosing-bugs` |
-| Issue needing fundamental rethink (criteria #10, #11) | `mattpocock-skills:grilling` |
-| Issue with multiple interpretations (criterion #12) | `mattpocock-skills:grilling` |
+| Issue needing fundamental rethink (criteria #10, #11) | re-run `/north-star` (rescope), then `/to-board` |
+| Issue with multiple interpretations (criterion #12) | re-run `/north-star` (rescope), then `/to-board` |
 | Ticket too big (criterion #15) | `/to-board` (split into vertical slices) |
 | Ticket format (criteria #16–18) | Inline rewrite into `ticket-format.md` (sub-agent in lint itself) |
 | Unsettled expensive design (criterion #19) | [Design preflight](design-preflight.md) with `mattpocock-skills:codebase-design`; `mattpocock-skills:domain-modeling` only for terminology/ADR work |

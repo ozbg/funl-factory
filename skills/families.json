@@ -30,13 +30,11 @@
     }
   },
   "helpers": {
-    "title": "Helpers installed beside the pack — 16 skills",
+    "title": "Helpers installed beside the pack — 7 skills",
     "install": "helper",
     "sources": {
       "mattpocock/skills": ["tdd", "diagnosing-bugs", "code-review", "codebase-design", "domain-modeling",
-                            "prototype", "grilling", "research", "triage",
-                            "improve-codebase-architecture", "handoff", "claude-handoff", "to-questionnaire",
-                            "wizard", "retro"],
+                            "improve-codebase-architecture"],
       "obra/superpowers": ["verification-before-completion"]
     },
     "skills": {
@@ -46,16 +44,7 @@
       "codebase-design": "Review lane and refactors: deep-module design vocabulary.",
       "domain-modeling": "Build lane when a card touches domain terms, glossary or ADRs.",
       "verification-before-completion": "Every lane: run the checks before claiming done.",
-      "prototype": "In-app UI or logic variants for later work; /mockup does Define.",
-      "grilling": "Stress-tests a plan with hard questions before it becomes tickets.",
-      "research": "Primary-source research written up as a Markdown file in the repo.",
-      "triage": "Sorts incoming issues into actionable, duplicate or won't-fix.",
-      "improve-codebase-architecture": "Finds refactor candidates; feeds /super-collect architecture.",
-      "handoff": "Writes a handoff note so the next session picks up cleanly.",
-      "claude-handoff": "Hands the current task to a fresh Claude session.",
-      "to-questionnaire": "Turns open questions into a questionnaire the owner answers.",
-      "wizard": "Interactive bash wizard for steps only the owner can do.",
-      "retro": "Run retro: what worked, what broke, what to change next."
+      "improve-codebase-architecture": "Finds refactor candidates; feeds /super-collect architecture."
     }
   },
   "retired": {
@@ -71,8 +60,8 @@
       "security-audit": "pr-security-review covers PRs; no lane runs it",
       "implement": "super-build routes to tdd",
       "implement-spec": "super-collect files tickets on the board Backlog",
-      "grill-me": "replaced by grilling",
-      "grill-with-docs": "replaced by grilling",
+      "grill-me": "north-star and to-board cover it",
+      "grill-with-docs": "north-star and to-board cover it",
       "wayfinder": "north-star starts new work",
       "pr": "super-board-pr-body.sh writes PR bodies",
       "ask-matt": "no lane uses it",
@@ -89,7 +78,16 @@
       "setup-matt-pocock-skills": "one-off setup; install it user-wide",
       "setup-ts-deep-modules": "one-off setup; install it user-wide",
       "setup-pre-commit": "one-off setup; install it user-wide",
-      "git-guardrails-claude-code": "the guard hooks cover it; install it user-wide"
+      "git-guardrails-claude-code": "the guard hooks cover it; install it user-wide",
+      "prototype": "replaced by /mockup",
+      "grilling": "north-star and to-board's blind review cover it; it interviews the owner",
+      "research": "no lane uses it",
+      "retro": "replaced by /super-board report",
+      "wizard": "no lane uses it; onboard has its own steps",
+      "triage": "super-collect files findings",
+      "to-questionnaire": "no lane uses it",
+      "handoff": "no lane uses it",
+      "claude-handoff": "no lane uses it"
     },
     "bin": ["super-board-lane.sh", "super-board-codex-lane.sh", "super-board-codex-wave.sh", "super-board-run.sh"],
     "workflows": ["ui-refine-loop.js"]

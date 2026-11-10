@@ -47,7 +47,7 @@ REGISTRY = {
 CORE = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'git-sync', 'pr-security-review', 'north-star', 'to-board', 'mockup']
 LANES = ['build', 'qa', 'review']
 NAME = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]*(?::[a-zA-Z0-9][a-zA-Z0-9._-]*)?\Z')
-INTERACTIVE = {'grilling', 'shape', 'clarify', 'mattpocock-skills:grilling', 'mattpocock-skills:shape', 'mattpocock-skills:clarify'}
+INTERACTIVE = {'shape', 'clarify', 'mattpocock-skills:shape', 'mattpocock-skills:clarify'}
 
 
 def valid_name(name):

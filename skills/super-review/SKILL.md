@@ -263,8 +263,7 @@ The reviewer loads three skills, all scoped to the diff:
 
 **Never load inside the lane:** `mattpocock-skills:improve-codebase-architecture`. It
 scans the whole codebase rather than the diff, writes a Tailwind/Mermaid HTML report and
-shells out to `open`, then asks the user which candidate to explore and hands off to
-`grilling`. Every one of those is fatal to an unattended reviewer. It is a
+shells out to `open`, then asks the user which candidate to explore. Every one of those is fatal to an unattended reviewer. It is a
 you-at-the-keyboard tool — run it yourself against the cards this lane files.
 
 ## Deepening opportunities

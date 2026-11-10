@@ -114,4 +114,4 @@ If the second round still gets "no", stop. Say what is unclear and send them to 
 
 ## Not this skill's job
 
-Real data, real code, other app screens, installing, specs, tickets, and building inside an existing app. For later in-app UI work use Matt's `/prototype`. Hand-off line: "Mock-up signed. Next: /to-board."
+Real data, real code, other app screens, installing, specs, tickets, and building inside an existing app. Hand-off line: "Mock-up signed. Next: /to-board."

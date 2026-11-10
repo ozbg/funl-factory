@@ -5,9 +5,11 @@
 The pack now ships `/to-board` and `/mockup`; `/to-spec` and `/to-tickets` are retired.
 
 - ✨ **`/to-board` and `/mockup` install into apps.** Both join the pack (10 skills). Install prunes
-  `to-spec` and `to-tickets` from apps, with a backup; `prototype` stays.
+  `to-spec` and `to-tickets` from apps, with a backup.
 - ✨ **`/super-collect` files straight into Backlog.** Verified findings go to the board in the
   ticket format; the `/to-spec` → `/to-tickets` hand-off is gone.
+- 🔧 **Apps install 7 helpers, not 16.** `prototype`, `grilling`, `research`, `retro`, `wizard`, `triage`,
+  `to-questionnaire`, `handoff` and `claude-handoff` are retired: no lane calls them. Install prunes them with a backup.
 - 🔧 **The merge gate refuses unticked ACs** (exit 13), and a coverage check runs before merge.
 - 🔧 **Sonnet builds flagged and red cards.**
 

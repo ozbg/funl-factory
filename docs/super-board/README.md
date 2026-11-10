@@ -143,7 +143,7 @@ Assignment happens when the ticket is written, not at runtime: super-build route
 **type label**, the same `bug` / `feature` / `ux` / `tests` / `docs` / `tech-debt` labels super-qa
 files, plus `refactor` from super-review. A `Skills:` line in a ticket body replaces its label's row.
 
-**Interactive-only, never in a lane:** `grilling`, `shape`, `clarify` and
+**Interactive-only, never in a lane:** `shape`, `clarify` and
 `improve-codebase-architecture`. They prompt, wait or open a browser. They belong to
 `super-board lint` and to you at a keyboard. A worker that wants one is telling you the ticket
 needed a human before the loop started.

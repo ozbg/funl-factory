@@ -365,7 +365,7 @@ echo "$OUT" | q '.legacy_backend == []' || fail "workflow backend needs no fix"
 [ "$(echo "$OUT" | jq -c '[.green, (.missing|length), (.configs|length)]')" = "$GREEN" ] || fail "a legacy backend alone must not change the check result"
 
 # 16 — helpers come from the manifest by name, never --skill '*', and no security-audit.
-python3 - "$SETUP" "$PACK/skills/families.json" <<'PY' || fail "HELPERS_CMD must name the 18 manifest helpers"
+python3 - "$SETUP" "$PACK/skills/families.json" <<'PY' || fail "HELPERS_CMD must name the 7 manifest helpers"
 import importlib.util, json, sys
 spec = importlib.util.spec_from_file_location("s", sys.argv[1]); s = importlib.util.module_from_spec(spec); spec.loader.exec_module(s)
 m = json.load(open(sys.argv[2]))

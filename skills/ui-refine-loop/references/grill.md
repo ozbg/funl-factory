@@ -1,6 +1,6 @@
 # Grill: goal, taste and direction
 
-It runs after you have read the target's code area (SKILL.md step 1) and before setup. It follows the `grilling` skill's pattern: number each question, give your recommended answer under it, and ask the whole current frontier in one message. The difference is a hard budget, because this loop runs unattended afterwards.
+It runs after you have read the target's code area (SKILL.md step 1) and before setup. Number each question, give your recommended answer under it, and ask the whole current frontier in one message. The difference is a hard budget, because this loop runs unattended afterwards.
 
 ## Rules
 
