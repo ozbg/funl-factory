@@ -1,221 +1,77 @@
 # Decision policy for super-board workers
 
-Workers run unattended. When the issue forces a judgment call the issue body
-does not settle, the worker resolves it with the **decision ladder** below and
-records the choice in the commit — it never blocks on the user.
-
-This file replaces the former `gstack-voting.md`. The `gstack` CLI and the
-`superpowers` / `gsd` skill packs are no longer dependencies; everything below
-runs with the skills listed in the skill map or with plain inline reasoning.
-
-**The advisor panel is gone as of 2.2.0.** It convened `grilling` inside a
-worker that is forbidden to ask the user anything — and `grilling`'s own
-contract is "put each question to them and wait." A worker either stalled on
-it or answered its own questions, which is inline reasoning wearing a costume.
-Ticket ambiguity is now caught upstream, where a human is actually present:
-`super-board lint` routes vague and multi-interpretation issues through
-`mattpocock-skills:grilling` before the loop ever starts. See `../../super-board/references/lint.md`.
+Workers run unattended. When the issue forces a judgment call it does not settle,
+the worker walks the **decision ladder**, records the choice in the commit, and
+never blocks on the user. `grilling`, `shape` and `clarify` need a human, so they
+live in `super-board lint`, never in a worker. Wanting one is a human gate (below).
 
 ## Skill map
 
-The vocabulary every super-board worker uses. Left column is the intent; right
-column is the skill to invoke.
+Tier comes from `super-board-zone.py --zones <config zones> --files <paths the card touches>`.
+An unplaced file counts as amber. The card's tier is the highest of its files.
 
-| Intent | Skill |
-| --- | --- |
-| Which skill / flow fits this situation | `mattpocock-skills:ask-matt` |
-| Build a feature or fix a bug test-first | `mattpocock-skills:tdd` |
-| Deliver a ticket against a spec or acceptance criteria | `mattpocock-skills:implement` |
-| Root-cause a hard bug or perf regression | `mattpocock-skills:diagnosing-bugs` |
-| Review a diff before approving it | `mattpocock-skills:code-review` |
-| Turn a settled discussion into a spec | `mattpocock-skills:to-spec` |
-| Break a spec into tracer-bullet tickets | `mattpocock-skills:to-tickets` |
-| Design a module interface / find deepening opportunities | `mattpocock-skills:codebase-design` |
-| Pin domain terminology or record an ADR | `mattpocock-skills:domain-modeling` |
-| Resolve an in-progress merge/rebase conflict | `mattpocock-skills:resolving-merge-conflicts` |
-| Prove a claim before calling work done | `verification-before-completion` |
-| Decide *which kind* of test a change needs | `testing-strategy` |
-| Write a unit or integration test (TS/JS) | `vitest` |
-| Write a browser e2e spec | `playwright-best-practices` |
-
-The last four have no equivalent in the Matt Pocock pack and are kept as-is.
-Everything else routes through `mattpocock-skills:*`.
-
-**Interactive-only, never inside a worker.** These need a human at the keyboard
-and belong to the `lint` verb, not to a lane:
-
-| Intent | Skill | Runs in |
+| Tier | Test depth | Extra |
 | --- | --- | --- |
-| Stress-test a vague or ambiguous ticket | `mattpocock-skills:grilling` | `super-board lint` |
-| Feature ticket with undefined UX | `shape` | `super-board lint` |
-| Copy / microcopy / error-message wording | `clarify` | `super-board lint` |
+| green | one test per AC at the cheapest layer; no edge-case sweep | — |
+| amber | every AC proven by a test | — |
+| red | every AC, plus the zone's `invariants` and listed edge cases | `code-review` self-pass on your diff (merge-base as fixed point) |
 
-If a worker reaches for one of these, that is the signal the ticket should have
-been caught by `lint`. Take the human gate instead — see below.
+Always: `mattpocock-skills:tdd` (skip for docs-only), `ponytail:ponytail` before code,
+`verification-before-completion` before the final commit. `bug` cards add
+`mattpocock-skills:diagnosing-bugs` first. An explicit `Skills:` line in the issue
+replaces the label pick. `vitest` / `playwright-best-practices` follow the layer.
 
-**Testing is three layers, not one skill.** They answer different questions:
-
-- **Discipline** — `mattpocock-skills:tdd`. Seams, red-green order, assertion
-  anti-patterns. Deliberately agnostic about the *kind* of test, which is why
-  it is not enough alone.
-- **Placement** — the localisation ladder. Walk down and stop at the first rung
-  that still reproduces: (1) call the module directly → unit; (2) wire real
-  collaborators → integration; (3) drive a browser → e2e; (4) needs a live
-  third party → not a test, file a mock/contract gap. Write it at the rung you
-  stopped on, not the rung you found it on.
-- **Mechanics** — the repo decides the library, so read `package.json`. TS/JS
-  unit and integration → `vitest`. Browser e2e → `playwright-best-practices`.
-
-`testing-strategy` informs *coverage* (what a component type is worth testing,
-what to skip) — it does not decide placement.
-
-Two gates before a test counts as done: it must go **red for the right reason**
-against the unfixed code (a timeout or missing selector means you pinned the
-harness, not the bug), and it must **survive a refactor** that leaves behaviour
-unchanged.
-
-
-**Before worker writes or worktree creation:** follow [skill readiness](../../super-board/references/skills-readiness.md).
-Resolve this lane for the actual host, load the report's files/fallbacks, halt
-on missing requirements and recheck each conditional helper before use.
-
-## Label routing
-
-A ticket already declares what kind of work it is. Reading that label is cheaper
-and more reliable than having every worker re-derive its own skill set from the
-issue prose — and it means the assignment happens when the ticket is written,
-where a human can see it.
-
-The type labels below are the ones this system already files: `super-qa` stamps
-`bug`, `feature`, `ux`, `tests`, `docs`, `tech-debt`; `super-review` stamps
-`refactor`. No new vocabulary.
-
-| Type label | Skills the worker loads |
-| --- | --- |
-| `bug` | `mattpocock-skills:diagnosing-bugs` → `mattpocock-skills:tdd` |
-| `feature` | `mattpocock-skills:implement` → `mattpocock-skills:tdd` → `mattpocock-skills:codebase-design` |
-| `ux` | `mattpocock-skills:implement` → `mattpocock-skills:tdd` |
-| `refactor` | `mattpocock-skills:codebase-design` → `mattpocock-skills:tdd` |
-| `tech-debt` | `mattpocock-skills:codebase-design` → `mattpocock-skills:tdd` |
-| `tests` | `mattpocock-skills:tdd` (no product code — mechanics only) |
-| `docs` | none of the above; **skip `tdd`** — there is no behaviour to pin |
-| *(no type label)* | `mattpocock-skills:tdd` |
-
-Order matters where it is listed: diagnose before you write the red test, and
-implement against the spec before you reach for design vocabulary.
-
-**On top of the row, always:**
-
-- `ponytail:ponytail` (full) — after you understand the problem, before you
-  write any code, whatever the label. See "Simplest solution first" below.
-- `verification-before-completion` — before the final commit, no exceptions.
-- `mattpocock-skills:code-review` — once against your own diff, merge-base as
-  the fixed point. See "The decision ladder" above.
-
-**On top of the row, when the situation calls for it:**
-
-- `vitest` or `playwright-best-practices` — picked by walking the localisation
-  ladder, never by label. A `ux` ticket whose defect reproduces in a pure
-  function gets a unit test.
-- `testing-strategy` — when the issue leaves coverage scope open.
-- `mattpocock-skills:resolving-merge-conflicts` — on an in-progress conflict.
-- `mattpocock-skills:domain-modeling` — when the change names a concept the
-  domain glossary does not have.
-
-**Precedence.** An explicit `Skills:` line in the issue body wins outright — it
-replaces the row, it does not extend it. Label routing applies only when no
-`Skills:` line is present. The always-list applies in both cases.
-
-**Multiple type labels** — take the first row that matches, reading the table
-top to bottom. A card labelled both `bug` and `refactor` is a bug first; the
-refactor is a separate card.
+Test gates: walk down and stop at the first layer that reproduces (call the module →
+unit; real collaborators → integration; browser → e2e; live third party → not a test,
+file a mock gap). A test counts only if it goes **red for the right reason** on the
+unfixed code and **survives a refactor** that keeps behaviour.
 
 ## Simplest solution first
 
-Invoke `ponytail:ponytail` (full) once the problem is understood and before the
-first line of code. The ponytail plugin may not be installed; if the Skill call
-fails, apply this fallback and carry on:
+Fallback when `ponytail:ponytail` is not installed:
 
-1. Climb the ladder, stop at the first rung that holds: does it need to exist at
-   all? → already in this codebase? → stdlib? → native platform feature? →
-   an already-installed dependency? → one line? → only then the minimum code.
-2. No new dependency, abstraction, config or file the acceptance criteria do not need.
+1. Stop at the first rung that holds: not needed at all → already in the codebase →
+   stdlib → platform → installed dependency → one line → only then minimum code.
+2. No dependency, abstraction, config or file the AC does not need.
 3. Bug fix = root cause: one guard in the shared function beats one per caller.
 4. Never cut validation, security, data-loss protection or accessibility to shrink a diff.
-5. Mark a deliberate corner with a `ponytail:` comment naming its ceiling.
-
-Ponytail picks *how little* to write. It never overrides an acceptance
-criterion, the `tdd` red test, or the decision ladder below.
 
 ## Verify before done
 
-Invoke `verification-before-completion` before you claim a fix or a card is done. It may not
-be installed; if the Skill call fails, apply this fallback and carry on:
+Fallback when `verification-before-completion` is not installed:
 
-1. Run the check that proves the claim, fresh, in this worktree: the failing test now
-   passes, then the full suite and `verify_commands`. Never reuse an earlier run's output.
-2. Read the output, not the exit code alone: count passes, failures and skips.
-3. Tick an acceptance criterion only when a test or probe you just ran shows it.
-4. Report what you ran and what it printed. If something was not run, say so; never
-   write "should work" or "probably passes".
+1. Run the check that proves the claim, fresh, in this worktree: the new test, then the
+   full suite and `verify_commands`. Never reuse earlier output.
+2. Read the output, not just the exit code. Tick an AC only when a run shows it.
+3. Report what you ran and what it printed. Never write "should work".
 
 ## Testing strategy
 
-Use `testing-strategy` to decide what a component is worth testing. It may not be installed;
-if the Skill call fails, apply this fallback and carry on:
-
-1. Test where the defect lives: pure logic → unit, wiring across modules → integration,
-   only what the browser itself breaks → e2e (the localisation ladder above).
-2. Cover each acceptance criterion and each edge the ticket names, once, at the lowest layer that proves it.
-3. Data-changing paths, auth and money get a failure-case test as well as the happy path.
-4. Skip tests for framework behaviour, generated code, and pure pass-through glue.
-5. Every new test is red for the right reason before the fix, and survives a refactor.
+Fallback when `testing-strategy` is not installed: the zone table above sets depth;
+test where the defect lives; skip framework behaviour, generated code and pass-through glue.
 
 ## The decision ladder
 
-Most forks in a worker run are not gray at all — they are already settled by
-something written down. Walk the ladder and **stop at the first rung that
-answers the question**. Do not climb past a rung that gave you an answer.
+Stop at the first rung that answers the question.
 
 ```
-  1  acceptance criteria   the issue body says which behaviour is correct
-  2  repo precedent        an existing pattern in this codebase already does this
-  3  smallest blast radius  neither settles it → least irreversible, smallest
-                            scope, easiest to revert
-  4  human gate            the fork is not yours to make → stop, exit non-zero
+  1  acceptance criteria    the issue body says which behaviour is correct
+  2  repo precedent         an existing pattern in this codebase already does this
+  3  smallest blast radius  least irreversible, fewest files, revertable in one commit
+  4  human gate             the fork is not yours to make → stop
 ```
 
-Rung 3 is the default resolution, not a coin flip: prefer the change that
-touches fewer files, adds no public surface, and can be reverted by dropping
-one commit. When two options tie on blast radius, take the one an existing test
-already constrains.
-
-For an authorized, unsettled technical rung-3 fork that introduces a new ownership boundary,
-new/changed public interface, or architecture expensive to reverse, follow
-[design preflight](../../super-board/references/design-preflight.md). An applicable supplied
-design/spec/ADR answers the question at an earlier rung; follow it. Labels alone, ordinary
-bugs and mechanical refactors do not trigger a comparison. Recheck conditional helper
-readiness before use. Record the choice in the existing decision trailer below.
-The comparison does not settle ambiguous product intent or waive any hard human gate.
-
-**One technical check is still mandatory before the final commit:** run
-`mattpocock-skills:code-review` against your own working diff, passing the
-merge-base as the fixed point (`git merge-base HEAD origin/<base>`). It never
-asks the user anything when the fixed point is supplied. Findings on its
-Standards axis are yours to fix before you commit; findings on its Spec axis
-that contradict the issue's acceptance criteria are a rung-4 human gate.
+A rung-3 fork that adds an ownership boundary, a public interface or architecture
+expensive to reverse follows [design preflight](../../super-board/references/design-preflight.md).
 
 ## Recording the decision
 
-Any fork you resolved at **rung 3** goes in the commit message under a
-`--- decision ---` trailer, after the bullets (commit format: writing-standard.md
-§ 1), so the orchestrator and downstream reviewers can audit it. Rungs 1 and 2
-need no trailer — the AC or the precedent is the record.
+A rung-3 choice goes in the commit under a `--- decision ---` trailer, after the bullets.
+Rungs 1 and 2 need none.
 
 ```
 🐛 [fix] orders: use the idempotency key from the request header
 
-- reuse the client's Idempotency-Key instead of minting one
 - duplicate POST returns the first order (orders.test.ts:41)
 Closes #123
 
@@ -227,19 +83,12 @@ rung: 3 (blast radius — no schema change, revertable in one commit)
 
 ## Hard human gates
 
-The ladder resolves gray decisions. It is not a licence to guess at decisions
-that were never the worker's to make. Print `HUMAN GATE TRIPPED: <reason>`,
-label the issue `human-gated`, leave the worktree intact, and exit non-zero when:
+Print `HUMAN GATE TRIPPED: <reason>`, label `human-gated`, keep the worktree, stop, when:
 
-- The fix would require a production deploy or a destructive DB change.
-- The change touches auth, secrets, permissions, or moves data across a trust
-  boundary — and the issue body does not explicitly authorise it.
-- The issue itself is unclear about what "fixed" means.
-- The fix is correct but would break a public contract or a downstream consumer.
-- `code-review`'s Spec axis says the diff does not implement the stated AC and
-  you cannot close the gap within the issue's scope.
-- You find yourself wanting `grilling`, `shape`, or `clarify` — the ticket
-  needed a human before the loop started.
+- **Money:** billing, payments, pricing — unless the issue explicitly authorises it.
+- **Auth:** auth, secrets, permissions, data across a trust boundary — unless authorised.
+- **Destructive schema:** DROP / TRUNCATE / RENAME, or any destructive DB change.
+- **Live DB:** a migration on the live database, or a production deploy.
+- The issue is unclear about what "fixed" means, or the fix breaks a public contract.
 
-Halts here cost less than a regression in production. When the work so far is
-salvageable but the gate blocks completion, prefer `WIP-PARTIAL` over a halt.
+Salvageable work blocked by a gate → `WIP-PARTIAL`, not a halt.
