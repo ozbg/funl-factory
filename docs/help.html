@@ -93,7 +93,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
 </header>
 
 <nav class="bar" aria-label="Sections"><div class="in">
-  <a href="#path">The path</a><a href="#stages">Step by step</a><a href="#files">Where things live</a><a href="#board">The board</a><a href="#zones">Zones</a><a href="#security">Security</a><a href="#standards">Code standards</a><a href="#qa">QA</a><a href="#done">Done</a><a href="#models">Models</a><a href="#numbers">Numbers</a><a href="#you">Your calls</a><a href="#skills">Skills</a>
+  <a href="#path">The path</a><a href="#stages">Step by step</a><a href="#files">Where things live</a><a href="#board">The board</a><a href="#zones">Zones</a><a href="#security">Security</a><a href="#standards">Code standards</a><a href="#qa">QA</a><a href="#done">Done</a><a href="#models">Models</a><a href="#numbers">Numbers</a><a href="#sdd">Spec-driven</a><a href="#you">Your calls</a><a href="#skills">Skills</a>
 </div></nav>
 
 <main class="wrap">
@@ -412,6 +412,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Checked by tools</td><td>The foundation card sets up a formatter, a linter (no empty catch, no unhandled async errors, no unused code, no <code>any</code>), strict types and a high-severity dependency audit. All of it runs in the test command, so every later card inherits it.</td><td>Every build, then the merge gate</td></tr>
     <tr><td>The app's checks pass</td><td>Typecheck, lint and tests: the <code>verify_commands</code> in the config (this app: <code>pnpm verify</code>).</td><td>Builder, then the merge gate again against the latest <code>main</code></td></tr>
     <tr><td>One name per thing</td><td>Name domain things exactly as <code>spec.md</code> does (its data model and contracts), so parallel cards don't invent different names for the same thing.</td><td>Builder, review</td></tr>
+    <tr><td>Spec stays true</td><td>A card that changes a contract or the data model updates <code>spec.md</code> in the same PR, so the cards after it copy the right shape.</td><td>Review (a blocker if missing)</td></tr>
     <tr><td>Validate at the edge</td><td>Inputs are checked where they enter: forms, APIs, files. Part of the amber bar, so QA can cite it.</td><td>QA</td></tr>
     <tr><td>Test first</td><td>Every acceptance check gets a test that fails before the change and passes after.</td><td>Builder (<span class="cmd">/tdd</span>), QA, merge gate</td></tr>
     <tr><td>Smallest safe change</td><td>Only the files the card lists. Copy the pattern the foundation card set; don't invent a new one.</td><td>Review: scope drift</td></tr>
@@ -479,6 +480,23 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   </table></div>
 </section>
 
+<section id="sdd">
+  <h2>Built on spec-driven development</h2>
+  <p class="sub">The factory follows the same principles as current spec-driven tools such as OpenSpec and GitHub's Spec Kit: write and check the spec before any code, trace every task back to it, and count work as done only when it's proven against it. It doesn't use those tools. It's a lighter version shaped for small apps and AI builders.</p>
+  <div class="tablebox"><table>
+    <tr><th>Principle</th><th>In OpenSpec / Spec Kit</th><th>In this factory</th></tr>
+    <tr><td>Requirements first</td><td>proposal · <code>specify</code></td><td><span class="cmd">/north-star</span>: numbered must-haves, must-nevers, core loop, postcard</td></tr>
+    <tr><td>Check them before building</td><td>proposal review</td><td><span class="cmd">/mockup</span>, which you click through, and the blind review in <span class="cmd">/to-board</span></td></tr>
+    <tr><td>A technical plan</td><td>design · <code>plan</code></td><td><code>spec.md</code>: tech decisions, data model, contracts, test command</td></tr>
+    <tr><td>Small tasks</td><td><code>tasks.md</code></td><td>Cards with exact files, a pattern to copy, and test-first checks</td></tr>
+    <tr><td>Rules that always hold</td><td>Spec Kit's constitution</td><td>Invariants <code>I1</code>… in <code>zones.yaml</code>, and the decision rights</td></tr>
+    <tr><td>Traceability</td><td>requirement IDs</td><td><code>coverage.md</code>: every must-have has its cards</td></tr>
+    <tr><td>Verified against the spec</td><td>scenarios · checklists</td><td>QA by zone, the merge gate refusing unproven checks, the Demo card</td></tr>
+    <tr><td>The spec stays true</td><td>specs updated by each change</td><td>A card that changes a contract or the data model updates <code>spec.md</code> in the same PR; review blocks it if not</td></tr>
+  </table></div>
+  <p>What it adds for AI builders: every card is written so a cheap model can build it without guessing, the build is checked harder where data can be lost or leaked (zones), every card is test-first, and an independent review checks the spec before anything is built.</p>
+</section>
+
 <section id="you">
   <h2>Your calls</h2>
   <div class="callout">
@@ -531,6 +549,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td><span class="cmd">/domain-modeling</span></td><td>Naming things, the glossary, or recording a decision (ADR).</td></tr>
     <tr><td><span class="cmd">/verification-before-completion</span></td><td>Lanes use it before claiming done.</td></tr>
   </table></div>
+  <p>That's all of them: 10 factory skills and 7 helpers. A skill no lane calls doesn't get installed.</p>
 </section>
 
 <footer>

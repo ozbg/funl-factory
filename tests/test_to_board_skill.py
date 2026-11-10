@@ -71,6 +71,13 @@ class ToBoardSkill(unittest.TestCase):
         build = (root / "skills/super-board/references/lanes/build.md").read_text()
         self.assertIn("exactly as `docs/shape/spec.md`", build)
 
+    def test_spec_stays_true(self):
+        root = Path(__file__).resolve().parent.parent
+        build = (root / "skills/super-board/references/lanes/build.md").read_text()
+        self.assertIn("update\n   `docs/shape/spec.md` in the same PR", build)
+        review = (root / "skills/super-board/references/lanes/review.md").read_text()
+        self.assertIn("`bar: spec.md matches the code`", review)
+
 
 if __name__ == "__main__":
     unittest.main()

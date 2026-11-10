@@ -26,8 +26,11 @@ Read `common.md` (this folder) first: branch + PR model, PR template, review thr
    - An unfixed Note never bounces; its row stays `❌ not fixed`.
    - Otherwise → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
 3c. **Zone + round cap.** Tier = the higher of the card's `zone:<tier>` label and `python3 .claude/bin/super-board-zone.py --zones docs/agents/zones.yaml --files <changed files>` (also gives `max_rounds`, `bar`, `invariants`). You may raise a tier with a `zone:<tier>` label, never lower one. `loop:rebuild-N` with N ≥ `max_rounds` → Blocked with the §4 template, `Why blocked: round cap — needs a ruling or split`. Exit.
-4. Review the code (logic, conventions) and the tests. **Green card:** skip this — check the builder's AC proof, rerun tests (step 5), then tick each AC whose test passed, with its proof line (no QA ticked them; the gate refuses unticked ACs, exit 13), go to step 7.
+4. Review the code (logic, conventions) and the tests. **Green card:** skip this — check the builder's AC proof, rerun tests (step 5), then tick each AC whose test passed, with its proof line (no QA ticked them; the gate refuses unticked ACs, exit 13), do step 4b, then go to step 7.
    Severity is two levels. **Blocker** must cite `AC<n>`, an invariant id, `bar: <line>` or `bug: <repro>`; no citation → **Note**. Over-engineering is always a Note; so are missing tests, edge cases, a11y and i18n unless they cite. Deepening opportunities and visible bugs outside the card's scope → file to Backlog (super-review → "Route fixes").
+4b. **Spec stays true** (every tier, green too): the diff changes a contract or the data model that
+   `docs/shape/spec.md` names, and spec.md is not updated to match → **Blocker**, class Gap, citation
+   `bar: spec.md matches the code`. No `docs/shape/spec.md` in the repo → skip.
 5. **Reviewer-side test rerun** (always — closes the Tester self-verification gap):
    - Pull `issue-<N>-<slug>` into the review worktree.
    - Re-run the test command Tester used (recorded in Tester's PR handoff comment as `Local tests:` line).
