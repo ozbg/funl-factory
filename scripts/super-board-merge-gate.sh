@@ -69,19 +69,28 @@
 #
 # Exit codes, all meaningful to the caller:
 #   0  merged
-#   2  verification failed — branch needs a rebase pass, NOT a Blocked card
+#   2  verify failed against the current base — send it back to Build (a fix or
+#      rebase pass), NOT a Blocked card
 #   3  PR is closed without a merge; no merge attempted
 #   4  could not take the lock within the timeout
 #   5  the base could not be merged in (real conflict) — needs a rebase pass
 #   6  the PR head is not the commit that was reviewed — review evidence is void,
 #      the card goes back to Review (not Blocked, not a rebase pass)
 #   7  merge policy says a human merges this one (money / auth / destructive
-#      schema, a diff over auto_max_lines — default 400, "big PR — please
-#      review" — or merge_policy.default "human"). Stdout lists each
+#      schema, a red-tier diff over auto_max_lines — default 600 source lines,
+#      "big PR — please review" — or merge_policy.default "human"). Stdout lists each
 #      `human-gate: <category> — <evidence>`. Nothing ran, nothing merged; the
 #      card → Blocked with the 🙋 template: the human reviews and merges it, or
 #      comments "done" after its pinned request to approve — the next wave re-runs
 #      the gate, which then skips the policy check and merges.
+#  10  deep review required: a non-red PR over auto_max_lines (policy outcome
+#      "deep-review") without the `deep-reviewed` label added after its head
+#      commit. Stdout has one `deep-review: <why>` line. Nothing ran, nothing
+#      merged, no human: the Reviewer runs the full review on its strongest
+#      model (truth-check included), posts it, adds the label, and re-runs.
+#  11  the PR is a draft: run `gh pr ready <PR>` and re-run. Never halts.
+#  12  a GitHub read came back empty or malformed (the head read): retry the
+#      gate next wave; the card stays in Review. Never halts.
 #   9  verification-readiness: repair config.verify_commands and restart; preserve
 #      card/worktree/approval state. Never bounce to Build or retry a rebase.
 #   79 required GitHub evidence unavailable: local run halt; preserve card and
@@ -97,7 +106,7 @@
 # MERGE POLICY AND MIGRATIONS (config, all optional — defaults shown in
 # references/config-schema.json)
 #
-#   merge_policy: { default: "auto"|"human", auto_max_lines: 400, size_exclude,
+#   merge_policy: { default: "auto"|"human", auto_max_lines: 600, size_exclude,
 #                   always_human: { <category>: {labels, paths, keywords} } }
 #   migrations:   { globs, allowed_envs, target_env, commands: {<env>: cmd},
 #                   human_steps }
@@ -208,18 +217,26 @@ trap cleanup EXIT
 # ---- the head guard --------------------------------------------------------
 # Review evidence belongs to one commit. If the branch moved after the Reviewer
 # passed it, the tests it reran and the diff it read describe something else.
-pr_head() { python3 "$GITHUB_READ" --kind head -- pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefName,headRefOid \
+# A -q read: an empty or malformed answer is a retry (12), not a run halt (#18).
+pr_head() { SB_GITHUB_READ_STRICT= python3 "$GITHUB_READ" --kind head -- pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefName,headRefOid \
               -q '.headRefName + " " + .headRefOid'; }
-HEAD=$(pr_head) || exit $?
-read -r HEAD_REF HEAD_SHA <<<"$HEAD"
-[ -n "${HEAD_SHA:-}" ] || { say "could not read the PR head from GitHub"; exit 1; }
-pr_state() { python3 "$GITHUB_READ" --kind merge-state -- pr view "$PR" ${REPO:+--repo "$REPO"} --json state,mergeCommit,headRefOid; }
+RC=0; HEAD=$(pr_head) || RC=$?
+[ "$RC" -ne 79 ] || exit 79
+read -r HEAD_REF HEAD_SHA <<<"$HEAD" || true
+if [ "$RC" -ne 0 ] || [[ ! "${HEAD_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+  say "the PR head read came back empty or malformed — retry the gate next wave (no halt)"; exit 12
+fi
+pr_state() { python3 "$GITHUB_READ" --kind merge-state -- pr view "$PR" ${REPO:+--repo "$REPO"} --json state,mergeCommit,headRefOid,isDraft; }
 STATE=$(pr_state) || exit $?
 if [ "$(echo "$STATE" | jq -r .state)" = MERGED ]; then
   say "already merged; no verification, migration, or merge is repeated"
   exit 0
 fi
 [ "$(echo "$STATE" | jq -r .state)" = OPEN ] || { say "PR is closed; refusing merge"; exit 3; }
+# GitHub refuses to merge a draft; that is a known outcome, never a halt (#13).
+if [ "$(echo "$STATE" | jq -r '.isDraft // false')" = true ]; then
+  say "PR is a draft — run \`gh pr ready $PR\` and re-run the gate"; exit 11
+fi
 if [ -n "$EXPECT_HEAD" ]; then
   case "$HEAD_SHA" in
     "$EXPECT_HEAD"*) : ;;
@@ -287,6 +304,28 @@ fi
 
 git -C "$REPO_PATH" fetch origin "$HEAD_REF" "$BASE" --quiet
 
+# ---- deep review (a big non-red PR) ----------------------------------------
+# Over the size cap and not red: a deeper review merges it, not a human. The
+# `deep-reviewed` label counts only when it was added after the head commit, so
+# a label from an earlier round never covers new code.
+if [ "$(echo "$PLAN" | jq -r '.outcome // "auto"')" = deep-review ]; then
+  DEEP_OK=false
+  if jq -e '[.labels[]?.name | ascii_downcase] | index("deep-reviewed")' "$META" >/dev/null; then
+    slug="${REPO:-}"; [ -n "$slug" ] || slug='{owner}/{repo}'
+    EVENTS=$(python3 "$GITHUB_READ" --kind array -- api "repos/$slug/issues/$PR/events?per_page=100" --paginate --slurp) || exit $?
+    LABELED=$(echo "$EVENTS" | jq '[.[][]? | select(.event == "labeled" and ((.label.name // "") | ascii_downcase) == "deep-reviewed")
+                                  | .created_at | fromdateiso8601] | max // 0')
+    COMMITTED=$(git -C "$REPO_PATH" log -1 --format=%ct "$HEAD_SHA")
+    [ "$LABELED" -ge "$COMMITTED" ] && DEEP_OK=true
+  fi
+  if [ "$DEEP_OK" != true ]; then
+    echo "deep-review: $(echo "$PLAN" | jq -r '.deep_review')"
+    say "big PR: run the deep review, add the \`deep-reviewed\` label at head ${HEAD_SHA}, and re-run the gate"
+    exit 10
+  fi
+  say "deep review on record for ${HEAD_SHA}"
+fi
+
 git -C "$REPO_PATH" worktree add --detach "$SCRATCH" "$HEAD_SHA" --quiet 2>/dev/null || {
   say "could not create a scratch worktree for ${HEAD_REF}@${HEAD_SHA}"; exit 5; }
 
@@ -302,7 +341,7 @@ for cmd in "${VERIFY[@]}"; do
   if ! ( cd "$SCRATCH" && eval "$cmd" ) >"$SCRATCH/.verify.log" 2>&1; then
     say "FAILED: ${cmd}"
     tail -30 "$SCRATCH/.verify.log" >&2
-    say "the branch is stale against ${BASE} — send it back to Build for a rebase pass"
+    say "verify failed against ${BASE} as it is now — send it back to Build (fix or rebase pass)"
     exit 2
   fi
 done
@@ -381,6 +420,9 @@ STATE=$(pr_state) || exit $?
 if [ "$(echo "$STATE" | jq -r .state)" = MERGED ]; then
   say "merge response was lost; GitHub confirms the merge commit"
   exit 0
+fi
+if [ "$(echo "$STATE" | jq -r '.isDraft // false')" = true ]; then
+  say "GitHub refused: the PR is a draft — run \`gh pr ready $PR\` and re-run the gate"; exit 11
 fi
 NOW_SHA=$(echo "$STATE" | jq -r .headRefOid)
 if [ "$NOW_SHA" != "$HEAD_SHA" ]; then

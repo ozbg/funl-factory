@@ -206,8 +206,10 @@ gh pr view <PR> --json comments \
 ```
 
 The number after `#issuecomment-` in `url` is the comment id. Write this round's report over it:
-`gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@report.md`. One report per
-PR, edited in place, so the table carries every round's status.
+`gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@report.md`, run as one plain
+command (no `cd … &&`, no loop; `lanes/common.md` → "Command shape"). One report per
+PR, edited in place, so the table carries every round's status. If the edit is denied, post
+the report as a new comment and carry on: a denied optional write never stops the handoff.
 
 Outside super-board (no PR), `prior_report` is whatever earlier review the caller hands you.
 
@@ -364,12 +366,26 @@ two complete builds. In order, no shortcuts:
    The gate owns the merge decision (config `merge_policy`, `migrations`):
    - **Exit 9 — verification-readiness.** Halt the run; preserve card, approval, claims, and worktree. Configure `verify_commands` with the owning project's real checks and restart explicitly. No bounce to Build, rebase retry, approval request, or bare merge.
    - **Exit 7 — a human merges.** `merge_policy` matched (money / auth / schema label,
-     path or added-line keyword; a diff over `auto_max_lines`, default 400 — "big PR — please
-     review"; `default: "human"`). `schema` means destructive only (DROP / TRUNCATE / RENAME);
+     path or added-line keyword; a red-tier diff over `auto_max_lines`, default 600 source
+     lines — "big PR — please review"; `default: "human"`). `schema` means destructive only (DROP / TRUNCATE / RENAME);
      an additive migration follows `migrations.allowed_envs`, and a live DB is always human.
      Card → **Blocked** with the 🙋 template: `Why blocked` quotes the gate's
      `human-gate:` lines; `To unblock` = review PR #<P> and merge it yourself, OR comment
      `done` to approve (the next wave re-runs the gate, which merges). Label `needs-you`.
+   - **Exit 10 — deep review.** A non-red PR over `auto_max_lines` (600 source lines) gets a
+     deeper review, not the owner. Stdout has a `deep-review: <why>` line. Re-run the whole
+     review on the strongest model the host offers (Opus; on a smaller model, spawn it as
+     one sub-agent on Opus): the code pass with no green-card skip, the test rerun, and the
+     truth-check whatever the tier or `truth_gate`. Post it as the Reviewer report (`Did:`
+     names the deep review). Clean → `gh pr edit <PR> --add-label deep-reviewed` (missing
+     label → `gh label create deep-reviewed --color 0E8A16` once), then re-run the gate with
+     the same `--expect-head`. The label counts only when added after the head commit. A
+     cited Blocker or a truth score below threshold → bounce or block as usual; no label.
+     No human unless the tier is red (then the gate exits 7).
+   - **Exit 11 — draft.** The Reviewer marks it ready (`gh pr ready <PR>`) and re-runs the
+     gate. Never Blocked, never a halt.
+   - **Exit 12 — a GitHub read came back empty or malformed.** Leave the card in Review;
+     the next wave re-runs the gate. Never Blocked, never a halt.
    - **Exit 8 — 🙋 needs you.** Migrations for a database outside
      `migrations.allowed_envs`, an allowed migrate command that failed, or a declared
      human-only step. Card → **Blocked** with the 🙋 template

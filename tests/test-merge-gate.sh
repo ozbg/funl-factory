@@ -125,14 +125,15 @@ case "$1 $2" in
   "pr view")
     case "$*" in *state,mergeCommit*)
       [ "${STUB_STATE_FAIL:-0}" = 0 ] || { grep -q '^pr merge' "$GH_LOG" && exit 1; }
-      state="${STUB_STATE:-OPEN}"; oid="$STUB_OID"
-      if grep -q '^pr merge' "$GH_LOG"; then state="${STUB_STATE_AFTER:-OPEN}"; oid="${STUB_OID_AFTER:-$STUB_OID}"; fi
-      jq -n --arg state "$state" --arg head "$oid" '{state:$state,headRefOid:$head,mergeCommit:(if $state=="MERGED" then {oid:$head} else null end)}'; exit 0 ;;
+      state="${STUB_STATE:-OPEN}"; oid="$STUB_OID"; draft="${STUB_DRAFT:-0}"
+      if grep -q '^pr merge' "$GH_LOG"; then state="${STUB_STATE_AFTER:-OPEN}"; oid="${STUB_OID_AFTER:-$STUB_OID}"; draft="${STUB_DRAFT_AFTER:-$draft}"; fi
+      jq -n --arg state "$state" --arg head "$oid" --arg draft "$draft" '{state:$state,headRefOid:$head,isDraft:($draft=="1"),mergeCommit:(if $state=="MERGED" then {oid:$head} else null end)}'; exit 0 ;;
     esac
     case "$*" in *labels*)
       if [ -n "${STUB_META_AFTER:-}" ] && [ -f "$STUB_VERIFIED" ]; then printf '%s\n' "$STUB_META_AFTER"; exit 0; fi
       if [ -n "${STUB_META:-}" ]; then printf '%s\n' "$STUB_META"; else echo '{"files":[],"labels":[],"body":"","additions":0,"deletions":0,"changedFiles":0}'; fi
       exit 0 ;; esac
+    if [ -n "${STUB_HEAD+x}" ]; then printf '%s' "$STUB_HEAD"; exit 0; fi
     oid="$STUB_OID"; grep -q '^pr merge' "$GH_LOG" && oid="${STUB_OID_AFTER:-$STUB_OID}"
     echo "feat $oid" ;;
   "pr merge") exit "${STUB_MERGE_RC:-0}" ;;
@@ -165,6 +166,7 @@ DIFF
     echo '{"permission":"admin"}' ;;
   "api repos/"*)
     # The paginated file list the gate reads instead of `pr view --json files` (which stops at 100).
+    case "$*" in */issues/*/events*) printf '%s' "${STUB_EVENTS:-[[]]}"; exit 0 ;; esac
     case "$*" in */pulls/*/files*) ;; *) exit 1 ;; esac
     meta="${STUB_META:-{\"files\":[]}}"
     if [ -n "${STUB_META_AFTER:-}" ] && [ -f "$STUB_VERIFIED" ]; then meta="$STUB_META_AFTER"; fi
@@ -251,6 +253,22 @@ RC=0; STUB_OID="$SHA" STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 
 [ ! -f "$TMP/cleanup.ran" ] || fail "cleanup must not run when the merge was refused"
 teardown
 
+# 13c — a draft PR is a retry (11), never a halt; so is a malformed head read (12).
+head_setup
+RC=0; STUB_DRAFT=1 STUB_OID="$SHA" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 11 ] || fail "a draft PR should exit 11, got $RC"
+[ ! -f "$TMP/halt.json" ] || fail "a draft PR must never write a halt file"
+grep -q '^pr merge' "$GH_LOG" && fail "no merge may be attempted on a draft"
+RC=0; STUB_DRAFT_AFTER=1 STUB_MERGE_RC=1 STUB_OID="$SHA" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 11 ] || fail "GitHub refusing a draft at merge should exit 11, got $RC"
+[ ! -f "$TMP/halt.json" ] || fail "a refused draft merge must never write a halt file"
+for h in "" "feat" "feat not-a-sha" "{}"; do
+  RC=0; STUB_HEAD="$h" STUB_OID="$SHA" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+  [ "$RC" -eq 12 ] || fail "a malformed head read ('$h') should exit 12, got $RC"
+  [ ! -f "$TMP/halt.json" ] || fail "a malformed head read ('$h') must never write a halt file"
+done
+teardown
+
 # ── Merge policy and migrations (14-25). Same origin and stub; STUB_META is the
 #    `gh pr view --json labels,files,…` answer, STUB_DIFF the `gh pr diff` text.
 cfgset() { jq "$1" "$TMP/c.json" > "$TMP/c2.json" && mv "$TMP/c2.json" "$TMP/c.json"; }
@@ -305,7 +323,19 @@ RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts)" gate --expect-head "$SHA" 
 # A big PR gets a deeper review, never the owner — unless its tier is red.
 cfgset '.merge_policy = {default: "auto", auto_max_lines: 100}'
 RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
-[ "$RC" -ne 7 ] || fail "a big amber PR must not wait for a human, got: $OUT"
+[ "$RC" -eq 10 ] || fail "a big amber PR without deep-reviewed must exit 10, got $RC: $OUT"
+echo "$OUT" | grep -q "^deep-review: big PR — deeper review: 400 changed lines" || fail "exit 10 must say why, got: $OUT"
+grep -q '^pr merge' "$GH_LOG" && fail "a big PR must not merge before its deep review"
+# The label counts only when added after the head commit.
+OLD='[[{"event":"labeled","label":{"name":"deep-reviewed"},"created_at":"2001-01-01T00:00:00Z"}]]'
+NEW='[[{"event":"labeled","label":{"name":"deep-reviewed"},"created_at":"2099-01-01T00:00:00Z"}]]'
+RC=0; STUB_EVENTS="$OLD" STUB_OID="$SHA" STUB_META="$(meta deep-reviewed src/x.ts "" 400)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 10 ] || fail "a deep-reviewed label older than the head must exit 10, got $RC"
+RC=0; STUB_EVENTS="$NEW" STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 10 ] || fail "a removed deep-reviewed label must exit 10, got $RC"
+grep -q '^pr merge' "$GH_LOG" && fail "no merge without a current deep review"
+RC=0; STUB_EVENTS="$NEW" STUB_OID="$SHA" STUB_META="$(meta deep-reviewed src/x.ts "" 400)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "a big PR labelled deep-reviewed after its head should merge, got $RC"
 printf 'zones:\n  red:\n    paths: ["src/**"]\n' > "$TMP/zones.yaml"
 cfgset ".zones = \"$TMP/zones.yaml\""
 RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
@@ -406,6 +436,14 @@ RC=0; STUB_OID="$SHA" STUB_META="$(meta "" db/x.sql)" STUB_DIFF='diff --git a/sr
 [ "$RC" -eq 7 ] || fail "an added DROP TABLE should exit 7 (schema), got $RC"
 RC=0; STUB_OID="$SHA" STUB_META="$(meta "" db/x.sql | jq ' .additions=0 | .deletions=1')" STUB_DIFF='diff --git a/db/x.sql b/db/x.sql\n--- a/db/x.sql\n+++ b/db/x.sql\n@@ -1 +0,0 @@\n-DROP TABLE users;\n' gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 0 ] || fail "a removed DROP TABLE must not gate, got $RC"
+for p in src/db.test.ts tests/schema.py e2e/fixtures/seed.ts test/fixtures/x.txt; do
+  RC=0; STUB_OID="$SHA" STUB_META="$(meta "" "$p")" STUB_DIFF="diff --git a/$p b/$p\n--- a/$p\n+++ b/$p\n@@ -0,0 +1 @@\n+expect(sql).not.toContain('DROP TABLE users');\n" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+  [ "$RC" -eq 0 ] || fail "a DROP TABLE in a test or fixture ($p) must not gate, got $RC"
+done
+for p in tests/migrations/001.sql supabase/migrations/002_drop.sql; do
+  RC=0; STUB_OID="$SHA" STUB_META="$(meta "" "$p")" STUB_DIFF="diff --git a/$p b/$p\n--- a/$p\n+++ b/$p\n@@ -0,0 +1 @@\n+DROP TABLE users;\n" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+  [ "$RC" -eq 7 ] || fail "a DROP TABLE in SQL or a migration ($p) must still gate, got $RC"
+done
 teardown
 
 # 16b — a stale UI label cannot approve a policy gate.
