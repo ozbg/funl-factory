@@ -16,6 +16,12 @@ digest  — short plain-text owner digest; prints only on a merge, breach or ask
   super-board-scorecard.py health --config <cfg> [--wave <label>] [--goal-done N --goal-total N]
   super-board-scorecard.py demo --accepted
   super-board-scorecard.py digest --config <cfg> --plan <plan.json> [--wave <label>]
+  super-board-scorecard.py report --config <cfg> [--repo-path <app>] [--log] [--compare] [--json]
+                                  [--board-json <file>]
+
+report  — one page per milestone against targets (config `targets`, else defaults);
+          --log appends one line to <repo>/docs/super-board/factory-log.jsonl, --compare
+          prints that log as a table. A missing input prints n/a, never a crash.
 
 --results is the wave's `cards` array (or the whole {cards, halted} result).
 --logs is the folder holding the wave's agent-*.jsonl logs (searched recursively).
@@ -24,8 +30,10 @@ An agent already counted in an earlier row is never counted twice.
 import argparse
 import json
 import re
+import subprocess
 import sys
-from datetime import datetime, timezone
+import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DEFAULT_SC = "docs/super-board/runs/scorecard.jsonl"
@@ -429,6 +437,270 @@ def digest(a):
     print("\n".join(lines))
 
 
+# ── report (factory #63) ────────────────────────────────────────────────────
+LOG_PATH = "docs/super-board/factory-log.jsonl"
+DEFAULT_TARGETS = {"days_per_app": 2, "first_pass_pct": 70, "rework_pct": 10,
+                   "rounds_per_merge": 1.5, "demo_first_try": True}
+NA = "n/a"
+
+
+def _jsonl(path):
+    out = []
+    try:
+        for raw in Path(path).read_text().splitlines():
+            try:
+                out.append(json.loads(raw))
+            except ValueError:
+                continue
+    except OSError:
+        pass
+    return out
+
+
+def _read_text(path):
+    try:
+        return Path(path).read_text()
+    except OSError:
+        return None
+
+
+def _num(v, suffix=""):
+    return NA if v is None else "{}{}".format(v, suffix)
+
+
+def _coverage(repo, rows, board_json):
+    """Coverage summary dict from super-board-coverage.py, or None when it can't run."""
+    script = Path(__file__).resolve().with_name("super-board-coverage.py")
+    if not script.exists():
+        script = Path(repo) / ".claude" / "bin" / "super-board-coverage.py"
+    if not script.exists() or not (Path(repo) / "docs/shape/coverage.md").exists():
+        return None
+    tmp = None
+    try:
+        if not board_json:
+            done = {r["card"] for r in rows if r.get("column") == "Done"}
+            tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+            json.dump([{"number": n, "status": "Done"} for n in sorted(done)], tmp)
+            tmp.close()
+            board_json = tmp.name
+        r = subprocess.run([sys.executable, str(script), "status", "--repo-path", str(repo),
+                            "--board-json", str(board_json), "--json"], capture_output=True, text=True)
+        return json.loads(r.stdout) if r.returncode == 0 and r.stdout.strip() else None
+    except (OSError, ValueError):
+        return None
+    finally:
+        if tmp:
+            Path(tmp.name).unlink(missing_ok=True)
+
+
+def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=None, today=None):
+    goal = cfg.get("goal") or {}
+    milestone = goal.get("milestone")
+    budget = goal.get("budget_usd")
+    targets = dict(DEFAULT_TARGETS)
+    targets.update(cfg.get("targets") or {})
+    rows = [r for r in rows if "event" not in r and r.get("card") is not None
+            and (not milestone or r.get("milestone") in (None, milestone))]
+    by_card = {}
+    for r in rows:
+        by_card.setdefault(r["card"], []).append(r)
+    merged = _merged_cards(rows)
+    n = len(merged)
+    total = goal_total if goal_total is not None else (len(by_card) or None)
+    done = goal_done if goal_done is not None else (n if rows else None)
+    merged_rows = [r for c in merged for r in by_card[c]]
+    scores = [r["score"] for r in rows if r.get("score")]
+
+    # Define: north-star log (latest line) and the Mock-up line.
+    ns = _jsonl(Path(repo) / "docs/shape/north-star-log.jsonl")
+    last = ns[-1] if ns else {}
+    ntext = _read_text(Path(repo) / "docs/shape/north-star.md")
+    mockup, postcard = None, None
+    if ntext is not None:
+        m = re.search(r"^Mock-up:\s*(.*)$", ntext, re.M)
+        mockup = bool(m)
+        postcard = bool(m and re.search(r"postcard:\s*yes", m.group(1), re.I))
+    define = {"minutes": last.get("minutes"), "questions": last.get("questions"),
+              "blind_match": last.get("blind_match"), "mockup_signed": mockup}
+
+    # Build
+    days = None
+    starts = []
+    for r in rows:
+        t = _ts(r.get("at"))
+        if t:
+            starts.append((t - timedelta(minutes=r.get("minutes") or 0), t, r))
+    ends = [t for _, t, r in starts if r.get("column") == "Done"]
+    if starts and ends:
+        days = round((max(ends) - min(s for s, _, _ in starts)).total_seconds() / 86400, 1)
+    fp = rw = rpm = tok = mins = None
+    if n:
+        first = [c for c in merged if not any("bounced" in (r.get("lanesRun") or "") for r in by_card[c])]
+        fp = round(100 * len(first) / n)
+        rounds = [max([(r.get("score") or {}).get("round", 1) for r in by_card[c]] or [1]) for c in merged]
+        rpm = round(sum(rounds) / n, 2)
+        tok = round(sum(r.get("tokens", 0) for r in merged_rows) / n / 1000)
+        mins = round(sum(r.get("minutes", 0) for r in merged_rows) / n)
+    if scores:
+        rw = round(100 * sum(1 for s in scores if s.get("verdict") == "rework") / len(scores))
+    causes = {}
+    for s in scores:
+        if s.get("verdict") in ("fixes", "rework") and s.get("cause") in ("build", "ticket"):
+            causes[s["cause"]] = causes.get(s["cause"], 0) + 1
+    rules = {}
+    for r in merged_rows:
+        mr = r.get("modelRules")
+        if isinstance(mr, dict):
+            for k, v in mr.items():
+                rules[k] = rules.get(k, 0) + (v if isinstance(v, int) else 1)
+        elif isinstance(mr, str):
+            rules[mr] = rules.get(mr, 0) + 1
+        elif isinstance(mr, list):
+            for k in mr:
+                rules[str(k)] = rules.get(str(k), 0) + 1
+
+    spent = round(sum(r.get("usd") or 0 for r in rows), 2) if rows else None
+
+    # Done: coverage and demo
+    cov = _coverage(repo, rows, board_json)
+    demo_done = cov.get("demo_done") if cov else None
+    demo_first = None
+    if cov is not None:
+        dc = by_card.get(cov.get("demo"), [])
+        late = any((r.get("score") or {}).get("round", 1) > 1 for r in dc)
+        demo_first = bool(demo_done and not late)
+
+    checks = [("days_per_app", "days", days, lambda v, t: v <= t, "≤"),
+              ("first_pass_pct", "first pass", fp, lambda v, t: v >= t, "≥"),
+              ("rework_pct", "rework", rw, lambda v, t: v <= t, "≤"),
+              ("rounds_per_merge", "rounds per merge", rpm, lambda v, t: v <= t, "≤")]
+    met = {}
+    for key, _, val, ok, _ in checks:
+        met[key] = None if val is None else bool(ok(val, targets[key]))
+    met["demo_first_try"] = None if demo_first is None else (demo_first or not targets["demo_first_try"])
+    return {"milestone": milestone, "targets": targets, "targets_met": met, "define": define,
+            "build": {"days": days, "merged": done, "total": total, "first_pass_pct": fp, "rework_pct": rw,
+                      "rounds_per_merge": rpm, "k_tokens_per_card": tok, "min_per_card": mins,
+                      "model_rules": rules or None, "causes": causes},
+            "cost": {"usd": spent, "budget_usd": budget},
+            "done": {"coverage": cov, "demo_passed": demo_done, "demo_first_try": demo_first},
+            "postcard": postcard, "_checks": checks}
+
+
+def render_report(app, rep):
+    d, b, c, dn, t, met = rep["define"], rep["build"], rep["cost"], rep["done"], rep["targets"], rep["targets_met"]
+    mark = lambda k: NA if met[k] is None else ("✅" if met[k] else "❌")
+    yn = lambda v: NA if v is None else ("yes" if v else "no")
+    out = ["{} {}".format(app, rep["milestone"] or "")]
+    out.append("Define: north star {} min · {} questions · blind match {} · mock-up signed {}".format(
+        _num(d["minutes"]), _num(d["questions"]), _num(d["blind_match"], "/5"), yn(d["mockup_signed"])))
+    rules = ", ".join("{} ×{}".format(k, v) for k, v in sorted(b["model_rules"].items())) if b["model_rules"] else NA
+    out.append("Build: {} days · {}/{} merged · first pass {} · rework {} · {} rounds per merge · {}k tokens/card · {} min/card · models by rule {}".format(
+        _num(b["days"]), _num(b["merged"]), _num(b["total"]), _num(b["first_pass_pct"], "%"), _num(b["rework_pct"], "%"),
+        _num(b["rounds_per_merge"]), _num(b["k_tokens_per_card"]), _num(b["min_per_card"]), rules))
+    out.append("Cost: {} of {} (API-equivalent)".format(
+        NA if c["usd"] is None else "${}".format(c["usd"]), NA if c["budget_usd"] is None else "${}".format(c["budget_usd"])))
+    cov = dn["coverage"]
+    if cov:
+        per = " · ".join("must-have {} {}/{}".format(m["must_have"], m["done"], m["total"]) for m in cov["must_haves"])
+        out.append("Done: {} · demo {}".format(per or NA, "passed" if dn["demo_passed"] else "not passed"))
+    else:
+        out.append("Done: {} · demo {}".format(NA, NA))
+    for key, label, val, _, op in rep["_checks"]:
+        unit = "%" if key.endswith("pct") else ""
+        out.append("{} {}: {} vs {} {}{}".format(mark(key), label, _num(val, unit if val is not None else ""), op, t[key], unit))
+    out.append("{} demo first try: {} vs {}".format(mark("demo_first_try"), yn(dn["demo_first_try"]), yn(t["demo_first_try"])))
+    out.append("Next:")
+    nxt = _next_steps(rep)
+    out.extend("  " + x for x in nxt)
+    return "\n".join(out)
+
+
+def _next_steps(rep):
+    met, b, c = rep["targets_met"], rep["build"], rep["cost"]
+    ca = b.get("causes") or {}
+    steps = []
+    if met["first_pass_pct"] is False:
+        steps.append("sharpen tickets: most bounces cite ticket" if ca.get("ticket", 0) > ca.get("build", 0)
+                     else "tighten build: most bounces cite build, add tests or a smaller card size"
+                     if ca else "sharpen tickets: read the bounced cards and fix what they share")
+    if met["rework_pct"] is False:
+        steps.append("shrink cards: rework means the card was too big or unclear")
+    if met["rounds_per_merge"] is False:
+        steps.append("write tighter AC: extra rounds mean the check was not clear up front")
+    if met["demo_first_try"] is False:
+        steps.append("run the demo card earlier and check it against the postcard")
+    if met["days_per_app"] is False:
+        steps.append("cut the must-haves or split the milestone: the app ran over its days")
+    if c["usd"] is not None and c["budget_usd"] and c["usd"] > c["budget_usd"]:
+        steps.append("over budget: cheaper models on low-complexity cards")
+    return steps[:3] or ["all targets met or n/a: keep going"]
+
+
+def _log_line(app, rep, today):
+    b, c = rep["build"], rep["cost"]
+    return {"date": today, "app": app, "milestone": rep["milestone"], "days": b["days"], "merged": b["merged"],
+            "total": b["total"], "first_pass_pct": b["first_pass_pct"], "rework_pct": b["rework_pct"],
+            "rounds_per_merge": b["rounds_per_merge"], "usd": c["usd"], "budget_usd": c["budget_usd"],
+            "demo_passed": rep["done"]["demo_passed"], "postcard": rep["postcard"], "targets_met": rep["targets_met"]}
+
+
+def compare(repo):
+    entries = _jsonl(Path(repo) / LOG_PATH)
+    if not entries:
+        print("{}: no factory log yet".format(NA))
+        return
+    head = ["date", "app", "milestone", "days", "merged", "first pass", "rework", "rounds", "usd", "demo", "postcard", "targets"]
+    table = [head]
+    for e in entries:
+        met = [v for v in (e.get("targets_met") or {}).values() if v is not None]
+        tm = "{}/{}".format(sum(1 for v in met if v), len(met)) if met else NA
+        yn = lambda v: NA if v is None else ("yes" if v else "no")
+        spend = NA if e.get("usd") is None else "${}{}".format(e["usd"], "/${}".format(e["budget_usd"]) if e.get("budget_usd") else "")
+        table.append([str(x) for x in (e.get("date") or NA, e.get("app") or NA, e.get("milestone") or NA, _num(e.get("days")),
+                      "{}/{}".format(_num(e.get("merged")), _num(e.get("total"))), _num(e.get("first_pass_pct"), "%"),
+                      _num(e.get("rework_pct"), "%"), _num(e.get("rounds_per_merge")), spend,
+                      yn(e.get("demo_passed")), yn(e.get("postcard")), tm)])
+    w = [max(len(r[i]) for r in table) for i in range(len(head))]
+    for r in table:
+        print("  ".join(x.ljust(w[i]) for i, x in enumerate(r)).rstrip())
+
+
+def report(a):
+    repo = Path(a.repo_path).resolve()
+    if a.compare:
+        compare(repo)
+        return 0
+    if not a.config:
+        print("report: --config is required", file=sys.stderr)
+        return 64
+    try:
+        cfg = _read_cfg(a.config)
+    except (OSError, ValueError) as e:
+        print("report: cannot read config: {}".format(e), file=sys.stderr)
+        return 64
+    sc = Path(a.scorecard) if a.scorecard else repo / DEFAULT_SC
+    try:
+        rows = load_all(sc)
+    except ValueError:
+        rows = []
+    rep = compute_report(cfg, rows, repo, a.goal_done, a.goal_total, a.board_json)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if a.log:
+        line = _log_line(repo.name, rep, today)
+        path = repo / LOG_PATH
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a") as f:
+            f.write(json.dumps(line, sort_keys=True) + "\n")
+    if a.json:
+        out = {k: v for k, v in rep.items() if not k.startswith("_")}
+        out["app"] = repo.name
+        print(json.dumps(out, sort_keys=True))
+    else:
+        print(render_report(repo.name, rep))
+    return 0
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -451,12 +723,22 @@ def main():
         x.add_argument("--goal-total", type=int, help="all issues on the goal milestone")
         if name == "digest":
             x.add_argument("--plan")
+    x = sub.add_parser("report")
+    x.add_argument("--config")
+    x.add_argument("--repo-path", default=".")
+    x.add_argument("--scorecard", help="default <repo>/" + DEFAULT_SC)
+    x.add_argument("--board-json", help="[{number,status}] for coverage; default: Done cards in the scorecard")
+    x.add_argument("--goal-done", type=int)
+    x.add_argument("--goal-total", type=int)
+    x.add_argument("--log", action="store_true", help="append one line to " + LOG_PATH)
+    x.add_argument("--compare", action="store_true", help="print the factory log as a table")
+    x.add_argument("--json", action="store_true")
     d = sub.add_parser("demo")
     d.add_argument("--accepted", action="store_true")
     d.add_argument("--note")
     d.add_argument("--scorecard", default=DEFAULT_SC)
     a = p.parse_args()
-    return {"record": record, "summary": summary, "health": health, "demo": demo, "digest": digest}[a.cmd](a)
+    return {"record": record, "summary": summary, "health": health, "demo": demo, "digest": digest, "report": report}[a.cmd](a)
 
 
 if __name__ == "__main__":
