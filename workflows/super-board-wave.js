@@ -156,7 +156,7 @@ const LANE = {
 // last Reviewer report first (run.md → Reviewer step 3b). The lookup is one gh
 // call by marker, so the lane does it — this script never sees PR comments.
 const REVIEW_MEMORY = [
-  `Before reviewing, load prior_report: the newest PR comment containing "<!-- super-review:report -->" (run.md → Reviewer step 3b).`,
+  `Before reviewing, load prior_report: the newest PR comment containing "<!-- super-review:report -->" (lanes/review.md → Reviewer step 3b).`,
   `None → first review, behave as usual. Found → round 1 marks each prior finding fixed / not fixed / no longer applies;`,
   `any not fixed → bounce again listing them. Edit that report comment in place (keep R-ids), never post a second one. Report the counts as priorFindings.`,
   // Independent pass (run.md → Reviewer step 3): hypotheses before the builder's account.
@@ -196,14 +196,14 @@ const lanePrompt = (lane, card) => [
   SKILLS_CHECK([card], lane),
   READ_FAILURE,
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
-  `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
+  `Read .claude/skills/super-board/references/lanes/${lane}.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
   `create your own worktree under .claude/worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   BOARD_IO(),
   `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' && card.status === 'Ready'
-    ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (run.md → "qa cards").`]
+    ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (lanes/qa.md → "qa cards").`]
     : []),
   ``,
   `Report your exit via structured output:`,
@@ -287,7 +287,7 @@ const preflightPrompt = (batch) => [
   SKILLS_CHECK(batch),
   READ_FAILURE,
   `Builder pre-flight for issues ${batch.map((c) => `#${c.number} ("${c.title}")`).join(', ')}. Config: ${input.configPath}.`,
-  `Read .claude/skills/super-board/references/run.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
+  `Read .claude/skills/super-board/references/lanes/build.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
   `Other cards in this wave: ${JSON.stringify(input.cards.map(({ number, status, title }) => ({ number, status, title })))}`,
   `Run .claude/bin/super-board-preflight.sh once for the whole batch, then judge its candidates semantically.`,
   `hold / sequence-behind → post the Block template (block-template.md) and move the card to Blocked yourself.`,

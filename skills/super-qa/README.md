@@ -26,4 +26,4 @@ The Tester: proves a card's acceptance criteria with tests and evidence, or send
 
 ## Install
 
-Part of the super-board pack: `./install.sh /path/to/project`. Run it against staging, not production. Lane details: `skills/super-board/references/run.md` → Tester.
+Part of the super-board pack: `./install.sh /path/to/project`. Run it against staging, not production. Lane details: `skills/super-board/references/lanes/qa.md` → Tester.

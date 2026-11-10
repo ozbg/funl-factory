@@ -639,9 +639,9 @@ def main() -> int:
     # ── header ──
     proj = cfg["project"]
     mode_label = "human-approves" if cfg.get("human_approves_merge") else "auto-merge"
-    tg = cfg.get("truth_gate", "off")
+    tg = cfg.get("truth_gate", "red")
     tt = cfg.get("truth_threshold", 70)
-    gate_label = {"off": "off", "always": "always"}.get(tg, f"non-trivial (≥{tt})")
+    gate_label = {"off": "off", "always": "always", "red": f"red only (≥{tt})"}.get(tg, f"non-trivial (≥{tt})")
     bot_login = (
         cfg.get("notifications", {}).get("bot_identity")
         or cfg.get("claim", {}).get("assignee_login")

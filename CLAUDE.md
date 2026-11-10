@@ -15,16 +15,14 @@ by `scripts/super-board-readme-sync.py` from SKILL.md frontmatter and `skills/fa
 **`super-board` is an autonomous trader. The interactive Claude session that invokes `/super-board run` is an *orchestrator*, NOT a worker.** Its only jobs are:
 
 1. Verify preconditions (clean git, no orphan workers, GraphQL quota, etc.).
-2. Dispatch per the config's `worker_backend`:
-   - `"workflow"` (default) — stay in-session and run the wave loop in `skills/super-board/references/run-workflow.md`: plan a wave, claim assignees, launch the `super-board-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
-   - `"claude-p"` (legacy, explicit opt-in only) — spawn the headless runner `nohup .claude/bin/super-board-run.sh <slug> &`, report PID + log path, exit. The runner refuses to start (exit 78) unless the config sets this value.
-3. Report back to the user (dispatch confirmation, or one status line per wave).
+2. Stay in-session and run the wave loop in `skills/super-board/references/run-workflow.md`: plan a wave, claim assignees, launch the `super-board-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work; each loads its own `references/lanes/<lane>.md` plus `lanes/common.md`.
+3. Report back to the user (one status line per wave).
 
 The orchestrator MUST NOT:
 
-- Build, test, review, or fix issues itself. All product work is delegated to workflow lane agents (or `claude -p` workers on the legacy backend).
+- Build, test, review, or fix issues itself. All product work is delegated to workflow lane agents.
 - Patch the dispatcher script or skill files mid-run, even if it sees a problem. Capture the symptom and tell the user; wait for explicit approval.
-- Wait on individual workers or relay their work. They write their evidence back to the GitHub issue + PR. The orchestrator's user-facing output is the dispatch confirmation (claude-p) or one short report per wave (workflow), not the run result.
+- Wait on individual workers or relay their work. They write their evidence back to the GitHub issue + PR. The orchestrator's user-facing output is one short report per wave, not the run result.
 - Hold context for multi-card progress. State lives on the GitHub Project board + the inflight lockfiles, not in the orchestrator's session.
 
 If a problem surfaces during the run, the orchestrator's reply is: "I saw X. Want me to dig in or stop the runner?" — not "I went ahead and fixed it."
@@ -72,7 +70,7 @@ fixes must-haves and finishes upgrades with no question.
 Columns are always Backlog · Ready · Building · QA · Review · Blocked · Done — no Skipped, no
 per-board `variant`. Labels `qa` · `bug` · `feature` route cards: `qa` skips Building, everything
 else (and no label) is built. Change routing in `scripts/super-board-wave-plan.sh`,
-`workflows/super-board-wave.js` and `run.md` → "Lanes and label routing" together.
+`workflows/super-board-wave.js` and `references/run.md` → "Lanes and label routing" together.
 
 Skills call the dispatcher scripts as `.claude/bin/<script>`.
 

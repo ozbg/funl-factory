@@ -26,4 +26,4 @@ The Builder: turns a `Ready` card into a branch, the smallest safe change, tests
 
 ## Install
 
-Part of the super-board pack: `./install.sh /path/to/project`. Lane details: `skills/super-board/references/run.md` → Builder.
+Part of the super-board pack: `./install.sh /path/to/project`. Lane details: `skills/super-board/references/lanes/build.md` → Builder.

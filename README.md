@@ -174,7 +174,7 @@ Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and
 /git-sync                     # commit, pull, push
 ```
 
-Flags: `run --low|--high` · `run --codex[=<model>]` · `super-collect --since 30d`
+Flags: `run --low|--high` · `super-collect --since 30d`
 
 ## Guards & hooks
 
@@ -193,22 +193,13 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 
 ## Models
 
-A cheap router grades each card easy, medium or hard first; the run flag picks the model for each grade. With `--codex`, every lane runs on Codex GPT models instead of Claude.
+A cheap router grades each card easy, medium or hard first; the run flag picks the model for each grade.
 
 | Command | Router | Easy card | Medium card | Hard card |
 | --- | --- | --- | --- | --- |
 | `/super-board run` | Haiku 4.5 | Sonnet 5.5 | Opus 5.5 | session model |
 | `/super-board run --low` | Haiku 4.5 | Haiku 4.5 | Sonnet 5.5 | Opus 5.5 |
 | `/super-board run --high` | Sonnet 5.5 | Opus 5.5 | Opus 5.5 | Opus 5.5 |
-| `/super-board run --codex` | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol | gpt-6-astra |
-| `/super-board run --codex --low` | gpt-6-luna | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol |
-| `/super-board run --codex --high` | gpt-6-luna | gpt-6-astra | gpt-6-astra | gpt-6-astra |
-
-`/super-board run --codex=<model>` pins one model for every card and skips the router.
-
-Run inside Codex? plain `/super-board run` switches to the Codex ladder by itself. Codex has no
-`/super-board` command: it finds skills in `.agents/skills/` (symlinks followed), so link
-`.claude/skills/super-board` there and type `$super-board run`.
 
 ## Writing standard
 

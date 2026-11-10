@@ -177,7 +177,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    git or gh → halt: "Without <tool> the board can't <why>. Your answers are saved — run
    │    the command, then re-run onboard."
    ├─ Re-check (`check --text`) after every install; move on only when it says all green.
-   ├─ Workflow runtime: syntax-check the installed workflow (same command run.md uses):
+   ├─ Workflow runtime: syntax-check the installed workflow (same command run-workflow.md uses):
    │      { echo '(async function(){'; sed 's/^export const meta/const meta/' \
    │        .claude/workflows/super-board-wave.js; echo '})'; } | node --check --input-type=module
    │    Fails → fix re-copies it; still failing → 🛑 (error table). Remind once: dynamic
@@ -317,7 +317,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
        failure is fixed here, not discovered at the first merge. For Supabase the URL is the
        Session pooler string (port 5432) with special characters in the password URL-encoded,
        and a just-reset password takes ~20 s to reach the pooler — retry once before calling it wrong.
-   Permission lines: the base list in run-workflow.md → "Mid-run permission prompts", plus the
+   Permission lines: the base list in "Mid-run permission prompts" below, plus the
    merge lines when merge_policy.default is "auto" ("Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
    "Bash(gh pr merge:*)"), one "Bash(<migrate command>)" per allowed env, "Bash(bash
    .claude/bin/super-board-env-check.sh:*)" and the test runner. N counts what is NOT already in
@@ -392,6 +392,94 @@ DONE — run `python3 $SB/super-board-verification-ready.py --config <saved conf
 ```
 
 ---
+
+## Mid-run permission prompts
+
+Lane agents inherit the session allowlist and run in acceptEdits. Add these
+to your project's `.claude/settings.json` → `permissions.allow` so waves
+don't stall on prompts:
+
+    "Bash(gh issue view:*)", "Bash(gh issue edit:*)", "Bash(gh issue comment:*)",
+    "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)", "Bash(gh pr comment:*)",
+    "Bash(gh pr create:*)", "Bash(gh pr ready:*)", "Bash(gh project item-edit:*)",
+    "Bash(gh project item-list:*)", "Bash(gh api:*)", "Bash(git worktree:*)",
+    "Bash(.claude/bin/super-board-card.sh:*)",
+    "Bash(git checkout:*)", "Bash(git add:*)", "Bash(git commit:*)",
+    "Bash(git push:*)", "Bash(git pull:*)", "Bash(git fetch:*)", "Bash(git blame:*)",
+    "Bash(mkdir:*)", "Bash(pgrep:*)", "Bash(node --check:*)",
+    "Bash(bash .claude/bin/super-board-wave-plan.sh:*)",
+    "Bash(bash .claude/bin/super-board-preflight.sh:*)",
+    "Bash(python3 .claude/bin/super-board-github-read.py:*)",
+    "Bash(.claude/bin/super-board-github-read.py:*)",
+    "Bash(python3 .claude/bin/super-board-verification-ready.py:*)",
+    "Bash(python3 .claude/bin/super-board-skills-ready.py:*)",
+    "Bash(bash .claude/bin/super-board-usage.sh:*)",
+    "Bash(bash .claude/bin/super-board-throttle.sh:*)",
+    "Bash(python3 .claude/bin/super-board-scorecard.py:*)",
+    "Bash(bash .claude/bin/super-board-host.sh:*)",
+    "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",
+    "Bash(bash .claude/bin/super-board-stop.sh:*)",
+    plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
+
+`tests/test_run_allowlist.py` fails when pre-flight or a lane calls a `.claude/bin`
+script this list does not cover. The read helper is listed in both forms: scripts call
+`python3 .claude/bin/super-board-github-read.py`, lane prompts call it directly.
+
+**Headless runs (`claude -p "/super-board run"`).** Supported only where Claude Code may
+write the project's `.claude/` folder without a prompt. `.claude/` is a protected path:
+the wave lock under `.claude/super-board/` (inflight lock, halt and PID files) is prompted
+in `default` and `acceptEdits`, denied in `dontAsk`, and no `permissions.allow` rule
+(e.g. `Edit(.claude/**)`) pre-approves it. Claude's own git worktrees under
+`.claude/worktrees/` are exempt, so lane worktrees need only `Bash(git worktree:*)`.
+Pick one:
+- Interactive (recommended): start `/super-board run` in a terminal session and answer
+  the first `.claude/` write prompt with "allow Claude to edit files in this project's
+  .claude folder for this session".
+- Headless: `claude -p "/super-board run" --permission-mode bypassPermissions`, only in
+  an isolated container or VM. `--permission-mode acceptEdits` stops at the wave lock.
+
+Merging is NOT in the base list. On a board whose `merge_policy.default` is
+`"auto"`, `super-board onboard` offers the merge lines as a diff to approve
+up front (onboard → Permissions), so the first overnight run does not stall:
+
+    "Bash(bash .claude/bin/super-board-merge-gate.sh:*)", "Bash(gh pr merge:*)",
+    plus one line per configured migrate command in `migrations.commands`
+    for the envs in `migrations.allowed_envs`.
+
+Without them every Reviewer merge pauses for one interactive approval, so the
+backend is **attended-only**. With them, the gate still enforces
+`merge_policy` (money / auth / destructive schema / over `auto_max_lines` → human, exit 7) and `migrations`
+(live DB → 🙋 needs you, exit 8), so the allowlist removes the prompt, not
+the policy. Pair auto-merge with a non-production `base_branch`.
+
+> **Read this before starting an overnight wave (issue #9).** The two settings
+> interact, and the failure is silent. A board configured
+> `"human_approves_merge": false` and `merge_policy.default: "auto"`, processing
+> otherwise ungated PRs **without** `"Bash(gh pr merge:*)"` allowed, will build,
+> test and review cards all night and land **nothing** —
+> each Reviewer stalls on an approval prompt nobody is there to click, and the
+> card returns to Review to be re-reviewed on the next wave.
+>
+> Pick one deliberately:
+>
+> | Intent | Configuration | Allowlist `gh pr merge` | Reviewer's terminal state |
+> | --- | --- | --- | --- |
+> | Attended — approve each merge command | `human_approves_merge: false`, `merge_policy.default: "auto"` | no | pauses on a tool permission prompt |
+> | Unattended auto-merge | `human_approves_merge: false`, `merge_policy.default: "auto"` | **yes** | card → Done after confirmed merge; configured human gates → 🙋 Blocked |
+> | Every PR requires human approval through the gate | `human_approves_merge: false`, `merge_policy.default: "human"` | needed only if the agent will merge after approval | gate exits 7 → 🙋 Blocked until a human merges or approves the pinned request |
+> | Legacy human-only switch | `human_approves_merge: true` | no | Reviewer stops before the gate; card stays in Review |
+>
+> Gate-based rows also need the merge-gate command allowed. A tool permission prompt
+> is separate from the gate's human-approval request; allowing a command does not
+> bypass `merge_policy`.
+>
+> Row 2 is the only combination that lands code with nobody watching, and it
+> requires a non-production `base_branch` — the production-merge
+> guard refuses to start otherwise. Whichever row you pick, the Reviewer still
+> owes the full merge protocol in `lanes/review.md` → "Merge protocol": mark the draft PR
+> ready, merge, **verify the merge commit is an ancestor of the base branch**,
+> and only then move the card to Done. A merge-blocked PR goes to Blocked, not
+> back to Review.
 
 ## AGENTS.md source of truth
 
@@ -498,7 +586,7 @@ remove a pending recovery record; use its saved state to reconcile a conflict be
    Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature.
 4. **Setup green** — `python3 .claude/bin/super-board-setup.py check` exits 0 (or only `needs`
    the user declined).
-5. **Workflow runtime** — unless `worker_backend` is `"claude-p"`, the step-1 `node --check` passes.
+5. **Workflow runtime** — the step-1 `node --check` passes.
 
 When step 5 wrote files: `super-board-agents-md.py check --file AGENTS.md` passes and `detect`
 reports CLAUDE.md as a pointer (unless "Only add the super-board section"). Any check fails →
