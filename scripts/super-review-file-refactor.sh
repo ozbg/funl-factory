@@ -7,10 +7,9 @@
 # warning; unavailable required evidence or an unknown write outcome pauses the
 # run (79) while preserving any issue already created. No mutation is retried.
 #
-# A card with real acceptance criteria lands in Ready; one without lands in Backlog.
-# A bare note has had no human eyes on it; auto-promoting it to Ready would feed the
-# build lane work nobody asked for. It waits for `super-board lint` like any other
-# unrefined ticket.
+# Every card lands in Backlog (or the board's holding-column alias), never Ready.
+# A reviewer-filed card has had no human eyes on it; auto-promoting it to Ready fed
+# the build lane work nobody asked for (#157). It waits for `super-board lint`.
 #
 # Usage:
 #   super-review-file-refactor.sh --config <config.json> \
@@ -18,13 +17,13 @@
 #     --body-file <path.md> \
 #     --fingerprint "<module>|<shape-problem>" \
 #     [--files "src/a.ts,src/b.ts"] [--strength strong|worth-exploring|speculative] \
-#     [--area <area>] [--pr <number>] [--column <name>]
+#     [--area <area>] [--pr <number>] [--column <holding column, never Ready>]
 #
 # Stdout: the issue number (new, or the existing one on a fingerprint hit).
 set -euo pipefail
 
 CONFIG=""; TITLE=""; BODY_FILE=""; FINGERPRINT=""
-FILES=""; STRENGTH="worth-exploring"; AREA=""; PR=""; COLUMN=""
+FILES=""; STRENGTH="worth-exploring"; AREA=""; PR=""; COLUMN="Backlog"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -45,6 +44,7 @@ done
 [ -n "$TITLE" ]       || { echo "--title is required" >&2; exit 64; }
 [ -n "$FINGERPRINT" ] || { echo "--fingerprint is required (dedupe key)" >&2; exit 64; }
 [ -n "$BODY_FILE" ] && [ -r "$BODY_FILE" ] || { echo "--body-file missing or unreadable: ${BODY_FILE:-<unset>}" >&2; exit 66; }
+[ "$COLUMN" != "Ready" ] || { echo "--column Ready is refused: review follow-ups always go to Backlog" >&2; exit 64; }
 
 # Enum-check loudly. A typo here becomes a label nobody filters on, and the card
 # quietly never surfaces in an architecture sweep.
@@ -99,20 +99,6 @@ $(cat "$BODY_FILE")" >/dev/null 2>&1 \
     || { python3 "$GITHUB_READ" --halt "Comment outcome unknown for #${EXISTING}; inspect before retrying"; exit 79; }
   echo "$EXISTING"
   exit 0
-fi
-
-# Where the card lands, and it is decided by the card, not by a default.
-#
-# A card with real acceptance criteria is buildable, so it goes to `Ready` and the
-# next wave takes it. A card without them is a note, and `Ready` feeds the Builder
-# lane directly — so it goes to the holding column and waits for `super-board
-# lint` like any other unrefined ticket.
-#
-# This used to be an unconditional `Backlog`, which was wrong twice over: it fed
-# nothing to the loop even when the card was ready, and on a board with no
-# `Backlog` column it produced cards with no Status at all.
-if [ -z "$COLUMN" ]; then
-  if grep -qiE '^## +Acceptance criteria *$' "$BODY_FILE"; then COLUMN="Ready"; else COLUMN="Backlog"; fi
 fi
 
 # --- create -----------------------------------------------------------------
@@ -224,11 +210,7 @@ place_card() {
   # card was sent to a holding column is that nobody has written its criteria yet.
   # (Briefly it did degrade upward, and a note-quality card would have been built
   # on a board that happens to have no Backlog column — which is this repo's.)
-  if [ "$COLUMN" = "Ready" ]; then
-    candidates=("Ready" "Backlog" "Todo" "To do" "Triage" "Inbox")
-  else
-    candidates=("$COLUMN" "Backlog" "Todo" "To do" "Triage" "Inbox")
-  fi
+  candidates=("$COLUMN" "Backlog" "Todo" "To do" "Triage" "Inbox")
   for candidate in "${candidates[@]}"; do
     option_id=$(echo "$field_json" | jq -r --arg c "$candidate" \
       '.fields[] | select(.name=="Status") | .options[]? | select(.name==$c) | .id')
