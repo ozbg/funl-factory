@@ -27,6 +27,7 @@ A live site with no repo is not a board. `/super-qa <url>` tests it on its own.
 6. **Security pass** on red, or amber with `boundary: true` (super-qa → "Security pass").
 7. Run the tests. Evidence goes to `.claude/super-board/evidence/<issue>/v<V>/` in the main
    checkout, gitignored. Never commit it, never embed images.
+   An AC that cannot be proven by a test or file is a fail: the merge gate refuses unticked or path-less proof (common.md → "No partial merge").
 8. **Sort findings.** A fail cites `AC<n>`, `I<n>`, `bar: <line>` or `bug: <repro steps>`.
    Anything else is a note. Out-of-scope privacy, data-loss or visible bug → Backlog card via
    `super-qa-file-bug.sh --column Backlog`; it does not fail this card.

@@ -196,7 +196,7 @@ const REVIEW_MEMORY = [
   // Truth-check brief is fixed (super-review → Adversarial mode); a hand-written one once made over-building blocking.
   `Truth-check sub-agents get the fixed brief from super-review → "Adversarial mode", verbatim. After collecting, any uncited or over-engineering finding is a Note; it never decides merge or bounce.`,
   // Merge policy + migrations live in the gate (lanes/review.md → Merge protocol step 5).
-  `Merge only via super-board-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema, or a big red PR): Blocked with the 🙋 template quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve. Exit 10 = deep review needed: run it (lanes/review.md), add deep-reviewed, re-run the gate. Exit 11 (draft) or 12 (bad read) = leave the card in Review and retry next wave; never Blocked, never a halt.`,
+  `Merge only via super-board-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema, or a big red PR): Blocked with the 🙋 template quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve. Exit 10 = deep review needed: run it (lanes/review.md), add deep-reviewed, re-run the gate. Exit 13 = acceptance checklist not met (unticked AC, or proof not a file at the head): bounce to Build citing each AC the gate printed; never Blocked. Exit 11 (draft) or 12 (bad read) = leave the card in Review and retry next wave; never Blocked, never a halt.`,
   `Exit 8 = 🙋 needs you (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked with the 🙋 template, exact commands from its needs-you lines, label needs-you.`,
   // Scorecard (factory #25): a by-product of the review above, never extra work.
   `Also return score, from what you already checked: verdict (clean = merge as is · fixes = notes only · rework = any blocker),`,
@@ -253,7 +253,7 @@ const lanePrompt = (lane, card, { greenEntry = false } = {}) => [
     ? [`Return tier and maxRounds from your zone step (3c). Green tier, and no zone:amber or zone:red label → no QA lane: move the card Building → Review, not QA, and return column Review.`]
     : []),
   ...(greenEntry
-    ? [`Green card: it skips QA and comes straight from Building. If the board still shows it in Building or QA, move it to Review first; there is no Tester report — check the builder's AC proof and rerun its tests (lanes/review.md step 4).`]
+    ? [`Green card: it skips QA and comes straight from Building. If the board still shows it in Building or QA, move it to Review first; there is no Tester report — check the builder's AC proof, rerun its tests, and tick each AC whose test passed with its proof line before the gate (lanes/review.md step 4).`]
     : []),
   ...(lane === 'qa' && card.status === 'Ready'
     ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (lanes/qa.md → "qa cards").`]
