@@ -1,5 +1,6 @@
-"""Offline tests for scripts/super-board-scorecard.py (factory #25)."""
+"""Offline tests for scripts/super-board-scorecard.py (factory #25, v2 T9 health)."""
 import json
+from datetime import datetime, timezone
 import subprocess
 import sys
 import tempfile
@@ -103,6 +104,143 @@ class Scorecard(unittest.TestCase):
 
     def test_summary_empty(self):
         self.assertIn("no scorecard rows", run("summary", "--scorecard", str(self.sc)))
+
+    # ── v2 T9: split tokens, dollars, health, demo, digest ──
+
+    def test_record_splits_tokens_prices_and_keeps_new_fields(self):
+        self.agent("agent-b", [
+            {"type": "assistant", "requestId": "r1", "timestamp": "2026-11-09T10:00:00Z",
+             "message": {"role": "assistant", "model": "claude-haiku-5-5", "usage": {
+                 "input_tokens": 1_000_000, "output_tokens": 1_000_000,
+                 "cache_creation_input_tokens": 1_000_000, "cache_read_input_tokens": 1_000_000}}},
+        ], {"description": "build:#7"})
+        res = self.tmp / "res.json"
+        res.write_text(json.dumps({"cards": [
+            {"number": 7, "lanesRun": "build:advanced → qa:advanced → review:bounced", "column": "Ready",
+             "citation": "AC2 · src/a.ts:12", "round_capped": True},
+            {"number": 8, "lanesRun": "build:advanced → qa:bounced", "column": "Ready", "citation": "x"},
+        ], "events": [{"type": "uncited-bounce", "number": 8}]}))
+        run("record", "--results", str(res), "--logs", str(self.logs), "--scorecard", str(self.sc),
+            "--wave", "w1", "--milestone", "M1")
+        r7, r8 = [json.loads(l) for l in self.sc.read_text().splitlines()]
+        self.assertEqual(r7["tokenSplit"], {"input": 1_000_000, "output": 1_000_000,
+                                            "cacheWrite": 1_000_000, "cacheRead": 1_000_000})
+        self.assertAlmostEqual(r7["usd"], 0.10 + 0.50 + 0.125 + 0.01)  # haiku list price
+        self.assertEqual(r7["milestone"], "M1")
+        self.assertEqual(r7["citation"], "AC2 · src/a.ts:12")
+        self.assertTrue(r7["roundCapped"])
+        self.assertTrue(r7["at"].endswith("Z"))
+        self.assertIsNone(r8["citation"])
+        self.assertTrue(r8["uncited"])
+        self.assertFalse(r8["roundCapped"])
+
+    def cfg(self, stage=3, budget=100, digest="merge-breach-ask"):
+        p = self.tmp / "cfg.json"
+        p.write_text(json.dumps({"goal": {"milestone": "M1", "budget_usd": budget}, "ramp": {"stage": stage},
+                                 "digest": digest}))
+        return p
+
+    def rows(self, *rows):
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%dT10:00:00Z")
+        self.sc.write_text("".join(json.dumps({"at": today, "milestone": "M1", **r}) + "\n" for r in rows))
+
+    def health(self, cfg, *extra):
+        return json.loads(run("health", "--config", str(cfg), "--scorecard", str(self.sc), *extra))
+
+    def test_budget_burn_with_few_merges_asks_and_steps_ramp_down(self):
+        cfg = self.cfg(stage=3, budget=100)
+        self.rows({"wave": "w1", "card": 1, "column": "Done", "lanesRun": "review:advanced", "usd": 50},
+                  {"wave": "w2", "card": 2, "column": "QA", "lanesRun": "build:advanced", "usd": 35})
+        h = self.health(cfg, "--goal-done", "1", "--goal-total", "5")
+        self.assertEqual(h["action"], "stop-ask")
+        self.assertEqual([b["metric"] for b in h["breaches"]], ["budget-burn"])
+        self.assertEqual(h["ramp"], {"from": 3, "to": 2})
+        self.assertEqual(json.loads(cfg.read_text())["ramp"]["stage"], 2)
+        self.assertEqual(h["budget"], {"usd": 85, "budget_usd": 100})
+        self.assertEqual(sorted(h), ["action", "breaches", "budget", "goal", "metrics", "ramp", "report", "warnings", "wave"])
+        ev = json.loads(self.sc.read_text().splitlines()[-1])
+        self.assertEqual((ev["event"], ev["action"], ev["wave"]), ("health", "stop-ask", "w2"))
+        # Same burn with 60% merged is fine.
+        self.assertEqual(self.health(cfg, "--goal-done", "3", "--goal-total", "5")["action"], "continue")
+
+    def test_breach_pauses_new_and_ramp_floors_at_one(self):
+        cfg = self.cfg(stage=1, budget=None)
+        self.rows({"wave": "w1", "card": 1, "column": "Review", "lanesRun": "build:advanced", "roundCapped": True})
+        h = self.health(cfg)
+        self.assertEqual(h["action"], "pause-new")
+        self.assertEqual(h["metrics"]["roundCapped"], [1])
+        self.assertEqual(h["ramp"], {"from": 1, "to": 1})
+        self.assertEqual(json.loads(cfg.read_text())["ramp"]["stage"], 1)
+
+    def test_clean_wave_continues_and_never_steps_up(self):
+        cfg = self.cfg(stage=2)
+        self.rows({"wave": "w1", "card": 1, "column": "Done", "lanesRun": "review:advanced",
+                   "score": {"round": 1}, "usd": 1})
+        h = self.health(cfg)
+        self.assertEqual((h["action"], h["breaches"]), ("continue", []))
+        self.assertNotIn("ramp", h)
+        self.assertEqual(json.loads(cfg.read_text())["ramp"]["stage"], 2)
+
+    def test_rounds_per_merge_and_failures_today(self):
+        cfg = self.cfg(stage=3, budget=None)
+        self.rows({"wave": "w1", "card": 1, "column": "Done", "score": {"round": 3}, "lanesRun": "review:advanced"},
+                  {"wave": "w1", "card": 2, "column": "Done", "score": {"round": 2}, "lanesRun": "review:advanced"},
+                  {"wave": "w2", "card": 3, "column": "Ready", "lanesRun": "build:failed"},
+                  {"wave": "w2", "card": 4, "column": "Ready", "lanesRun": "build:advanced → qa:failed"},
+                  {"wave": "w2", "card": 5, "column": "QA", "lanesRun": "none", "finalStatus": "halted"})
+        h = self.health(cfg)
+        self.assertEqual(h["metrics"]["roundsPerMerge"], 2.5)
+        self.assertEqual(h["metrics"]["failuresToday"], 3)
+        self.assertEqual(sorted(b["metric"] for b in h["breaches"]), ["factory-failures", "rounds-per-merge"])
+        self.assertEqual(h["action"], "pause-new")
+
+    def test_warns_when_wave_wrote_no_rows_and_reports_after_ten_merges(self):
+        cfg = self.cfg(stage=1, budget=None)
+        self.rows(*[{"wave": "w1", "card": n, "column": "Done", "lanesRun": "review:advanced",
+                     "tokenSplit": {"input": 1000, "output": 0, "cacheWrite": 0, "cacheRead": 0}} for n in range(10)],
+                  {"wave": "w1", "card": 20, "column": "Ready", "lanesRun": "review:bounced", "citation": "AC1"},
+                  {"wave": "w1", "card": 21, "column": "Ready", "lanesRun": "review:bounced"})
+        out = run("demo", "--accepted", "--scorecard", str(self.sc))
+        self.assertIn("demo", out)
+        h = self.health(cfg, "--wave", "w9")
+        self.assertEqual(h["warnings"], ["wave w9 wrote no scorecard rows"])
+        self.assertEqual(h["report"], {"ready": True, "merges": 10, "citedBouncePct": 50,
+                                       "tokensPerMerge": 1000, "daysSinceDemo": 0})
+        self.assertEqual(h["action"], "continue")  # report-only metrics never act
+
+    def test_digest_shows_goal_merges_health_budget(self):
+        cfg = self.cfg(stage=2, budget=100)
+        self.rows({"wave": "w1", "card": 7, "column": "Done", "lanesRun": "review:advanced", "usd": 12.5},
+                  {"wave": "w1", "card": 9, "column": "Blocked", "finalStatus": "blocked", "lanesRun": "build:blocked"})
+        plan = self.tmp / "plan.json"
+        plan.write_text(json.dumps({"cards": []}))
+        out = run("digest", "--config", str(cfg), "--plan", str(plan), "--scorecard", str(self.sc),
+                  "--goal-done", "3", "--goal-total", "5")
+        self.assertIn("🎯 M1 · 3/5 done", out)
+        self.assertIn("Merged this wave: #7", out)
+        self.assertIn("Health: continue", out)
+        self.assertIn("rounds/merge", out)
+        self.assertIn("Budget: $12.5 of $100", out)
+        self.assertIn("Asks: #9", out)
+
+    def test_digest_quiet_without_merge_breach_or_ask_unless_every_wave(self):
+        self.rows({"wave": "w1", "card": 7, "column": "QA", "lanesRun": "build:advanced", "usd": 1})
+        plan = self.tmp / "plan.json"
+        plan.write_text("{}")
+        args = ("--plan", str(plan), "--scorecard", str(self.sc))
+        self.assertEqual(run("digest", "--config", str(self.cfg()), *args), "")
+        self.assertIn("Health: continue", run("digest", "--config", str(self.cfg(digest="every-wave")), *args))
+
+    def test_digest_budget_breach_is_an_ask(self):
+        cfg = self.cfg(stage=2, budget=10)
+        self.rows({"wave": "w1", "card": 7, "column": "QA", "lanesRun": "build:advanced", "usd": 9})
+        self.health(cfg)
+        plan = self.tmp / "plan.json"
+        plan.write_text("{}")
+        out = run("digest", "--config", str(cfg), "--plan", str(plan), "--scorecard", str(self.sc))
+        self.assertIn("Health: stop-ask", out)
+        self.assertIn("budget-burn", run("health", "--config", str(cfg), "--scorecard", str(self.sc)))
+        self.assertIn("Asks: budget", out)
 
 
 if __name__ == "__main__":

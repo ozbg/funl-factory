@@ -79,7 +79,7 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 - The backend is in-session dynamic workflows: turn them on in `/config`.
 - Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
 - `onboard` fixes what the board needs without asking (skills, scripts, workflows, guards, settings, old folders, config keys) and asks only to install a system tool or sign in. An older super-board is upgraded in place (see [Upgrading from 2.x](../../RELEASE-NOTES.md#upgrading-from-2x)).
-- `onboard` asks once what the robot may do: auto-merge normal changes up to 400 changed lines (money, auth, destructive schema like DROP/TRUNCATE/RENAME, and bigger PRs wait for you; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
+- `onboard` asks once what the robot may do: auto-merge normal changes (money, auth and destructive schema like DROP/TRUNCATE/RENAME wait for you; a PR over 600 source lines gets a deeper review, not you, unless the card is red; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
 - Auto-merge needs the merge-gate and `gh pr merge` lines in your allowlist; `onboard` offers them as a diff.
 - `onboard` can make AGENTS.md the source of truth (CLAUDE.md becomes `@AGENTS.md`) and keeps a managed super-board section in it. Plugin install: the command is `/super-board:super-board onboard`, and its 🔍 Checks step installs the missing scripts, workflows and hooks.
 - Bug sources take any extra source in onboard — a link, app name, API URL, MCP server or command — proven readable (read-only) before it is saved; `/super-collect` runs it like the built-ins.
@@ -201,9 +201,9 @@ to the base branch is opt-in (`onboard` asks once, or `install.sh --protect-main
   ─────────────────────────────────────────    ────────    ─────────────────────────────
   a normal change, verify green                merge (0)   Done
   money / auth / destructive schema (labels,   exit 7      Blocked 🙋 — you merge it, or
-    path globs, added-line keywords), or                   comment `done` to approve
-    over auto_max_lines (default 400 changed
-    lines: "big PR — please review")
+    path globs, added-line keywords)                       comment `done` to approve
+  over auto_max_lines (default 600 source      deep        Done after a deeper review;
+    lines), card not red                       review      red → Blocked 🙋
   additive migrations, target env allowed      migrate,    Done
                                                merge (0)
   migrations for live (not allowed), a failed  exit 8      Blocked 🙋 — exact commands;
@@ -233,7 +233,7 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 ```
   columns               Backlog · Ready · Building · QA · Review · Blocked · Done (always all seven)
   human_approves_merge  legacy: true = never auto-merge (prefer merge_policy.default "human")
-  merge_policy          default auto|human · auto_max_lines (400) · size_exclude · always_human {money, auth, schema}
+  merge_policy          default auto|human · auto_max_lines (600) · size_exclude · always_human {money, auth, schema}
   migrations            globs · allowed_envs (test, staging, live) · target_env · commands
   verify_commands       run by the merge gate against the current base before every merge
   rebuild_cap           bounces allowed before a card goes Blocked
@@ -299,7 +299,7 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 - The usage guard reads only what an interactive status line recorded; headless runs see no usage.
 - `verify_commands` are only as good as your test suite. Without them the gate says it proved nothing.
 - Lanes call [mattpocock/skills](https://github.com/mattpocock/skills) by name; without that pack a worker fails when it reaches for one.
-- The Tester (QA lane) runs the bundled `pr-security-review` on every PR, and a finding fails QA; it reports only high-confidence findings, so it is not a full audit. Cloudflare's `security-audit` (added by get.sh and onboard) covers the whole repo, and only runs when you ask.
+- The Tester (QA lane) runs the bundled `pr-security-review` on red cards and on amber cards on a boundary path, and a finding fails QA; it reports only high-confidence findings, so it is not a full audit. Cloudflare's `security-audit` (added by get.sh and onboard) covers the whole repo, and only runs when you ask.
 - `bash` 3.2+ (stock macOS is fine), `jq` and Python 3 are required on the machine running the loop.
 
 ## Pack layout and tests

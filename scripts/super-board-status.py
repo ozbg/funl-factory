@@ -220,6 +220,24 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
     }
 
 
+def latest_health(scorecard: Path) -> str | None:
+    """The last `health` event in the scorecard as one line, or None (v2 T9)."""
+    if not scorecard.is_file():
+        return None
+    last = None
+    for raw in scorecard.read_text(errors="replace").splitlines():
+        try:
+            row = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(row, dict) and row.get("event") == "health":
+            last = row
+    if last is None:
+        return None
+    breaches = ", ".join(last.get("breaches") or []) or "no breaches"
+    return f"health: {last.get('action', '?')} · {breaches} · wave {last.get('wave') or '?'}"
+
+
 def visual_width(s: str) -> int:
     """Approximate east-asian-width-aware cell count."""
     w = 0
@@ -747,6 +765,9 @@ def main() -> int:
         )
     else:
         print(f"   no run today    workers: 0/{max_workers} idle")
+    health_line = latest_health(Path(runs_dir) / "scorecard.jsonl")
+    if health_line:
+        print(f"   {health_line}")
 
     return 0
 

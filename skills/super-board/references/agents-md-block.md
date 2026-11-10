@@ -12,15 +12,13 @@ Board: Backlog · Ready · Building · QA · Review · Blocked · Done. Labels r
 | QA a branch, or a live URL alone | `/super-qa` · `/super-qa <url>` | NEVER mark QA pass without evidence |
 | Review a PR, merge | `/super-review` | NEVER `gh pr merge` direct — merge gate only |
 | Turn Sentry, PostHog, PR problems into tickets | `/super-collect` | DON'T skip the verifier; it hands off to `/to-spec` |
-| UI polish | `/ui-refine-loop` (human runs it) | board NEVER runs it |
-| Diagram / explainer page | `/visual` | |
 | Commit, pull, push this branch | `/git-sync` | NEVER force push or rebase shared history |
 
 | Rule | Value |
 |---|---|
 | Config | `.claude/super-board/configs/<slug>.json` |
 | Isolation | 1 card · 1 worktree · 1 branch |
-| Merge | auto for normal changes · money, auth, destructive schema (DROP/TRUNCATE/RENAME) → human · PR > 400 changed lines → human |
+| Merge | auto for normal changes · money, auth, destructive schema (DROP/TRUNCATE/RENAME) → human · PR > 600 source lines → deeper review, not you, unless the card is red |
 | Migrations | additive → robot migrates allowed DBs only · live DB ALWAYS → 🙋 needs you |
 | Blocked card | block-template comment · last line `blocked-by:` · 🙋 = needs you |
 | Secrets | NEVER read `.env`; key names via `.claude/bin/super-board-env-check.sh` |
