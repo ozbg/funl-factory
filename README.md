@@ -131,6 +131,7 @@ Add cards to `Ready`. The board drains on its own.
 
 | Skill | What it does |
 |---|---|
+| [`/mockup`](skills/mockup/SKILL.md) | One-hour clickable mock-up of the core loop; installing it is #60. |
 | [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
 | [`/to-board`](skills/to-board/SKILL.md) | North star to one-page spec and Haiku-ready cards in Backlog. |
