@@ -207,7 +207,7 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$CAP" --argjson deps
       elif any(.picked[]; overlaps(files_of(.number); files_of($c.number)))
         then .deferred += [ { number: $c.number, title: $c.title, reason: "overlap" } ]
       else .picked += [ $c ] end) as $pick
-  | { cards: ($pick.picked | map(del(.milestone))),
+  | { cards: ($pick.picked | map(del(.milestone) | . + { judgement: (dep(.number).judgement // false) })),
       refused: [ $gated[] | select(.reason != "") | { number, reason } ],
       deferred: $pick.deferred,
       offGoal: $offgoal,

@@ -127,4 +127,17 @@ OUT=$("$DEPS" --from "$CARD")
 get 1 '.acs == 2 and .mustHave == [1,3] and .files == ["src/a/","docs/x.md"]' || fail "card lines: $(echo "$OUT" | jq -c '.["1"]')"
 get 2 '.acs == 0 and .mustHave == null and .files == null' || fail "absent card lines: $(echo "$OUT" | jq -c '.["2"]')"
 
-echo "PASS: test-deps.sh (21 scenarios)"
+# 21 — `Needs judgement:` yes (any case, bullet/bold, trailing reason) is true; else false.
+jq -n '[{number:3,title:"a",state:"OPEN",body:"## Context\n- **Needs judgement:** yes — new auth shape\n\n## Blocked by\n- None."},
+        {number:4,title:"b",state:"OPEN",body:"## Context\nNeeds judgement: YES\n\n## Blocked by\n- None."},
+        {number:5,title:"c",state:"OPEN",body:"## Context\n- **Needs judgement:** no\n\n## Blocked by\n- None."},
+        {number:6,title:"d",state:"OPEN",body:"## Context\n- **Needs judgement:** yesterday\n\n## Blocked by\n- None."},
+        {number:7,title:"e",state:"OPEN",body:"## Blocked by\n- None."}]' > "$CARD"
+OUT=$("$DEPS" --from "$CARD")
+get 3 '.judgement == true' || fail "judgement yes: $(echo "$OUT" | jq -c '.["3"]')"
+get 4 '.judgement == true' || fail "judgement YES"
+get 5 '.judgement == false' || fail "judgement no"
+get 6 '.judgement == false' || fail "judgement yesterday is not yes"
+get 7 '.judgement == false' || fail "judgement absent"
+
+echo "PASS: test-deps.sh (22 scenarios)"

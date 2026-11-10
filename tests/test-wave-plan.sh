@@ -224,4 +224,12 @@ width() { "$PLAN" --config <(echo "$NOCAP" | jq "$1") --items <(echo "$R_ITEMS")
 RC=0; "$PLAN" --config <(echo "$NOCAP" | jq '.ramp.stage = 4') --items <(echo "$R_ITEMS") --deps <(echo "$R_DEPS") >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 65 ] || fail "ramp.stage 4 should exit 65, got $RC"
 
-echo "PASS: test-wave-plan.sh (22 scenarios)"
+# 23 — each picked card carries judgement from the dependency graph; absent = false.
+J_ITEMS=$(jq -n '{items: [range(60;62) as $n | {status:"Ready", content:{type:"Issue", number:$n, title:"c\($n)", assignees:[]}}]}')
+J_DEPS=$(jq -n '{"60":{judgement:true}, "61":{}} | map_values(. + {runnable:true, parseable:true, blockers:[], acs:1, mustHave:[1], files:["j/"]})')
+J_DEPS=$(echo "$J_DEPS" | jq '{"60": .["60"], "61": (.["61"] + {files:["k/"]})}')
+OUT23=$("$PLAN" --config <(echo "$NOCAP" | jq '.ramp.stage = 3') --items <(echo "$J_ITEMS") --deps <(echo "$J_DEPS"))
+echo "$OUT23" | jq -e '([.cards[] | {(.number|tostring): .judgement}] | add) == {"60":true,"61":false}' >/dev/null \
+  || fail "judgement per card: $OUT23"
+
+echo "PASS: test-wave-plan.sh (23 scenarios)"
