@@ -37,9 +37,12 @@ const base = { configPath: 'c.json' }
   ;/before the builder's PR summary/.test(rp) || fail('review prompt must put the independent pass before the builder summary')
   ;/Gap \/ Bug \/ Verification miss \/ Scope drift \/ Over-engineering/.test(rp) || fail('review prompt must name the finding classes')
   rp.includes('ponytail:ponytail-review') || fail('review prompt must run ponytail-review')
-  ;/never blocks merge alone/.test(rp) || fail('review prompt must say Over-engineering never blocks alone')
+  ;/over-engineering is always a Note/.test(rp) || fail('review prompt must say over-engineering is a Note')
   ;/fixed brief from super-review/.test(rp) || fail('review prompt must use the fixed truth-check brief')
-  ;/reclass any Over-engineering Blocker to Should fix/.test(rp) || fail('review prompt must re-apply the Over-engineering rule after the truth-check')
+  ;/any uncited or over-engineering finding is a Note/.test(rp) || fail('review prompt must re-apply the Note rule after the truth-check')
+  ;/any cited Blocker not fixed → bounce again/.test(rp) || fail('review prompt must re-bounce only cited Blockers')
+  ;/Re-bounce only cited Blockers/.test(rp) || fail('review prompt must state the v2 severity rule')
+  ;/Should fix|never blocks merge alone|reclass any Over-engineering/.test(rp) && fail('review prompt still carries v1 severity text')
   ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('ponytail-review') && fail(`${l} must not get the review pass`))
   ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('super-review:report') && fail(`${l} must not get review memory`))
   // 1b — ui-refine-loop is standalone: no lane prompt mentions it.
@@ -47,7 +50,7 @@ const base = { configPath: 'c.json' }
 
   // 2 — a re-review bounce surfaces round-1 counts in the wave summary.
   const b = await run({ ...base, cards: [{ number: 9, status: 'Review', title: 't' }] },
-    () => ({ status: 'bounced', column: 'Ready', detail: '1 prior finding not fixed',
+    () => ({ status: 'bounced', column: 'Ready', detail: '1 prior finding not fixed', citation: 'AC1',
              priorFindings: { fixed: 2, notFixed: 1, noLongerApplies: 0 } }))
   const s = b.out.cards[0]
   s.finalStatus === 'bounced' || fail('expected bounced')
