@@ -417,7 +417,7 @@ rm -rf "$T" "$FAKE"
 # 20 — upgrade over an app that grew to 49 skills: the 9 skills an older pack installed
 #      (.agents/ copies linked from .claude/), Matt Pocock's whole set (--skill '*') and
 #      Cloudflare's security-audit in skills-lock.json, plus one helper the owner added
-#      by hand. The install ends with exactly the 26 the manifest names; every pruned
+#      by hand. The install ends with exactly the 17 the manifest names; every pruned
 #      entry and the old lock are backed up first; a second run changes nothing.
 MATT="ask-matt chief-of-staff claude-handoff code-review codebase-design diagnosing-bugs domain-modeling
 git-guardrails-claude-code grill-me grill-with-docs grilling handoff implement implement-spec
@@ -443,8 +443,8 @@ PY
 cp "$T/skills-lock.json" "$T/lock-before.json"
 OUT=$("$INSTALL" "$T" 2>&1) || fail "upgrade over 49 skills failed: $OUT"
 WANT=$(python3 -c 'import json; d=json.load(open("../skills/families.json")); print("\n".join(sorted([n for f in d.values() if f.get("install") == "pack" for n in f["skills"]] + list(d["helpers"]["skills"]))))')
-[ "$(echo "$WANT" | wc -l | tr -d ' ')" -eq 26 ] || fail "the manifest should name 26 installed skills"
-[ "$(ls "$T/.claude/skills" | sort)" = "$WANT" ] || fail "upgrade should leave exactly the 26 manifest skills: $(diff <(echo "$WANT") <(ls "$T/.claude/skills" | sort))"
+[ "$(echo "$WANT" | wc -l | tr -d ' ')" -eq 17 ] || fail "the manifest should name 17 installed skills"
+[ "$(ls "$T/.claude/skills" | sort)" = "$WANT" ] || fail "upgrade should leave exactly the 17 manifest skills: $(diff <(echo "$WANT") <(ls "$T/.claude/skills" | sort))"
 [ "$(ls "$T/.agents/skills" | sort)" = "$(echo $ALL_SKILLS | tr ' ' '\n' | sort)" ] || fail ".agents/skills should hold the 10 pack skills, got: $(ls "$T/.agents/skills")"
 for s in super-board-run.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh; do
   [ ! -e "$T/.agents/bin/$s" ] && [ ! -L "$T/.claude/bin/$s" ] || fail "retired $s was not pruned"
@@ -458,7 +458,7 @@ B=$(ls -d "$T"/.claude/super-board/backup/*/ | head -1)
 [ -f "$B/.agents/bin/super-board-run.sh" ] && [ -f "$B/.agents/workflows/ui-refine-loop.js" ] || fail "pruned scripts and workflows must be backed up"
 cmp -s "$B/skills-lock.json" "$T/lock-before.json" || fail "skills-lock.json must be backed up before it changes"
 jq -e '.skills | (has("grill-me") or has("security-audit") or has("implement-spec") or has("to-spec") or has("to-tickets")) | not' "$T/skills-lock.json" >/dev/null || fail "pruned lock entries must be dropped"
-jq -e '(.skills | has("tdd") and has("prototype")) and .version == 1' "$T/skills-lock.json" >/dev/null || fail "helper lock entries and other keys must stay"
+jq -e '(.skills | has("tdd") and has("code-review")) and .version == 1' "$T/skills-lock.json" >/dev/null || fail "helper lock entries and other keys must stay"
 echo "$OUT" | grep -q "🧹 pruned .* retired: .*grill-me.*(backup: .claude/super-board/backup/" || fail "prune should be one grouped line naming the backup: $OUT"
 echo "$OUT" | grep -q "💡 want them user-wide? npx skills add -g mattpocock/skills --skill setup-matt-pocock-skills" || fail "prune should suggest npx skills add -g for the moved-out skills: $OUT"
 echo "$OUT" | grep -q "ozbg/funl-factory --skill visual" || fail "the suggestion should cover visual: $OUT"

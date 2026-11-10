@@ -2,7 +2,7 @@
 
 Workers run unattended. When the issue forces a judgment call it does not settle,
 the worker walks the **decision ladder**, records the choice in the commit, and
-never blocks on the user. `grilling`, `shape` and `clarify` need a human, so they
+never blocks on the user. `shape` and `clarify` need a human, so they
 live in `super-board lint`, never in a worker. Wanting one is a human gate (below).
 
 ## Skill map

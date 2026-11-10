@@ -46,7 +46,7 @@ HELPERS=$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]
 MATT_HELPERS=$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["helpers"]["sources"]["mattpocock/skills"]))' "$M")
 
 # 1 — default install into --target: the 10 pack skills land, hooks wired, and the
-#     16 helpers are fetched by name (never --skill '*'). Exactly 26 skills result.
+#     7 helpers are fetched by name (never --skill '*'). Exactly 17 skills result.
 T="$WORK/t1"; mkdir -p "$T"; : > "$NPX_LOG"
 out=$(bash "$GET" --target "$T" 2>&1) || fail "default install exited non-zero: $out"
 for s in super-board super-build super-qa super-review super-collect git-sync pr-security-review north-star; do
@@ -59,7 +59,7 @@ grep -q 'add mattpocock/skills --skill tdd' "$NPX_LOG" || fail "helper skills st
 grep -q 'add obra/superpowers --skill verification-before-completion -a claude-code -y' "$NPX_LOG" || fail "verification-before-completion not fetched: $(cat "$NPX_LOG")"
 for h in $HELPERS; do grep -q -- "--skill $h " "$NPX_LOG" || fail "helper $h not named: $(cat "$NPX_LOG")"; done
 ! grep -q "'\*'\|--skill \*\|security-audit" "$NPX_LOG" || fail "get.sh must name helpers, never '*' or security-audit: $(cat "$NPX_LOG")"
-[ "$(ls "$T/.claude/skills" | sort)" = "$WANT" ] || fail "fresh install should end with exactly 26 skills: $(diff <(echo "$WANT") <(ls "$T/.claude/skills" | sort))"
+[ "$(ls "$T/.claude/skills" | sort)" = "$WANT" ] || fail "fresh install should end with exactly 17 skills: $(diff <(echo "$WANT") <(ls "$T/.claude/skills" | sort))"
 echo "$out" | grep -q '/super-board onboard' || fail "summary is missing the next step"
 n=$(printf '%s\n' "$out" | grep -c '/super-board onboard' || true)
 [ "$n" -eq 1 ] || fail "the next step should be printed once, got $n times: $out"
@@ -95,9 +95,9 @@ bash "$GET" --target "$T" >/dev/null 2>&1 || fail "install with only Matt's help
 grep -q 'obra/superpowers --skill verification-before-completion' "$NPX_LOG" || fail "missing verification-before-completion was not fetched"
 
 # 4c — upgrade over an app with 49 skills (old pack + Matt's whole set + security-audit,
-#      as a lock says): ends with exactly the 26, pruned ones backed up.
+#      as a lock says): ends with exactly the 17, pruned ones backed up.
 T="$WORK/t4c"; mkdir -p "$T/.claude/skills"; : > "$NPX_LOG"
-OLD="to-spec to-tickets ask-matt chief-of-staff git-guardrails-claude-code grill-me grill-with-docs implement implement-spec loop-me migrate-to-shoehorn pr scaffold-exercises setup-matt-pocock-skills setup-pre-commit setup-ts-deep-modules teach wait-what wayfinder writing-beats writing-for-agents writing-fragments writing-shape"
+OLD="to-spec to-tickets ask-matt chief-of-staff git-guardrails-claude-code grill-me grill-with-docs implement implement-spec loop-me migrate-to-shoehorn pr scaffold-exercises setup-matt-pocock-skills setup-pre-commit setup-ts-deep-modules teach wait-what wayfinder writing-beats writing-for-agents writing-fragments writing-shape prototype grilling research retro wizard triage to-questionnaire handoff claude-handoff"
 for s in $OLD $MATT_HELPERS security-audit verification-before-completion ui-refine-loop visual super-board super-build super-qa super-review super-collect git-sync pr-security-review; do
   mkdir -p "$T/.claude/skills/$s"; echo x > "$T/.claude/skills/$s/SKILL.md"
 done
@@ -109,7 +109,7 @@ json.dump({"version": 1, "skills": s}, open(sys.argv[1], "w"))
 PY
 [ "$(ls "$T/.claude/skills" | wc -l | tr -d ' ')" -eq 49 ] || fail "4c fixture should start with 49 skills"
 bash "$GET" --target "$T" >/dev/null 2>&1 || fail "upgrade over 49 skills failed"
-[ "$(ls "$T/.claude/skills" | sort)" = "$WANT" ] || fail "upgrade should end with exactly 26 skills: $(diff <(echo "$WANT") <(ls "$T/.claude/skills" | sort))"
+[ "$(ls "$T/.claude/skills" | sort)" = "$WANT" ] || fail "upgrade should end with exactly 17 skills: $(diff <(echo "$WANT") <(ls "$T/.claude/skills" | sort))"
 ls "$T"/.claude/super-board/backup/*/.claude/skills/wayfinder/SKILL.md >/dev/null 2>&1 || fail "pruned skills must be backed up"
 [ ! -s "$NPX_LOG" ] || fail "all helpers were present; npx should not run: $(cat "$NPX_LOG")"
 

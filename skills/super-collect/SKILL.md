@@ -119,8 +119,8 @@ recurrence, prefer a fitting structural correction, and retain the actual prior 
 ### architecture — the finder
 
 Spawn one fresh, **read-only** sub-agent (it edits nothing and commits nothing). It uses, in order
-of what is installed: mattpocock `improve-codebase-architecture` (skip its HTML report and
-grilling; findings only) or `codebase-design` (module, interface, depth, seam, deletion test),
+of what is installed: mattpocock `improve-codebase-architecture` (skip its HTML report;
+findings only) or `codebase-design` (module, interface, depth, seam, deletion test),
 plus `ponytail:ponytail-audit` for over-engineering. It reads `CONTEXT.md` and `docs/adr/` and
 does not re-open a recorded decision; recently changed files weigh higher. It returns
 `{module, problem, finding, files, why, severity}`; each finding = one `refactor` ticket with

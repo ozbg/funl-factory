@@ -53,7 +53,7 @@ Or as a Claude Code plugin:
 
 ### What lands in your app
 
-Exactly 26 skills: the 8 pack skills and the 18 helpers in the tables under [Skills](#skills),
+Exactly 17 skills: the 10 pack skills and the 7 helpers in the tables under [Skills](#skills),
 all listed in [`skills/families.json`](skills/families.json). Re-running the installer prunes
 retired skills (Cloudflare's `security-audit`, `implement`, `grill-me`, `visual`, the setup
 skills and the rest in the manifest's `retired` list), but only super-board's own copies and
@@ -136,7 +136,7 @@ Add cards to `Ready`. The board drains on its own.
 | [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
 
-**Helpers installed beside the pack — 16 skills**
+**Helpers installed beside the pack — 7 skills**
 
 | Skill | What it does |
 |---|---|
@@ -146,16 +146,7 @@ Add cards to `Ready`. The board drains on its own.
 | `/codebase-design` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Review lane and refactors: deep-module design vocabulary. |
 | `/domain-modeling` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Build lane when a card touches domain terms, glossary or ADRs. |
 | `/verification-before-completion` ([obra/superpowers](https://github.com/obra/superpowers)) | Every lane: run the checks before claiming done. |
-| `/prototype` ([mattpocock/skills](https://github.com/mattpocock/skills)) | In-app UI or logic variants for later work; /mockup does Define. |
-| `/grilling` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Stress-tests a plan with hard questions before it becomes tickets. |
-| `/research` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Primary-source research written up as a Markdown file in the repo. |
-| `/triage` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Sorts incoming issues into actionable, duplicate or won't-fix. |
 | `/improve-codebase-architecture` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Finds refactor candidates; feeds /super-collect architecture. |
-| `/handoff` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Writes a handoff note so the next session picks up cleanly. |
-| `/claude-handoff` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Hands the current task to a fresh Claude session. |
-| `/to-questionnaire` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Turns open questions into a questionnaire the owner answers. |
-| `/wizard` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Interactive bash wizard for steps only the owner can do. |
-| `/retro` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Run retro: what worked, what broke, what to change next. |
 <!-- skills:end -->
 
 Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and `README.md`, add a line to `skills/families.json`, and this table updates itself.

@@ -42,7 +42,7 @@ class Readiness(unittest.TestCase):
 
     def test_complete_partial_lock_and_grilling_are_distinct(self):
         (self.root / 'skills-lock.json').write_text('{"mattpocock/skills":true}')
-        self.put('grilling'); self.put('tdd')
+        self.put('shape'); self.put('tdd')
         self.assertFalse(self.run_cli(expected=10)['ready'])
         self.full()
         result = self.run_cli()
@@ -156,7 +156,7 @@ class Readiness(unittest.TestCase):
     def test_bad_override_and_missing_body_are_input_errors(self):
         self.full()
         for body in ['Skills: tdd,', 'Skills: ../tdd', 'Skills: /tdd', 'Skills: tdd\nSkills: implement',
-                     'Skills: mattpocock-skills:grilling']:
+                     'Skills: mattpocock-skills:shape']:
             self.card['body'] = body
             self.run_cli(expected=64)
         self.card.update(body='Skills: mattpocock-skills:improve-codebase-architecture', status='Review')
@@ -190,7 +190,7 @@ class Readiness(unittest.TestCase):
         catalog.write_text(json.dumps(dict(host='claude', skills=[entry])))
         self.run_cli(extra=['--catalog', str(catalog)], expected=10)
         entry.update(project_root=str(self.root))
-        interactive = dict(name='mattpocock-skills:grilling', path=str(external), enabled=True, scope='user')
+        interactive = dict(name='mattpocock-skills:shape', path=str(external), enabled=True, scope='user')
         catalog.write_text(json.dumps(dict(host='claude', skills=[entry, interactive])))
         self.run_cli(extra=['--catalog', str(catalog)])
         catalog.write_text('{"host":"claude","skills":{}}')
@@ -371,7 +371,7 @@ class Readiness(unittest.TestCase):
         sr = importlib.util.module_from_spec(spec); spec.loader.exec_module(sr)
         installed = set(CORE) | set(MANIFEST['helpers']['skills'])
         self.assertEqual(sorted(sr.CORE), sorted(CORE))
-        self.assertEqual(len(CORE) + len(MANIFEST['helpers']['skills']), 26)
+        self.assertEqual(len(CORE) + len(MANIFEST['helpers']['skills']), 17)
         names = set(sr.REGISTRY['default'])
         for _, row in sr.REGISTRY['build_rows']:
             names |= set(row)

@@ -32,7 +32,7 @@ If two readings of the target are plausible, or target files are dirty in `<main
 
 ## 2. Grill (at most 10 questions)
 
-Follow [`references/grill.md`](references/grill.md), which uses the `grilling` skill's pattern: numbered questions with your recommended answer under each, asked in waves. Wave 1 is 3 questions; later waves come only if needed, and the total is 10 at most. "You pick" accepts your recommendation. Don't ask what the code or an existing taste file already answers. Keep the answers for step 3.4.
+Follow [`references/grill.md`](references/grill.md), which asks numbered questions with your recommended answer under each, asked in waves. Wave 1 is 3 questions; later waves come only if needed, and the total is 10 at most. "You pick" accepts your recommendation. Don't ask what the code or an existing taste file already answers. Keep the answers for step 3.4.
 
 ## 3. Setup (once)
 
