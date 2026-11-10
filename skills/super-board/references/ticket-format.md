@@ -2,7 +2,7 @@
 
 Canonical copy of the super-board ticket format, from `writing-standard.md` § 3. Onboard writes
 it into the target's `docs/agents/issue-tracker.md` under `## Ticket format` (the file
-`/to-board` and `/to-tickets` read); the AGENTS.md block only links there, so there is one copy to keep current.
+`/to-board` reads); the AGENTS.md block only links there, so there is one copy to keep current.
 
 ```markdown
 ## Problem

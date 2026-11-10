@@ -71,7 +71,7 @@ failure is fixed by moving the code into a red path — never by editing the lin
 - Over `merge_policy.auto_max_lines` (default 600 source lines) the PR gets a deeper review,
   not the owner — unless the card is red, when the owner reviews it. Keep red slices under the cap.
 - Far past the cap mid-build: stop, push what you have, propose the split (vertical slices via
-  `/to-tickets`) in a PR comment, and move the card to Blocked `❓`.
+  `/to-board`) in a PR comment, and move the card to Blocked `❓`.
 
 ## Foundation cards
 

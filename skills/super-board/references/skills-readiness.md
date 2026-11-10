@@ -18,7 +18,7 @@ keeps its existing halt policy. Verification-readiness remains exit 9.
 label precedence, Build overrides, lane boundaries, conditionals and fallbacks.
 `Skills:` outside code fences replaces the Build row and keeps always helpers;
 QA-only overrides are additional requests. Empty selection needs no helpers.
-Setup uses `--profile setup` for the eight core skills and unconditional union;
+Setup uses `--profile setup` for the ten core skills and unconditional union;
 a selected chain can be runnable while the setup union is incomplete.
 
 Claude sees project/user `.claude/skills` and enabled, scoped plugin records.

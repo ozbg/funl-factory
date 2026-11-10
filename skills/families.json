@@ -1,12 +1,14 @@
 {
   "you_type": {
-    "title": "You type — 4 skills",
+    "title": "You type — 6 skills",
     "install": "pack",
     "skills": {
       "super-board": "Orchestrator: plans waves, runs Build → QA → Review, merges when green.",
-      "super-collect": "Finds problems, verifies them, writes a findings doc for /to-spec and /to-tickets.",
+      "super-collect": "Finds problems, verifies them, files them into Backlog.",
       "git-sync": "Commit per logical change, merge-pull, push without force, report.",
-      "north-star": "One short interview that fixes an app's why, must-haves and destination."
+      "north-star": "One short interview that fixes an app's why, must-haves and destination.",
+      "to-board": "North star to one-page spec and Haiku-ready cards in Backlog.",
+      "mockup": "One-hour clickable mock-up of the core loop."
     }
   },
   "board_runs": {
@@ -20,21 +22,19 @@
     }
   },
   "standalone": {
-    "title": "Kept here, not installed into apps — 3 skills",
+    "title": "Kept here, not installed into apps — 2 skills",
     "install": "none",
     "skills": {
-      "mockup": "One-hour clickable mock-up of the core loop; installing it is #60.",
       "ui-refine-loop": "Critique → refine loop that polishes one page or component.",
-      "visual": "One HTML page: branch recap, plan, or codebase map with diagrams.",
-      "to-board": "North star to one-page spec and Haiku-ready cards in Backlog."
+      "visual": "One HTML page: branch recap, plan, or codebase map with diagrams."
     }
   },
   "helpers": {
-    "title": "Helpers installed beside the pack — 18 skills",
+    "title": "Helpers installed beside the pack — 16 skills",
     "install": "helper",
     "sources": {
       "mattpocock/skills": ["tdd", "diagnosing-bugs", "code-review", "codebase-design", "domain-modeling",
-                            "prototype", "to-spec", "to-tickets", "grilling", "research", "triage",
+                            "prototype", "grilling", "research", "triage",
                             "improve-codebase-architecture", "handoff", "claude-handoff", "to-questionnaire",
                             "wizard", "retro"],
       "obra/superpowers": ["verification-before-completion"]
@@ -46,9 +46,7 @@
       "codebase-design": "Review lane and refactors: deep-module design vocabulary.",
       "domain-modeling": "Build lane when a card touches domain terms, glossary or ADRs.",
       "verification-before-completion": "Every lane: run the checks before claiming done.",
-      "prototype": "Throwaway prototype that settles a design question before a ticket.",
-      "to-spec": "Turns a findings doc or idea into a spec; super-collect hands off here.",
-      "to-tickets": "Splits a spec into board tickets with acceptance criteria.",
+      "prototype": "In-app UI or logic variants for later work; /mockup does Define.",
       "grilling": "Stress-tests a plan with hard questions before it becomes tickets.",
       "research": "Primary-source research written up as a Markdown file in the repo.",
       "triage": "Sorts incoming issues into actionable, duplicate or won't-fix.",
@@ -66,6 +64,8 @@
     "sources": ["mattpocock/skills", "cloudflare/security-audit-skill"],
     "user_wide": "npx skills add -g mattpocock/skills --skill setup-matt-pocock-skills --skill setup-ts-deep-modules --skill setup-pre-commit --skill git-guardrails-claude-code; npx skills add -g ozbg/funl-factory --skill visual",
     "names": {
+      "to-spec": "replaced by to-board",
+      "to-tickets": "replaced by to-board",
       "ui-refine-loop": "kept in the factory repo for standalone use",
       "visual": "kept in the factory repo; install it user-wide",
       "security-audit": "pr-security-review covers PRs; no lane runs it",

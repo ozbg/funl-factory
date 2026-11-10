@@ -1,8 +1,7 @@
 # /super-collect
 
-Finds problems in one project, checks each one, and writes one findings doc. Matt Pocock's
-`/to-spec` turns that doc into a spec and `/to-tickets` turns the spec into tickets. Then 1–5
-tickets and 6+ alike go to the super-board Backlog. See [routing](../../docs/super-board/routing.md).
+Finds problems in one project, checks each one, and writes one findings doc, then files each
+verified finding straight into the super-board Backlog in the ticket format. See [routing](../../docs/super-board/routing.md).
 
 ## What It Does
 
@@ -16,9 +15,8 @@ tickets and 6+ alike go to the super-board Backlog. See [routing](../../docs/sup
   fetchers print `{"status":"unavailable","error":…}` and exit 2.
 - Writes the findings doc to `docs/super-board/findings/collect-<YYYY-MM-DD>.md`, grouped by
   root cause (`scripts/collect_handoff.py`).
-- No `/to-spec` or `/to-tickets` installed, or `--direct`: files each finding through
-  `super-qa-file-bug.sh` and `super-review-file-refactor.sh`, always into the holding column,
-  and says why. Nothing reaches `Ready` until `super-board lint` says so.
+- Files each finding through `super-qa-file-bug.sh` and `super-review-file-refactor.sh`,
+  always into the holding column. Nothing reaches `Ready` until `super-board lint` says so.
 
 ## Usage
 
@@ -28,9 +26,8 @@ tickets and 6+ alike go to the super-board Backlog. See [routing](../../docs/sup
 | `/super-collect sentry` | one source (or several) |
 | `--since 30d` / `--since 2026-09-01` | window, default 14 days |
 | `--yes` | write and file without the confirm step |
-| `--direct` | skip `/to-spec` and `/to-tickets`; file straight into Backlog |
 
-Dry-run is the default: you see the findings doc and the route, then confirm.
+Dry-run is the default: you see the findings doc and what would be filed, then confirm.
 
 ## Setup
 

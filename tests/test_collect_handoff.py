@@ -1,10 +1,8 @@
-"""super-collect's hand-off to Matt Pocock's planning chain (collect_handoff.py).
+"""super-collect's findings doc (collect_handoff.py).
 
-route  — /to-spec and /to-tickets installed → planning; either missing → backlog + why
 doc    — one findings doc, verified findings grouped, drops listed; dry-run writes nothing
-fork   — 1–5 tickets → /implement-spec, 6+ → super-board Backlog, 0 → refused
 
-Offline: a temp project and a temp home; the real skills-ready resolver decides "installed".
+Offline: a temp project.
 
     python3 tests/test_collect_handoff.py
 """
@@ -42,47 +40,14 @@ class Handoff(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name) / "project"
-        self.home = Path(tmp.name) / "home"
         self.root.mkdir()
-        self.home.mkdir()
         self.findings = Path(tmp.name) / "verified.json"
         self.findings.write_text(json.dumps(FINDINGS))
 
-    def put(self, name):
-        path = self.root / ".claude/skills" / name / "SKILL.md"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("skill instructions")
-
     def run_cli(self, *args, expected=0):
-        p = subprocess.run([sys.executable, str(CLI), *args], cwd=self.root, text=True, capture_output=True,
-                           env=dict(os.environ, SUPER_BOARD_SKILLS_HOME=str(self.home)))
+        p = subprocess.run([sys.executable, str(CLI), *args], cwd=self.root, text=True, capture_output=True)
         self.assertEqual(p.returncode, expected, p.stderr)
         return p
-
-    # route ---------------------------------------------------------------
-    def test_route_planning_when_to_spec_and_to_tickets_installed(self):
-        for name in ("to-spec", "to-tickets", "implement-spec"):
-            self.put(name)
-        out = json.loads(self.run_cli("route", "--root", str(self.root)).stdout)
-        self.assertEqual(out["route"], "planning")
-        self.assertEqual(out["missing"], [])
-        # implement-spec is retired: the resolver no longer knows it, so even a leftover
-        # copy never routes 1–5 tickets away from the board Backlog.
-        self.assertIsNone(out["implement_spec"])
-
-    def test_route_backlog_names_the_missing_skill(self):
-        self.put("to-spec")
-        out = json.loads(self.run_cli("route", "--root", str(self.root)).stdout)
-        self.assertEqual(out["route"], "backlog")
-        self.assertEqual(out["missing"], ["to-tickets"])
-        self.assertIn("to-tickets", out["reason"])
-        self.assertIn("Backlog", out["reason"])
-
-    def test_route_without_implement_spec_still_plans(self):
-        self.put("to-spec"); self.put("to-tickets")
-        out = json.loads(self.run_cli("route", "--root", str(self.root)).stdout)
-        self.assertEqual(out["route"], "planning")
-        self.assertIsNone(out["implement_spec"])
 
     # doc -----------------------------------------------------------------
     def test_doc_groups_verified_findings_and_lists_drops(self):
@@ -101,7 +66,7 @@ class Handoff(unittest.TestCase):
         self.assertIn("Old 404 on /legacy", dropped)
         self.assertIn("drop-fixed", dropped)
         self.assertIn("duplicate", dropped)
-        self.assertIn("/to-spec", text)
+        self.assertIn("filed straight into Backlog", text)
 
     def test_doc_dry_run_prints_and_writes_nothing(self):
         p = self.run_cli("doc", "--findings", str(self.findings), "--date", "2026-10-27")
@@ -119,24 +84,14 @@ class Handoff(unittest.TestCase):
         p = self.run_cli("doc", "--findings", str(self.findings), "--yes", expected=3)
         self.assertIn("nothing to hand off", p.stderr)
 
-    # fork ----------------------------------------------------------------
-    def test_fork_boundaries(self):
-        for n, build in ((1, "implement-spec"), (5, "implement-spec"), (6, "super-board"), (40, "super-board")):
-            out = json.loads(self.run_cli("fork", "--tickets", str(n)).stdout)
-            self.assertEqual(out["build"], build, n)
-        self.run_cli("fork", "--tickets", "0", expected=64)
-
-    def test_fork_without_implement_spec_goes_to_the_board(self):
-        out = json.loads(self.run_cli("fork", "--tickets", "3", "--no-implement-spec").stdout)
-        self.assertEqual(out["build"], "super-board")
-        self.assertIn("implement-spec", out["why"])
-
-    # SKILL.md names the chain exactly --------------------------------------
-    def test_skill_names_the_chain_and_the_doc_path(self):
+    # SKILL.md files straight into Backlog ----------------------------------
+    def test_skill_files_straight_into_backlog(self):
         text = SKILL.read_text()
-        for needle in ("/to-spec", "/to-tickets", "/implement-spec", "collect_handoff.py",
-                       "docs/super-board/findings/collect-<YYYY-MM-DD>.md", "1–5 tickets", "6+ tickets"):
+        for needle in ("collect_handoff.py", "docs/super-board/findings/collect-<YYYY-MM-DD>.md",
+                       "super-collect-file.sh", "ticket-format.md"):
             self.assertIn(needle, text)
+        for gone in ("/to-spec", "/to-tickets", "/implement-spec"):
+            self.assertNotIn(gone, text)
 
 
 if __name__ == "__main__":

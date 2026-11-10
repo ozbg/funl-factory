@@ -36,7 +36,7 @@ REGISTRY = {
         'qa': ['vitest', 'playwright-best-practices'], 'review': []},
     'optional': {'build': [], 'qa': [], 'review': ['ponytail:ponytail-review']},
     'aliases': {'mattpocock-skills': ['diagnosing-bugs', 'tdd', 'codebase-design', 'code-review', 'domain-modeling',
-                                   'improve-codebase-architecture', 'to-spec', 'to-tickets'],
+                                   'improve-codebase-architecture'],
                 'ponytail': ['ponytail', 'ponytail-review']},
     # Skills no installer fetches fall back to a checklist in the decision policy (#29).
     'fallbacks': {'ponytail:ponytail': {'id': 'simplest-solution-first', 'source': POLICY + '#simplest-solution-first'},
@@ -44,7 +44,7 @@ REGISTRY = {
                   'testing-strategy': {'id': 'testing-strategy', 'source': POLICY + '#testing-strategy'},
                   'ponytail:ponytail-review': {'id': 'over-engineering-ladder', 'source': 'skills/super-review/SKILL.md#over-engineering'}},
 }
-CORE = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'git-sync', 'pr-security-review', 'north-star']
+CORE = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'git-sync', 'pr-security-review', 'north-star', 'to-board', 'mockup']
 LANES = ['build', 'qa', 'review']
 NAME = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]*(?::[a-zA-Z0-9][a-zA-Z0-9._-]*)?\Z')
 INTERACTIVE = {'grilling', 'shape', 'clarify', 'mattpocock-skills:grilling', 'mattpocock-skills:shape', 'mattpocock-skills:clarify'}
@@ -405,7 +405,7 @@ def report(root, host, cards=None, profile=None, lane=None, require=(), home=Non
             raise ValueError('each card needs number, status and literal body')
         chain = list(requirements(card, lane, require))
         if profile:
-            chain += [('setup', name, 'required', 'boundary: setup eight-skill pack installation') for name in CORE]
+            chain += [('setup', name, 'required', 'boundary: setup ten-skill pack installation') for name in CORE]
             for _, names in REGISTRY['build_rows']:
                 chain += [('build', name, 'required', 'label: ' + POLICY) for name in names]
         seen = set()

@@ -19,7 +19,7 @@
 #      "## Blocked by" inside backticks. A parser that takes the FIRST match reads
 #      the banner and finds no blockers. This takes the LAST heading-shaped match.
 #
-#   2. Tickets written by `to-tickets` follow its template, whose example line is
+#   2. Tickets written from an older planning template, whose example line was
 #      `**Blocked by:** … or "None — can start immediately"`. In practice that
 #      produced lines like:
 #

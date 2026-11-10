@@ -29,16 +29,16 @@ unset CODEX_THREAD_ID CODEX_SESSION_ID SUPER_BOARD_HOST
 SKILLS="super-board super-build super-qa super-review"
 # The pack, from the manifest: the families install.sh puts in an app.
 ALL_SKILLS="$(python3 -c 'import json; d=json.load(open("../skills/families.json")); print(" ".join(n for f in d.values() if f.get("install") == "pack" for n in f["skills"]))')"
-[ "$(echo $ALL_SKILLS | wc -w | tr -d ' ')" -eq 8 ] || fail "the manifest should name 8 pack skills, got: $ALL_SKILLS"
+[ "$(echo $ALL_SKILLS | wc -w | tr -d ' ')" -eq 10 ] || fail "the manifest should name 10 pack skills, got: $ALL_SKILLS"
 
-# 1 — a fresh project: plain directories, nothing to preserve. Exactly the 8 pack
+# 1 — a fresh project: plain directories, nothing to preserve. Exactly the 10 pack
 #     skills land (not ui-refine-loop or visual), and the wave workflow alone.
 T=$(mktemp -d)
 "$INSTALL" "$T" >/dev/null 2>&1
 for s in $ALL_SKILLS; do
   [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "plain layout: $s/SKILL.md missing"
 done
-[ "$(ls "$T/.claude/skills" | wc -l | tr -d ' ')" -eq 8 ] || fail "fresh install should hold exactly 8 skills, got: $(ls "$T/.claude/skills")"
+[ "$(ls "$T/.claude/skills" | wc -l | tr -d ' ')" -eq 10 ] || fail "fresh install should hold exactly 10 skills, got: $(ls "$T/.claude/skills")"
 [ "$(ls "$T/.claude/workflows")" = "super-board-wave.js" ] || fail "only the wave workflow ships, got: $(ls "$T/.claude/workflows")"
 [ -e "$T/.claude/super-board/backup" ] && fail "a fresh install has nothing to prune or back up"
 rm -rf "$T"
@@ -445,19 +445,20 @@ OUT=$("$INSTALL" "$T" 2>&1) || fail "upgrade over 49 skills failed: $OUT"
 WANT=$(python3 -c 'import json; d=json.load(open("../skills/families.json")); print("\n".join(sorted([n for f in d.values() if f.get("install") == "pack" for n in f["skills"]] + list(d["helpers"]["skills"]))))')
 [ "$(echo "$WANT" | wc -l | tr -d ' ')" -eq 26 ] || fail "the manifest should name 26 installed skills"
 [ "$(ls "$T/.claude/skills" | sort)" = "$WANT" ] || fail "upgrade should leave exactly the 26 manifest skills: $(diff <(echo "$WANT") <(ls "$T/.claude/skills" | sort))"
-[ "$(ls "$T/.agents/skills" | sort)" = "$(echo $ALL_SKILLS | tr ' ' '\n' | sort)" ] || fail ".agents/skills should hold the 8 pack skills, got: $(ls "$T/.agents/skills")"
+[ "$(ls "$T/.agents/skills" | sort)" = "$(echo $ALL_SKILLS | tr ' ' '\n' | sort)" ] || fail ".agents/skills should hold the 10 pack skills, got: $(ls "$T/.agents/skills")"
 for s in super-board-run.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh; do
   [ ! -e "$T/.agents/bin/$s" ] && [ ! -L "$T/.claude/bin/$s" ] || fail "retired $s was not pruned"
 done
 [ ! -e "$T/.agents/workflows/ui-refine-loop.js" ] && [ ! -L "$T/.claude/workflows/ui-refine-loop.js" ] || fail "ui-refine-loop.js was not pruned"
 B=$(ls -d "$T"/.claude/super-board/backup/*/ | head -1)
 [ "$(ls -d "$T"/.claude/super-board/backup/*/ | wc -l | tr -d ' ')" -eq 1 ] || fail "one prune should write one backup folder"
-[ -f "$B/.claude/skills/grill-me/SKILL.md" ] && [ -f "$B/.claude/skills/security-audit/SKILL.md" ] || fail "pruned helpers must be backed up first"
+[ -f "$B/.claude/skills/grill-me/SKILL.md" ] && [ -f "$B/.claude/skills/security-audit/SKILL.md" ] && [ -f "$B/.claude/skills/to-spec/SKILL.md" ] && [ -f "$B/.claude/skills/to-tickets/SKILL.md" ] || fail "pruned helpers must be backed up first"
+[ -f "$T/.claude/skills/to-board/SKILL.md" ] && [ -f "$T/.claude/skills/mockup/SKILL.md" ] && [ ! -e "$T/.claude/skills/to-spec" ] && [ ! -e "$T/.claude/skills/to-tickets" ] || fail "upgrade installs to-board and mockup and prunes to-spec and to-tickets"
 [ -f "$B/.agents/skills/visual/SKILL.md" ] && [ -L "$B/.claude/skills/visual" ] || fail "pruned pack copies and links must be backed up (links as links)"
 [ -f "$B/.agents/bin/super-board-run.sh" ] && [ -f "$B/.agents/workflows/ui-refine-loop.js" ] || fail "pruned scripts and workflows must be backed up"
 cmp -s "$B/skills-lock.json" "$T/lock-before.json" || fail "skills-lock.json must be backed up before it changes"
-jq -e '.skills | (has("grill-me") or has("security-audit") or has("implement-spec")) | not' "$T/skills-lock.json" >/dev/null || fail "pruned lock entries must be dropped"
-jq -e '(.skills | has("tdd") and has("to-spec")) and .version == 1' "$T/skills-lock.json" >/dev/null || fail "helper lock entries and other keys must stay"
+jq -e '.skills | (has("grill-me") or has("security-audit") or has("implement-spec") or has("to-spec") or has("to-tickets")) | not' "$T/skills-lock.json" >/dev/null || fail "pruned lock entries must be dropped"
+jq -e '(.skills | has("tdd") and has("prototype")) and .version == 1' "$T/skills-lock.json" >/dev/null || fail "helper lock entries and other keys must stay"
 echo "$OUT" | grep -q "🧹 pruned .* retired: .*grill-me.*(backup: .claude/super-board/backup/" || fail "prune should be one grouped line naming the backup: $OUT"
 echo "$OUT" | grep -q "💡 want them user-wide? npx skills add -g mattpocock/skills --skill setup-matt-pocock-skills" || fail "prune should suggest npx skills add -g for the moved-out skills: $OUT"
 echo "$OUT" | grep -q "ozbg/funl-factory --skill visual" || fail "the suggestion should cover visual: $OUT"
