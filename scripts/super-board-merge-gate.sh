@@ -266,13 +266,17 @@ META=$(mktemp); DIFF=$(mktemp)
 # read as truncated and halted the run. Read the rest of the metadata there and the
 # file list from the paginated REST endpoint, then require the count to match.
 read_meta() {
+  # Both reads go to files, not shell arguments: a big PR's file list (with patches)
+  # is larger than the OS argument limit, and `jq --argjson` crashed on it (#68).
   local base files
-  base=$(python3 "$GITHUB_READ" --kind json -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,additions,deletions,changedFiles,body) || exit $?
+  base=$(mktemp); files=$(mktemp)
+  python3 "$GITHUB_READ" --kind json -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,additions,deletions,changedFiles,body > "$base" || exit $?
   local slug="${REPO:-}"
   [ -n "$slug" ] || slug='{owner}/{repo}'
-  files=$(python3 "$GITHUB_READ" --kind json -- api "repos/$slug/pulls/$PR/files?per_page=100" --paginate --slurp) || exit $?
-  jq -n --argjson b "$base" --argjson f "$files" \
-    '$b + {files: [$f[][] | {path: .filename, additions: .additions, deletions: .deletions}]}' > "$META" || exit 70
+  python3 "$GITHUB_READ" --kind json -- api "repos/$slug/pulls/$PR/files?per_page=100" --paginate --slurp > "$files" || exit $?
+  jq -n --slurpfile b "$base" --slurpfile f "$files" \
+    '$b[0] + {files: [$f[0][][] | {path: .filename, additions: .additions, deletions: .deletions}]}' > "$META" || exit 70
+  rm -f "$base" "$files"
   if ! jq -e '(.files | length) == .changedFiles' "$META" >/dev/null; then
     python3 "$GITHUB_READ" --halt "PR #$PR file list incomplete: $(jq '.files|length' "$META") of $(jq .changedFiles "$META") files"
     exit 79
