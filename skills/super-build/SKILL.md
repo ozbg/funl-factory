@@ -42,7 +42,7 @@ code `unverified against current docs`, keep it minimal. Nothing outside touched
 
 ## Test depth by zone
 
-Get the tier before writing tests: run `super-board-zone.py` from the installed bin with
+Get the tier before writing tests: run `python3 .claude/bin/super-board-zone.py` with
 `--zones <config zones, default docs/agents/zones.yaml> --files <every path the card will touch>`.
 
 The card's tier is the highest of its files. An unplaced file counts as amber.

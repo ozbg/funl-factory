@@ -63,7 +63,7 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
 3. Read issue body + ALL comments + PROJECT.md.
 3b. Touches a third-party API/SDK, an upgrade, or auth/billing? Read the current official docs
     for the installed version first (super-build → "Docs first").
-3c. Get the tier: `super-board-zone.py` on the files the card touches (unplaced = amber).
+3c. Get the tier: `python3 .claude/bin/super-board-zone.py --zones docs/agents/zones.yaml --files …` on the files the card touches (unplaced = amber).
     Green: one test per AC at the cheapest layer. Amber: every AC proven by a test. Red: plus
     the zone's invariants and edge cases, and one `code-review` self-pass — red only.
 4. Implement the smallest safe change covering ACs. Aim for 200–600 source lines (tests don't

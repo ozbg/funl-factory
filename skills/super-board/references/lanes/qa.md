@@ -19,7 +19,7 @@ A live site with no repo is not a board. `/super-qa <url>` tests it on its own.
    A `qa` card has no branch yet: move it Ready → QA, then create the branch from the base.
 2. `target.url` set → health-check it first. Unhealthy → Block.
 3. Read issue + PR + Builder's handoff comment.
-4. **Zone.** Run `super-board-zone.py` on the diff's files (super-qa → "Zone first").
+4. **Zone.** Run `python3 .claude/bin/super-board-zone.py` on the diff's files (super-qa → "Zone first").
    Green → move QA → Review with `Did: green zone — no QA lane`, `citation: "none"`. Stop.
 5. **Checks** (super-qa → "Checks by zone"). Amber: AC ledger, the zone's bar, the ticket's own
    edge cases. Red: those, plus a test per touched invariant and one mutation per guarded line.
@@ -34,7 +34,7 @@ A live site with no repo is not a board. `/super-qa <url>` tests it on its own.
    `visual` as text for UI, append a `history` row, rewrite `status` → `[qa] [report] ✅` PR
    comment with the AC table (text) → issue comment → move QA → Review. Result
    `citation: "none"`. Clean up worktree.
-10. **Fail** → read `loop:rebuild-N` (none = 0). N ≥ the zone's `max_rounds` → Blocked with the
+10. **Fail** → read `loop:rebuild-N` (none = 0). N + 1 ≥ the zone's `max_rounds` (this was the last allowed round) → Blocked with the
     block template, reason 🛡, line `ruling or split: <what keeps failing>`. Otherwise leave the
     failing ACs unchecked with the reason, append a `history` row, rewrite `status` →
     `[qa] [report] ❌` PR comment with the AC table and expected/actual per cited fail → issue

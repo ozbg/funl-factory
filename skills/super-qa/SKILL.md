@@ -31,7 +31,7 @@ Scope is the PR's diff against its base. Resolve its zone:
 
 ```bash
 git diff --name-only "$(git merge-base HEAD origin/<base>)"...HEAD \
-  | python3 super-board-zone.py --zones <config.zones> --files-from -   # in .claude/bin
+  | python3 .claude/bin/super-board-zone.py --zones <config.zones> --files-from -
 ```
 
 The JSON gives `tier`, `max_rounds`, `bar`, `invariants`, `accepted_limits`, `boundary`. No

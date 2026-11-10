@@ -110,7 +110,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
    - **Human gate:** product/design/ops decision that cannot be safely guessed.
 
    **Zone tier.** The card's tier is the higher of its `zone:<tier>` label and
-   `super-board-zone.py --zones docs/agents/zones.yaml --files <changed files>` (which also
+   `python3 .claude/bin/super-board-zone.py --zones docs/agents/zones.yaml --files <changed files>` (which also
    gives `max_rounds`, `bar` and `invariants`). You may **raise** a tier by adding a
    `zone:<tier>` label when the diff is riskier than its files say; never lower one.
    **Green card:** check the builder's AC proof and rerun the `Local tests:` command. Nothing
