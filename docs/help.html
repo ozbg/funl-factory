@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Factory Field Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column with a sticky section bar; diagrams scroll sideways on phones. */
+:root{
+  --bg:#f4f6f9; --panel:#ffffff; --fg:#17202b; --muted:#566273; --line:#d6dce5;
+  --accent:#1f5fbf; --accent-soft:#e3ecfa;
+  --green:#1e7f4f; --green-soft:#e1f2e8; --amber:#a86400; --amber-soft:#fbefd9; --red:#b3261e; --red-soft:#fae3e1;
+  --you:#6b3fb5; --you-soft:#efe7fb;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151c; --panel:#18202a; --fg:#e6ebf2; --muted:#9aa6b6; --line:#2b3644;
+  --accent:#7fb0ff; --accent-soft:#1c2c45;
+  --green:#5fcf93; --green-soft:#16302a; --amber:#f0b45a; --amber-soft:#33281a; --red:#ff8a80; --red-soft:#3a1f1f;
+  --you:#c3a2ff; --you-soft:#2a2140; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151c; --panel:#18202a; --fg:#e6ebf2; --muted:#9aa6b6; --line:#2b3644;
+  --accent:#7fb0ff; --accent-soft:#1c2c45;
+  --green:#5fcf93; --green-soft:#16302a; --amber:#f0b45a; --amber-soft:#33281a; --red:#ff8a80; --red-soft:#3a1f1f;
+  --you:#c3a2ff; --you-soft:#2a2140; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.55 var(--f-body);margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+header.top{padding-block:40px 20px}
+.eyebrow{font:600 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font:800 clamp(30px,5vw,46px)/1.05 var(--f-display);margin:10px 0 12px;text-wrap:balance;letter-spacing:-.01em}
+h2{font:700 24px/1.2 var(--f-display);margin:0 0 6px;text-wrap:balance}
+h3{font:700 16px/1.3 var(--f-display);margin:0 0 4px}
+p{margin:0 0 10px;max-width:68ch}
+.lede{font-size:18px;color:var(--muted);max-width:62ch}
+nav.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-block:1px solid var(--line)}
+nav.bar .in{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px;display:flex;gap:4px 16px;flex-wrap:wrap}
+nav.bar a{font:600 13px/1.8 var(--f-mono);color:var(--muted);text-decoration:none}
+nav.bar a:hover,nav.bar a:focus-visible{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section{padding-block:36px 4px;scroll-margin-top:56px}
+.sub{color:var(--muted);margin-bottom:18px}
+code,.cmd{font-family:var(--f-mono);font-size:.88em}
+.cmd{background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:4px;white-space:nowrap}
+.diagram{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin:8px 0 18px}
+.diagram svg{display:block;min-width:820px;width:100%;height:auto}
+svg text{font-family:var(--f-body)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.step .n{font:600 12px var(--f-mono);color:var(--muted)}
+.step ul{margin:6px 0 0;padding-left:18px}
+.step li{margin:2px 0}
+.tag{display:inline-block;font:600 11px/1.6 var(--f-mono);letter-spacing:.04em;padding:0 7px;border-radius:999px;vertical-align:middle}
+.tag.you{background:var(--you-soft);color:var(--you)}
+.tag.fac{background:var(--accent-soft);color:var(--accent)}
+.tag.g{background:var(--green-soft);color:var(--green)}
+.tag.a{background:var(--amber-soft);color:var(--amber)}
+.tag.r{background:var(--red-soft);color:var(--red)}
+.tablebox{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin:8px 0 18px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font:600 12px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td:first-child{white-space:nowrap}
+.groupcap{font:600 12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 0}
+.callout{border-left:3px solid var(--you);background:var(--you-soft);padding:12px 14px;border-radius:0 6px 6px 0;margin:8px 0 16px;max-width:76ch}
+.callout p:last-child{margin:0}
+footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid var(--line);margin-top:36px}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+</head>
+<body>
+
+<header class="wrap top">
+  <div class="eyebrow">funl-factory · super-board 3.3</div>
+  <h1>Factory Field Guide</h1>
+  <p class="lede">How an idea becomes a built, tested app: who does what at each stage, what moves a card, what "done" means, and which skill to reach for.</p>
+</header>
+
+<nav class="bar" aria-label="Sections"><div class="in">
+  <a href="#path">The path</a><a href="#stages">Stages</a><a href="#board">The board</a><a href="#zones">Zones</a><a href="#done">Done</a><a href="#models">Models</a><a href="#numbers">Numbers</a><a href="#you">Your calls</a><a href="#skills">Skills</a>
+</div></nav>
+
+<main class="wrap">
+
+<section id="path">
+  <h2>The path</h2>
+  <p class="sub">Five steps. You sign three things; the factory does the rest and asks only when it must.</p>
+  <div class="diagram" role="img" aria-label="Path: north-star, mockup, to-board, run, report. You sign the postcard, the mock-up, and the scope and zone map.">
+  <svg viewBox="0 0 980 230" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+    <g font-size="13">
+      <!-- boxes -->
+      <g>
+        <rect x="10" y="40" width="170" height="92" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="95" y="66" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">/north-star</text>
+        <text x="95" y="88" text-anchor="middle" fill="var(--fg)">why, must-haves,</text>
+        <text x="95" y="106" text-anchor="middle" fill="var(--fg)">must-nevers, postcard</text>
+        <text x="95" y="124" text-anchor="middle" fill="var(--muted)" font-size="12">~15 min</text>
+      </g>
+      <g>
+        <rect x="210" y="40" width="170" height="92" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="295" y="66" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">/mockup</text>
+        <text x="295" y="88" text-anchor="middle" fill="var(--fg)">clickable core loop,</text>
+        <text x="295" y="106" text-anchor="middle" fill="var(--fg)">2–3 versions</text>
+        <text x="295" y="124" text-anchor="middle" fill="var(--muted)" font-size="12">~1 hour</text>
+      </g>
+      <g>
+        <rect x="410" y="40" width="170" height="92" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="495" y="66" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">/to-board</text>
+        <text x="495" y="88" text-anchor="middle" fill="var(--fg)">spec, zones, cards,</text>
+        <text x="495" y="106" text-anchor="middle" fill="var(--fg)">blind review</text>
+        <text x="495" y="124" text-anchor="middle" fill="var(--muted)" font-size="12">~30 min</text>
+      </g>
+      <g>
+        <rect x="610" y="40" width="170" height="92" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="695" y="66" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">/super-board run</text>
+        <text x="695" y="88" text-anchor="middle" fill="var(--fg)">build · QA · review</text>
+        <text x="695" y="106" text-anchor="middle" fill="var(--fg)">· merge, in waves</text>
+        <text x="695" y="124" text-anchor="middle" fill="var(--muted)" font-size="12">1–2 days</text>
+      </g>
+      <g>
+        <rect x="810" y="40" width="160" height="92" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="890" y="66" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">report</text>
+        <text x="890" y="88" text-anchor="middle" fill="var(--fg)">vs targets,</text>
+        <text x="890" y="106" text-anchor="middle" fill="var(--fg)">app log</text>
+        <text x="890" y="124" text-anchor="middle" fill="var(--muted)" font-size="12">1 min</text>
+      </g>
+      <!-- arrows -->
+      <path d="M180 86H206" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar)"/>
+      <path d="M380 86H406" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar)"/>
+      <path d="M580 86H606" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar)"/>
+      <path d="M780 86H806" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar)"/>
+      <!-- owner gates -->
+      <g font-size="12">
+        <rect x="30" y="160" width="130" height="44" rx="22" fill="var(--you-soft)"/>
+        <text x="95" y="178" text-anchor="middle" fill="var(--you)" font-weight="600">you: postcard</text>
+        <text x="95" y="195" text-anchor="middle" fill="var(--you)">yes / nearly / no</text>
+        <path d="M95 132V158" stroke="var(--you)" stroke-dasharray="3 3"/>
+        <rect x="230" y="160" width="130" height="44" rx="22" fill="var(--you-soft)"/>
+        <text x="295" y="178" text-anchor="middle" fill="var(--you)" font-weight="600">you: pick a version</text>
+        <text x="295" y="195" text-anchor="middle" fill="var(--you)">is it the postcard?</text>
+        <path d="M295 132V158" stroke="var(--you)" stroke-dasharray="3 3"/>
+        <rect x="420" y="160" width="150" height="44" rx="22" fill="var(--you-soft)"/>
+        <text x="495" y="178" text-anchor="middle" fill="var(--you)" font-weight="600">you: scope, once</text>
+        <text x="495" y="195" text-anchor="middle" fill="var(--you)">sign zones.yaml</text>
+        <path d="M495 132V158" stroke="var(--you)" stroke-dasharray="3 3"/>
+        <rect x="620" y="160" width="150" height="44" rx="22" fill="var(--you-soft)"/>
+        <text x="695" y="178" text-anchor="middle" fill="var(--you)" font-weight="600">you: only on 🙋</text>
+        <text x="695" y="195" text-anchor="middle" fill="var(--you)">money · auth · live DB</text>
+        <path d="M695 132V158" stroke="var(--you)" stroke-dasharray="3 3"/>
+      </g>
+      <!-- loop back -->
+      <path d="M295 40 C295 8, 95 8, 95 38" fill="none" stroke="var(--muted)" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+      <text x="195" y="18" text-anchor="middle" fill="var(--muted)" font-size="12">must-have wrong? re-sign</text>
+    </g>
+  </svg>
+  </div>
+  <p>Run Define (<span class="cmd">/north-star</span>, <span class="cmd">/mockup</span>, <span class="cmd">/to-board</span>) in the app's folder, or in an empty folder to test an idea. <span class="cmd">/to-board --dry-run</span> writes the spec and shows the cards without touching a board.</p>
+</section>
+
+<section id="stages">
+  <h2>Stages</h2>
+  <p class="sub">What goes in, what comes out, and who does the work.</p>
+  <div class="grid">
+    <div class="step">
+      <div class="n">1 · Define the destination</div>
+      <h3><span class="cmd">/north-star</span> <span class="tag you">you answer</span></h3>
+      <ul>
+        <li>≤ 3 questions a round, 12 at most</li>
+        <li>Must list: 3 for a prototype, 5 for a product</li>
+        <li>Ends with the postcard and a blind test you score 1–5</li>
+        <li>Out: <code>docs/shape/north-star.md</code>, <code>later.md</code>, a log line</li>
+      </ul>
+    </div>
+    <div class="step">
+      <div class="n">2 · Feel it</div>
+      <h3><span class="cmd">/mockup</span> <span class="tag you">you click</span></h3>
+      <ul>
+        <li>One HTML file, fake data, one tab per core-loop step</li>
+        <li>2–3 radically different versions; you pick one</li>
+        <li>At most 2 tweak rounds, then the postcard question</li>
+        <li>Out: <code>docs/shape/mockup.html</code>, a <code>Mock-up:</code> line on the north star</li>
+      </ul>
+    </div>
+    <div class="step">
+      <div class="n">3 · Plan the route</div>
+      <h3><span class="cmd">/to-board</span> <span class="tag fac">factory decides</span></h3>
+      <ul>
+        <li>One-page spec: postcard, must-haves, must-nevers as invariants, contracts</li>
+        <li>Cards Haiku can build without guessing; foundation first, Demo last</li>
+        <li>Blind reviewer + a Haiku read of every card, one fix round</li>
+        <li>You see the table and the verdict, and change scope only</li>
+        <li>Out: <code>spec.md</code>, <code>coverage.md</code>, draft <code>zones.yaml</code>, cards in Ready</li>
+      </ul>
+    </div>
+    <div class="step">
+      <div class="n">4 · Build</div>
+      <h3><span class="cmd">/super-board lint</span> then <span class="cmd">run</span> <span class="tag fac">factory</span></h3>
+      <ul>
+        <li>Lint checks Ready cards and coverage</li>
+        <li>Each wave: build, QA, review and merge through the gate</li>
+        <li>A digest on a merge, breach or ask; nothing else interrupts you</li>
+        <li><span class="cmd">status</span> any time; <span class="cmd">stop</span> to halt cleanly</li>
+      </ul>
+    </div>
+    <div class="step">
+      <div class="n">5 · Score it</div>
+      <h3><span class="cmd">/super-board report</span> <span class="tag you">you read</span></h3>
+      <ul>
+        <li>Define, Build, Cost, Done, each against a target</li>
+        <li><code>--log</code> adds the app to the factory log</li>
+        <li><code>--compare</code> shows every app side by side</li>
+      </ul>
+    </div>
+    <div class="step">
+      <div class="n">Any time · Keep it healthy</div>
+      <h3><span class="cmd">/super-collect</span> <span class="tag fac">factory</span></h3>
+      <ul>
+        <li>Pulls problems from Sentry, PostHog, GitHub, merged PRs, architecture</li>
+        <li>Each one checked by a fresh verifier</li>
+        <li>Verified findings go to Backlog in the card format</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="board">
+  <h2>The board</h2>
+  <p class="sub">Seven columns. One card is one worktree, one branch, one PR.</p>
+  <div class="diagram" role="img" aria-label="Card flow: Ready to Building; amber and red go to QA, green skips to Review; QA and Review can bounce back to Building; the merge gate moves cards to Done; round caps and human-only steps go to Blocked. Backlog holds cards not yet planned.">
+  <svg viewBox="0 0 980 250" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+    <g font-size="13">
+      <rect x="10" y="90" width="110" height="50" rx="6" fill="var(--panel)" stroke="var(--line)"/><text x="65" y="120" text-anchor="middle" fill="var(--muted)" font-weight="600">Backlog</text>
+      <rect x="150" y="90" width="110" height="50" rx="6" fill="var(--panel)" stroke="var(--accent)"/><text x="205" y="120" text-anchor="middle" fill="var(--fg)" font-weight="600">Ready</text>
+      <rect x="290" y="90" width="120" height="50" rx="6" fill="var(--panel)" stroke="var(--accent)"/><text x="350" y="120" text-anchor="middle" fill="var(--fg)" font-weight="600">Building</text>
+      <rect x="450" y="30" width="110" height="50" rx="6" fill="var(--panel)" stroke="var(--accent)"/><text x="505" y="60" text-anchor="middle" fill="var(--fg)" font-weight="600">QA</text>
+      <rect x="600" y="90" width="110" height="50" rx="6" fill="var(--panel)" stroke="var(--accent)"/><text x="655" y="120" text-anchor="middle" fill="var(--fg)" font-weight="600">Review</text>
+      <rect x="760" y="90" width="100" height="50" rx="6" fill="var(--green-soft)" stroke="var(--green)"/><text x="810" y="120" text-anchor="middle" fill="var(--green)" font-weight="600">Done</text>
+      <rect x="600" y="190" width="110" height="46" rx="6" fill="var(--red-soft)" stroke="var(--red)"/><text x="655" y="218" text-anchor="middle" fill="var(--red)" font-weight="600">Blocked</text>
+
+      <path d="M120 115H146" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+      <text x="133" y="160" text-anchor="middle" fill="var(--muted)" font-size="11">you move</text>
+      <path d="M260 115H286" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <path d="M410 105 C430 70, 430 55, 446 55" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <text x="400" y="50" text-anchor="end" fill="var(--amber)" font-size="12">amber · red</text>
+      <path d="M560 55 C590 55, 600 70, 620 88" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <path d="M410 125H596" stroke="var(--green)" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <text x="503" y="118" text-anchor="middle" fill="var(--green)" font-size="12">green skips QA</text>
+      <path d="M710 115H756" stroke="var(--green)" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <text x="733" y="106" text-anchor="middle" fill="var(--green)" font-size="11">gate</text>
+      <path d="M655 140V186" stroke="var(--red)" stroke-width="1.5" marker-end="url(#ar2)"/>
+      <text x="667" y="168" fill="var(--red)" font-size="11">round cap · 🙋</text>
+      <path d="M640 140 C600 175, 400 175, 360 143" fill="none" stroke="var(--amber)" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+      <text x="500" y="185" text-anchor="middle" fill="var(--amber)" font-size="12">bounce (must cite AC, I, bar or bug)</text>
+      <path d="M205 140 C205 200, 120 200, 75 144" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#ar2)"/>
+      <text x="150" y="212" text-anchor="middle" fill="var(--muted)" font-size="11">planner refuses</text>
+    </g>
+  </svg>
+  </div>
+  <div class="tablebox"><table>
+    <tr><th>Column</th><th>How a card gets here</th><th>What happens</th></tr>
+    <tr><td>Backlog</td><td>super-collect findings, splits, refused cards</td><td>Waits. Not part of a run until you move it to Ready.</td></tr>
+    <tr><td>Ready</td><td><span class="cmd">/to-board</span> after your scope review</td><td>Lint checks it. The planner admits it if it has ACs, a must-have and no file clash.</td></tr>
+    <tr><td>Building</td><td>A wave picks it up</td><td>Its own worktree. Test first, smallest change, draft PR.</td></tr>
+    <tr><td>QA</td><td>Amber and red cards after Build</td><td>Every AC proven by a test; red adds invariant tests and a security pass.</td></tr>
+    <tr><td>Review</td><td>After QA, or straight from Build for green</td><td>Opus reviews, then the merge gate re-proves the branch and merges.</td></tr>
+    <tr><td>Blocked</td><td>Round cap hit, or a step only you can do (🙋)</td><td>Last comment line says <code>blocked-by:</code> and what's needed.</td></tr>
+    <tr><td>Done</td><td>Merged through the gate</td><td>Counts towards its must-have in <code>coverage.md</code>.</td></tr>
+  </table></div>
+</section>
+
+<section id="zones">
+  <h2>Zones</h2>
+  <p class="sub">Every file sits in a zone (<code>docs/agents/zones.yaml</code>). A card takes the highest zone of any file it touches. The zone sets how hard it's checked.</p>
+  <div class="tablebox"><table>
+    <tr><th>Zone</th><th>What lives there</th><th>Checks</th><th>Rounds</th><th>Builder</th></tr>
+    <tr><td><span class="tag g">green</span></td><td>Screens, read-only views, copy</td><td>Typecheck, tests, light review. No QA lane.</td><td>1</td><td>Haiku</td></tr>
+    <tr><td><span class="tag a">amber</span></td><td>Features that change data through the red write path</td><td>Every AC tested, the zone's bar, scenario run, review</td><td>2</td><td>Haiku</td></tr>
+    <tr><td><span class="tag r">red</span></td><td>Anything that can lose, leak or corrupt data, or give the agent rights only you have</td><td>Invariant suite, mutation test, security pass, adversarial review</td><td>3</td><td>Sonnet</td></tr>
+  </table></div>
+  <p>A bounce must cite something: <code>AC2</code>, an invariant <code>I4</code>, a <code>bar:</code> line, or a <code>bug:</code> with repro steps. No citation, no bounce: it becomes a note.</p>
+</section>
+
+<section id="done">
+  <h2>What done means</h2>
+  <p class="sub">Each level is done only when the level below it is. Three of the four are checked by scripts.</p>
+  <div class="tablebox"><table>
+    <tr><th>Level</th><th>Done when</th><th>Checked by</th></tr>
+    <tr><td>Card</td><td>Every AC ticked, each with a proof that names a file at the PR head, and the gate's own test run is green. Unmet AC → back to Build, or split into a new linked card.</td><td>Merge gate (exit 13 refuses)</td></tr>
+    <tr><td>Must-have</td><td>Every card listed for it in <code>coverage.md</code> is Done.</td><td><code>super-board-coverage.py</code></td></tr>
+    <tr><td>Milestone</td><td>Every must-have done, and the Demo card walked the whole core loop against the mock-up.</td><td>Demo card · status line</td></tr>
+    <tr><td>App</td><td>You use it and say yes to the postcard.</td><td>You</td></tr>
+  </table></div>
+</section>
+
+<section id="models">
+  <h2>Models</h2>
+  <div class="tablebox"><table>
+    <tr><th>Lane</th><th>Model</th><th>When it changes</th></tr>
+    <tr><td>Build, QA</td><td>Haiku</td><td>Sonnet for red cards and cards marked <code>Needs judgement: yes</code>. Nothing else moves up without your OK.</td></tr>
+    <tr><td>Review</td><td>Opus (the session)</td><td>Never. It's the quality gate.</td></tr>
+    <tr><td>Classify, pre-flight</td><td>Haiku</td><td>—</td></tr>
+  </table></div>
+  <p>Many cards marked <code>Needs judgement</code> means the spec isn't finished. Fix the spec, not the model.</p>
+</section>
+
+<section id="numbers">
+  <h2>Is it on track?</h2>
+  <p class="sub">Where the numbers live, and what the factory does when one slips.</p>
+  <div class="tablebox"><table>
+    <tr><th>Where</th><th>What it tells you</th><th>When</th></tr>
+    <tr><td><span class="cmd">/super-board status</span></td><td>Board state, health, and the milestone line: <code>M1: 9/12 cards done · demo #20 not run</code></td><td>Any time</td></tr>
+    <tr><td>Digest</td><td>Merges, breaches and questions for you</td><td>Only on a merge, breach or ask</td></tr>
+    <tr><td>Health check</td><td>Round-capped cards, rounds per merge, budget burn against progress, factory failures</td><td>Every wave. A breach pauses new cards; budget asks you. Never halts.</td></tr>
+    <tr><td><span class="cmd">/super-board report</span></td><td>Days, cost against budget, first pass, rework, rounds, demo, postcard, each ✅ or ❌</td><td>End of a milestone</td></tr>
+    <tr><td><code>factory-log.jsonl</code></td><td>One line per app. <code>report --compare</code> shows whether the factory is improving.</td><td>After each report <code>--log</code></td></tr>
+    <tr><td><code>north-star-log.jsonl</code></td><td>Questions, minutes, postcard attempts, blind match per idea</td><td>Every <span class="cmd">/north-star</span></td></tr>
+  </table></div>
+  <div class="tablebox"><table>
+    <tr><th>Target</th><th>Default</th><th>If it misses</th></tr>
+    <tr><td>Days per app</td><td>2</td><td>Cards too big, or too many bounces</td></tr>
+    <tr><td>First pass</td><td>≥ 70%</td><td>Sharpen tickets if bounces cite the ticket; ask about the builder if they cite the build</td></tr>
+    <tr><td>Rework</td><td>≤ 10%</td><td>Same as above</td></tr>
+    <tr><td>Rounds per merge</td><td>≤ 1.5</td><td>Spec gaps; look at Needs judgement</td></tr>
+    <tr><td>Demo passes first try</td><td>yes</td><td>Coverage gap or a contract mismatch between cards</td></tr>
+    <tr><td>Budget</td><td><code>goal.budget_usd</code></td><td>The factory asks: keep going, raise it, or stop</td></tr>
+  </table></div>
+</section>
+
+<section id="you">
+  <h2>Your calls</h2>
+  <div class="callout">
+    <p><strong>You set direction, scope and business rules.</strong> The factory makes technical calls: stack, data model, card cuts, review depth, test seams. If it asks you about those, that's a bug in the skill.</p>
+  </div>
+  <div class="tablebox"><table>
+    <tr><th>You</th><th>When</th></tr>
+    <tr><td>Say yes to the postcard</td><td>End of <span class="cmd">/north-star</span> and <span class="cmd">/mockup</span></td></tr>
+    <tr><td>Score the blind test 1–5</td><td>End of <span class="cmd">/north-star</span></td></tr>
+    <tr><td>Approve the card list for scope</td><td><span class="cmd">/to-board</span>, once</td></tr>
+    <tr><td>Sign <code>zones.yaml</code></td><td>Before the first run, and when an area is promoted</td></tr>
+    <tr><td>Merge money, auth and destructive-schema PRs; run anything on a live database</td><td>A 🙋 card in Blocked</td></tr>
+    <tr><td>Keep going, raise the budget, or stop</td><td>Budget breach in the digest</td></tr>
+    <tr><td>Re-read the north star next morning</td><td>The day after signing</td></tr>
+  </table></div>
+</section>
+
+<section id="skills">
+  <h2>Skills</h2>
+  <p class="sub">Installed into every app. The board runs some of them for you; type the rest.</p>
+
+  <p class="groupcap">You type</p>
+  <div class="tablebox"><table>
+    <tr><th>Skill</th><th>Use it when</th></tr>
+    <tr><td><span class="cmd">/north-star</span></td><td>A new app, or a rescope. Add <code>--panel</code> for a product lead, architect and scope cutter behind the questions.</td></tr>
+    <tr><td><span class="cmd">/mockup</span></td><td>Right after the north star is signed, to feel the core loop.</td></tr>
+    <tr><td><span class="cmd">/to-board</span></td><td>After the mock-up. Also after a north-star change (it rescopes). <code>--dry-run</code> to test.</td></tr>
+    <tr><td><span class="cmd">/super-board</span></td><td><code>onboard</code> to set up or repair · <code>lint</code> before a run · <code>run</code> · <code>status</code> · <code>stop</code> · <code>report</code></td></tr>
+    <tr><td><span class="cmd">/super-collect</span></td><td>After real use: turn errors, rage clicks and repeated PR fixes into Backlog cards.</td></tr>
+    <tr><td><span class="cmd">/git-sync</span></td><td>Commit, pull and push the current branch. Never force pushes.</td></tr>
+  </table></div>
+
+  <p class="groupcap">The board runs these</p>
+  <div class="tablebox"><table>
+    <tr><th>Skill</th><th>What it does</th></tr>
+    <tr><td><span class="cmd">/super-build</span></td><td>Builder lane: one card in its own worktree, test first, draft PR. Never merges.</td></tr>
+    <tr><td><span class="cmd">/super-qa</span></td><td>Tester lane: proves each AC by zone. Standalone: <code>/super-qa &lt;url&gt;</code> bug-bashes a live site.</td></tr>
+    <tr><td><span class="cmd">/super-review</span></td><td>Reviewer lane: forms its own view first, bounces only on a cited blocker, merges through the gate.</td></tr>
+    <tr><td><span class="cmd">/pr-security-review</span></td><td>Security pass on red and boundary amber cards. A finding fails QA.</td></tr>
+  </table></div>
+
+  <p class="groupcap">Helpers</p>
+  <div class="tablebox"><table>
+    <tr><th>Skill</th><th>Use it when</th></tr>
+    <tr><td><span class="cmd">/prototype</span></td><td>Later work: try UI or logic variants inside a running app. Not for Define; that's <span class="cmd">/mockup</span>.</td></tr>
+    <tr><td><span class="cmd">/grilling</span></td><td>You want a plan or idea stress-tested with hard questions.</td></tr>
+    <tr><td><span class="cmd">/research</span></td><td>A question needs primary sources, written up as a file.</td></tr>
+    <tr><td><span class="cmd">/tdd</span></td><td>Lanes use it on every change: red, green, refactor.</td></tr>
+    <tr><td><span class="cmd">/diagnosing-bugs</span></td><td>Something's broken or slow and the cause isn't obvious.</td></tr>
+    <tr><td><span class="cmd">/code-review</span></td><td>Review a branch against standards and its spec.</td></tr>
+    <tr><td><span class="cmd">/codebase-design</span></td><td>Designing or deepening a module's interface.</td></tr>
+    <tr><td><span class="cmd">/improve-codebase-architecture</span></td><td>Looking for refactors; feeds <code>/super-collect architecture</code>.</td></tr>
+    <tr><td><span class="cmd">/domain-modeling</span></td><td>Naming things, the glossary, or recording a decision (ADR).</td></tr>
+    <tr><td><span class="cmd">/verification-before-completion</span></td><td>Lanes use it before claiming done.</td></tr>
+    <tr><td><span class="cmd">/triage</span></td><td>Sorting a pile of incoming issues.</td></tr>
+    <tr><td><span class="cmd">/to-questionnaire</span></td><td>Turning open questions into a form you fill in.</td></tr>
+    <tr><td><span class="cmd">/wizard</span></td><td>A step only you can do (a dashboard, a secret, a cutover), walked through in the terminal.</td></tr>
+    <tr><td><span class="cmd">/retro</span></td><td>After a run: what worked, what broke, what to change.</td></tr>
+    <tr><td><span class="cmd">/handoff</span> · <span class="cmd">/claude-handoff</span></td><td>Passing work to the next session cleanly.</td></tr>
+  </table></div>
+</section>
+
+<footer>
+  <p>Factory changes are ticketed on <code>ozbg/funl-factory</code> first. Source of truth: the skills in that repo. This page: <code>docs/help.html</code>.</p>
+</footer>
+</main>
+</body>
+</html>
