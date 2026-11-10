@@ -4,11 +4,11 @@ The Tester: proves a card's acceptance criteria with tests and evidence, or send
 
 ## What It Does
 
-- **One observable test per AC**, written at the layer the defect lives (unit or integration in Vitest, e2e in Playwright only when the browser is what broke).
-- **Test-gap check after build**: maps every AC to tests, hunts edge cases with exact values, names weak tests. High gaps are written red-first; Medium/Low are listed and never block.
-- **Captures evidence**: screenshots at desktop, tablet and mobile, logs and HARs, committed to the branch and embedded inline in the PR comment.
-- **Runs `pr-security-review` on every PR diff.** Each finding fails QA and goes back to Build, like any failing check. For a whole-repo audit it points you at `security-audit`.
-- **Files what it finds** off-ticket as `source:qa` cards instead of fixing them silently.
+- **Checks by zone** (`docs/agents/zones.yaml`). Green skips QA. Amber maps each AC to a test and checks the zone's bar and the ticket's own edge cases. Red adds a test per touched invariant and one mutation per guarded line. Accepted limits are never checked.
+- **No citation, no bounce.** A fail cites an AC, an invariant, a bar line or a reproducible bug. Anything else is a note. After `max_rounds` fails the card goes to Blocked for a ruling or a split.
+- **Keeps evidence local**: screenshots, logs and HARs go to `.claude/super-board/evidence/<issue>/`, gitignored. The PR gets an AC table as text and 0 evidence lines.
+- **Runs `pr-security-review`** on red cards and amber cards on a boundary. For a whole-repo audit it points you at `security-audit`.
+- **Files what it finds** off-ticket as `source:qa` Backlog cards instead of failing the card for them.
 
 ## When To Use It
 
