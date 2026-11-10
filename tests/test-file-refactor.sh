@@ -137,12 +137,17 @@ has "appends a criteria placeholder"      "$(cat "$BODY_LOG")" "## Acceptance Cr
 has "appends a Risk line"                 "$(cat "$BODY_LOG")" "## Risk"
 has "sends a bare note to the holding column" "$(cat "$GH_LOG")" "opt_Backlog"
 
-# 2 — a card that already carries criteria is buildable, so it goes straight to
-#     Ready and the next wave takes it.
+# 2 — a card that carries criteria still lands in Backlog, never Ready: a
+#     reviewer-filed card with ACs once went straight to the build lane (#157).
 printf '## Problem\nBody.\n\n## Context\n- **Where:** `src/x.ts`\n\n## Fix\nOne.\n\n## Acceptance Criteria\n\n- [ ] one real thing\n\n## Risk\n🟢 **Low** · one file.\n\n## Blocked by\n\n- None.\n' > "$WORK/full.md"
 OUT=$(DEDUPE_HIT="" STATUS_OPTS="Backlog Ready Done" run --config "$WORK/config.json" \
   --title "Complete card" --body-file "$WORK/full.md" --fingerprint "full|card")
-has "a card with criteria lands in Ready" "$(cat "$GH_LOG")" "opt_Ready"
+has "a card with criteria lands in Backlog" "$(cat "$GH_LOG")" "opt_Backlog"
+case "$(cat "$GH_LOG")" in
+  *opt_Ready*) bad "a card with criteria never lands in Ready" "no opt_Ready" "found it" ;;
+  *) ok "a card with criteria never lands in Ready" ;;
+esac
+is "--column Ready is refused" 64 "$( DEDUPE_HIT="" "$SCRIPT" --config "$WORK/config.json" --title T --fingerprint f --body-file "$WORK/full.md" --column Ready >/dev/null 2>&1; echo $? )"
 case "$(grep -c '## Blocked by' "$BODY_LOG")" in
   1) ok "does not duplicate a section the caller wrote" ;;
   *) bad "does not duplicate a section the caller wrote" "1" "$(grep -c '## Blocked by' "$BODY_LOG")" ;;

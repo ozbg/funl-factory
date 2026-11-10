@@ -22,31 +22,33 @@ Read `common.md` (this folder) first: branch + PR model, PR template, review thr
    ```
    - Empty → first review of this card. Skip to step 4; behave exactly as before.
    - Non-empty → the card was bounced and rebuilt. **Round 1** walks every finding in `prior_report` and marks each one `fixed` / `not fixed` / `no longer applies` (code it pointed at is gone or the AC changed), citing the file:line that proves it. A resolved thread is not proof — check the code.
-   - Any `not fixed` → bounce again now: re-open one thread per unfixed finding with its original prefix (`[builder]` → Ready, `[qa]` → QA, both → `[builder]` first), `loop:rebuild-N`, and update the Reviewer report: those rows go to `❌ not fixed`. Skip the fresh pass; it would review code that is about to change.
-   - An unfixed **Over-engineering** finding alone does not bounce; carry it into the new report's Findings.
-   - All `fixed` / `no longer applies` → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
-4. Review the code (logic, conventions). Review the tests (right thing tested? testable assertions? meaningful coverage?).
+   - Any cited Blocker `not fixed` → bounce again now: re-open one thread per unfixed Blocker with its original prefix and citation (`[builder]` → Ready, `[qa]` → QA, both → `[builder]` first), `loop:rebuild-N`, and update the Reviewer report: those rows go to `❌ not fixed`. Skip the fresh pass; it would review code that is about to change.
+   - An unfixed Note never bounces; its row stays `❌ not fixed`.
+   - Otherwise → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
+3c. **Zone + round cap.** Tier = the higher of the card's `zone:<tier>` label and `super-board-zone.py --zones docs/agents/zones.yaml --files <changed files>` (also gives `max_rounds`, `bar`, `invariants`). You may raise a tier with a `zone:<tier>` label, never lower one. `loop:rebuild-N` with N ≥ `max_rounds` → Blocked with the §4 template, `Why blocked: round cap — needs a ruling or split`. Exit.
+4. Review the code (logic, conventions) and the tests. **Green card:** skip this — check the builder's AC proof, rerun tests (step 5), go to step 7.
+   Severity is two levels. **Blocker** must cite `AC<n>`, an invariant id, `bar: <line>` or `bug: <repro>`; no citation → **Note**. Over-engineering is always a Note; so are missing tests, edge cases, a11y and i18n unless they cite. Deepening opportunities and visible bugs outside the card's scope → file to Backlog (super-review → "Route fixes").
 5. **Reviewer-side test rerun** (always — closes the Tester self-verification gap):
    - Pull `issue-<N>-<slug>` into the review worktree.
    - Re-run the test command Tester used (recorded in Tester's PR handoff comment as `Local tests:` line).
    - Tests green → continue to step 6.
-   - Tests red → open new `[qa]`-prefixed PR thread quoting the failure output, move card Review → QA with `loop:rebuild-N`, exit. Tester wrote a broken suite; QA owns the fix.
-6. **Adversarial mode** (per `truth_gate`): when triggered, spawn 2 sub-agents in parallel:
+   - Tests red → open new `[qa]`-prefixed PR thread quoting the failure output, move card Review → QA with `loop:rebuild-N` (citation `bug: <test command>`), exit. Tester wrote a broken suite; QA owns the fix.
+6. **Adversarial mode** (per `truth_gate`, default `red`: red-tier cards only; `off` never; `always` every card): when triggered, spawn 2 sub-agents in parallel:
    - **Code-grounder** — verify cited file:line still exists and matches claims.
    - **Historian** — `git blame` the changed lines, check for ADRs / prior incidents.
    - **Budget cap (added 2026-05-22): each sub-agent ≤50 gh calls.** Prefer local `git blame` / `git log` over `gh api graphql`. If a sub-agent needs >50 calls to reach confidence, it returns `confidence: "insufficient_data"` and the Reviewer flags the card as 🛡 truth-check inconclusive instead of burning the shared quota. See `rate-limit-etiquette.md`.
-   - **Brief:** use the fixed sub-agent brief in super-review → "Adversarial mode" verbatim. Never write your own. It states that Over-engineering is Should fix, never Blocker on its own, and never lowers confidence.
+   - **Brief:** use the fixed sub-agent brief in super-review → "Adversarial mode" verbatim. Never write your own. A sub-agent finding is a Blocker only with a citation.
    - Aggregate into a confidence score (0-100). Compare against `config.truth_threshold` (default 70).
    - **Below threshold** — Reviewer MUST NOT approve. Open a `[reviewer]`-prefixed PR thread quoting the lowest-confidence sub-agent finding, write the full Block template comment (see §4 Block/Skip), move card Review → Blocked with reason tag 🛡 truth-check failed (confidence X/100). The card stays Blocked until human review; the bot's "Why I cannot decide" line names the specific sub-agent finding it could not confirm.
    - **Above threshold** — continue to step 7.
    - **No Reproducer needed** — Tester's tests were re-run in step 5.
-7. Decide per finding. First re-apply the Over-engineering rule to every collected finding, whatever a sub-agent wrote: Should fix, never Blocker, never on its own a bounce or block. Then:
-   - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** below. Do not move the card to Done any other way.
-   - **Over-engineering only** (from `ponytail:ponytail-review`, see super-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
-   - **Code-side new finding** → open new `[builder]`-prefixed PR thread, comment, move card Review → Ready (label `loop:rebuild-N`).
-   - **Test-side new finding** → open new `[qa]`-prefixed PR thread, comment, move card Review → QA (label `loop:rebuild-N`).
+7. Decide. Only cited Blockers count; Notes go in the report with no thread.
+   - **No Blockers + threads clean + truth ≥ threshold (when it ran) + tests green** → run the **merge protocol** below. Do not move the card to Done any other way.
+   - **Code-side Blocker** → open new `[builder]`-prefixed PR thread naming the citation, move card Review → Ready (label `loop:rebuild-N`).
+   - **Test-side Blocker** → open new `[qa]`-prefixed PR thread naming the citation, move card Review → QA (label `loop:rebuild-N`).
+   - Every bounce puts `citation: "<value>"` (or `"none"` for a Gate 1 bounce) in the structured result.
    - **CI-budget block (💳, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[qa]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Write the PR's `redcheck` block (`> [!WARNING]` · `🔴 Merged with a failing check: <check> · CI budget block`) and a `[reviewer] [report] ✅ merged · CI-budget bypass` comment on the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `💳` — never for `🛡` truth-fail, `🔐` missing creds, or `🧑` human-only decisions.
-   - **Human-gate / Blocker finding (destructive schema, API contract, money, auth, live-DB migration) / rebuild cap hit (config.rebuild_cap)** → write the full Block template (see §4), move card Review → Blocked. A clean PR that only *touches* money, auth or schema is not a blocker — run the merge protocol; the gate's `merge_policy` routes it to a human (exit 7 → 🙋 Blocked).
+   - **Human gate (destructive schema, API contract, money, auth, live-DB migration)** → write the full Block template (see §4), move card Review → Blocked. A clean PR that only *touches* money, auth or schema is not a blocker — run the merge protocol; the gate's `merge_policy` routes it to a human (exit 7 → 🙋 Blocked).
 8. Write the **Reviewer report** on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and writes none). It is ONE comment per PR, **edited in place** each round: find it by the marker (step 3b's lookup, plus `.url` — the number after `#issuecomment-` is its id) and `gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`; post a new comment only when none exists. It is what step 3b reads next time, so the first line is the stable marker and every finding keeps its id (writing-standard.md § 4):
 
    ```
@@ -61,9 +63,9 @@ Read `common.md` (this folder) first: branch + PR model, PR template, review thr
    |---|---|---|---|---|---|
    | R1 | builder | Bug | `src/api/stream.ts:54` | <one line> | ✅ fixed |
    | R2 | qa | Verification miss | `e2e/streaming/ttfb.spec.ts:18` | <one line> | ❌ not fixed |
-   | R3 | builder | Over-engineering | `src/api/retry.ts:1` | <what it builds → smaller thing> (should fix, not blocking) | open |
+   | R3 | builder | Over-engineering | `src/api/retry.ts:1` | <what it builds → smaller thing> · note | open |
    ```
-   Status words in the header: `merge-ready` · `bounced` · `blocked` · `human-gated` · `merged`. Keep every row across rounds; update its Status (`open` · `✅ fixed` · `❌ not fixed` · `no longer applies`). New findings take the next free id. Every finding names its class — Gap / Bug / Verification miss / Scope drift / Over-engineering (super-review → "Classify findings"); a checked hypothesis that held is not a finding, it goes on the `✅ Done` line.
+   Blocker rows carry their citation in the Finding cell (`· blocker · AC2`). Status words in the header: `merge-ready` · `bounced` · `blocked` · `human-gated` · `merged`. Keep every row across rounds; update its Status (`open` · `✅ fixed` · `❌ not fixed` · `no longer applies`). New findings take the next free id. Every finding names its class — Gap / Bug / Verification miss / Scope drift / Over-engineering (super-review → "Classify findings"); a checked hypothesis that held is not a finding, it goes on the `✅ Done` line.
 9. Clean up worktree.
 
 ## Merge protocol (Reviewer only — added 2026-08-06, issue #9)
