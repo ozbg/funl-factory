@@ -13,6 +13,7 @@ description: GitHub-Project-driven autonomous pipeline. Five verbs — onboard, 
 | `super-board lint` | interactive | walks active-pipeline issues, flags vague ACs, runs pre-flight readiness |
 | `super-board status` | interactive (read-only) | snapshot of active config, column counts, in-flight workers |
 | `super-board run` | in-session (default) | the autonomous loop: waves of the `super-board-wave` dynamic workflow, run from this session. Also the resume command — state lives on the board, not in process memory. Accepts a model-tier flag: `--low` (haiku/sonnet/opus ladder), default = medium (sonnet/opus/session), `--high` (opus for every card). |
+| `super-board report` | interactive (read-only; `--log` appends one line to `docs/super-board/factory-log.jsonl`) | one page per milestone against targets: Define, Build, Cost, Done, each target ✅/❌, what to change next. `--compare` prints the log, one row per app. |
 | `super-board stop` | interactive | graceful shutdown: posts "stopped mid-flight" comments on every in-flight issue + PR, releases assignee mutexes, kills workers. Next `super-board run` resumes. |
 
 If invoked with no verb, ask which one.
@@ -30,6 +31,7 @@ In Codex the skill is not a slash command: it is `$super-board <verb>`, found in
 | `super-board lint ...` | `references/lint.md` |
 | `super-board status ...` | `references/status.md` |
 | `super-board run ...` | `references/run-workflow.md` + `references/run.md` (lane agents load `references/lanes/<lane>.md` + `lanes/common.md`) |
+| `super-board report ...` | `references/report.md` |
 | `super-board stop ...` / "stop the run" / "pause the loop" / "kill super-board" | `references/stop.md` |
 | "resume" / "pick up where I left off" / "restart after stop" | `references/stop.md` (resume = run; no separate verb) |
 | Anything about Blocked exits, 🙋 needs you, or dropping a card | `references/block-template.md` |

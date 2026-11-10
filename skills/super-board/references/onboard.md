@@ -370,7 +370,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    │    "session", bot_identity}, worker_backend "workflow", host (always: `bash $SB/super-board-host.sh`;
    │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks), model defaults
    │    │    `lane_models_by_tier: {"red": {"build": "sonnet", "qa": "sonnet"}}` and
-   │    │    `lane_models_judgement: {"build": "sonnet", "qa": "sonnet"}`. No `variant`.
+   │    │    `lane_models_judgement: {"build": "sonnet", "qa": "sonnet"}`, and report targets
+    │    `targets: {"days_per_app": 2, "first_pass_pct": 70, "rework_pct": 10,
+    │    "rounds_per_merge": 1.5, "demo_first_try": true}` (kept when already set). No `variant`.
    │    ├─ .claude/super-board/active ← <slug>
    │    ├─ .gitignore += .claude/super-board/active, onboard-answers.json, onboard-staged/,
    │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/super-board/)

@@ -8,6 +8,7 @@ Board: Backlog · Ready · Building · QA · Review · Blocked · Done. Labels r
 | Check tickets before a run | `/super-board lint` | NEVER run with AC-less tickets |
 | Drain the board | `/super-board run` | NEVER build, test or merge from the orchestrator |
 | Board state / halt | `/super-board status` · `/super-board stop` | |
+| How a milestone went against targets | `/super-board report` · `--log` · `--compare` | DON'T hand-write the factory log |
 | Build one ticket | `/super-build` | NEVER build outside the card's worktree |
 | QA a branch, or a live URL alone | `/super-qa` · `/super-qa <url>` | NEVER mark QA pass without evidence |
 | Review a PR, merge | `/super-review` | NEVER `gh pr merge` direct — merge gate only |
