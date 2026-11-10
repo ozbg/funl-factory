@@ -61,8 +61,8 @@ skills your `skills-lock.json` says came from `mattpocock/skills` or Cloudflare.
 up first to `.claude/super-board/backup/<timestamp>/`. Skills you added from anywhere else stay.
 `--no-helper-skills` skips the helper download; `/super-board onboard` adds them later.
 
-[`pr-security-review`](skills/pr-security-review/README.md) runs on every PR inside the QA lane;
-each finding fails QA and goes back to Build. It is from Anthropic's
+[`pr-security-review`](skills/pr-security-review/README.md) runs inside the QA lane on red cards,
+and on amber cards on a boundary path; each finding fails QA and goes back to Build. It is from Anthropic's
 [claude-code-security-review](https://github.com/anthropics/claude-code-security-review).
 Claude Code's built-in `/security-review` is left as it is.
 
@@ -125,7 +125,7 @@ Add cards to `Ready`. The board drains on its own.
 | [`/super-build`](skills/super-build/README.md) | Builder lane: worktree, smallest safe change, tests, draft PR. |
 | [`/super-qa`](skills/super-qa/README.md) | Tester lane: evidence, test-gap check, screenshots, or bounce to Build. |
 | [`/super-review`](skills/super-review/README.md) | Reviewer lane: own hypotheses, remembers prior findings, merge gate. |
-| [`/pr-security-review`](skills/pr-security-review/README.md) | Security pass on every PR diff; super-qa runs it, findings fail QA. |
+| [`/pr-security-review`](skills/pr-security-review/README.md) | Security pass on red and boundary amber cards; super-qa runs it, findings fail QA. |
 
 **Kept here, not installed into apps — 2 skills**
 

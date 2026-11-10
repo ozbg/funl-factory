@@ -13,7 +13,32 @@ There is **exactly one branch per issue** and **exactly one PR per issue**. All 
 - Builder creates the branch off `config.base_branch`, writes code, commits + pushes, opens a **draft PR**.
 - Tester checks out the same branch in a fresh worktree, adds tests, commits to the same branch, pushes.
 - Reviewer is the **only lane that merges**. On approval: squash-merges PR into `base_branch`, deletes the branch.
-- If `config.merge_policy` says a human merges (`default: "human"`, or a money / auth / schema / size hit), the merge gate exits 7 and the Reviewer parks the card in Blocked for a human click instead.
+- If `config.merge_policy` says a human merges (`default: "human"`, or a money / auth / schema hit, or a red-tier PR over the size cap), the merge gate exits 7 and the Reviewer parks the card in Blocked for a human click instead. A non-red PR over the cap gets a deep review instead (exit 10, no human; `review.md` → "Deep review").
+
+## Command shape — every lane, every command
+
+A permission rule matches one plain command. Anything else misses the allowlist and goes to
+the permission checker, which denies GitHub writes and strands the card (#37).
+
+- `gh`, `.claude/bin/…` and board commands run as one plain command: no `cd … &&` in front,
+  no shell loop, no `;` or `&&` chain. Name the repo with `-R <owner>/<repo>` (or
+  `--repo`, or `--config` for board scripts), never by changing directory. Ten threads to
+  reply to → ten commands.
+- `git` runs as `git -C <absolute worktree> …`. Before every commit and push, check
+  `git -C <worktree> rev-parse --show-toplevel` and `git -C <worktree> branch --show-current`
+  name your worktree and branch: lanes can share a shell's working directory (#23).
+- Tests and builds run from the worktree: as the lane's own cwd when it was started there,
+  else pinned in the command (`pnpm -C <worktree> …`, `npm --prefix <worktree> …`, or
+  `cd <worktree> && <test command>` — a local command, never a GitHub one).
+- Verify runs in the **foreground** and you wait for it: never `run_in_background`, `&` or
+  `nohup`. A lane that hands back while verify runs hands back nothing.
+- Cap test workers at 2 per lane, or parallel lanes overload the machine and timing tests
+  flake (#5): vitest or jest `--maxWorkers=2`, Playwright `--workers=2`, pytest-xdist `-n 2`.
+  Write the capped command into `Local tests:` so the Reviewer reruns the same thing.
+- A denied **optional** write (a thread reply, a thread resolve, a comment edit) never stops
+  the handoff. Post a new comment instead, or name the skipped write on the `❌ Not done:`
+  line, and finish the exit. Only a denied **required** write (card move, handoff comment)
+  stops the lane: return `failed` with the planned writes in `detail` for the orchestrator.
 
 ## PR description template
 
@@ -117,7 +142,24 @@ e2e/streaming/ttfb.spec.ts:18   [qa] [issue] spec asserts status only — add a 
 | Tester (QA → Review) | All `[qa]` threads on this PR | Stay in QA, fix, then exit |
 | Reviewer (approving merge) | All findings and human requests; any conversations GitHub requires resolved | Bounce: `[builder]` open → Ready; `[qa]` open → QA; unresolved human decision → Blocked |
 
-Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when the fix is committed.
+### Thread and comment writes — the one allowed route
+
+The lane that fixed a finding resolves its thread once the fix is pushed. One command per
+thread, each a single plain `gh api` call (allowlist `Bash(gh api graphql:*)` and `Bash(gh api:*)`):
+
+```
+# list thread ids (read)
+gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100){nodes{id isResolved comments(first:1){nodes{body}}}}}}}' -F o=<owner> -F r=<repo> -F n=<PR>
+# resolve one thread
+gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<thread-id>
+# reply in a thread
+gh api repos/<owner>/<repo>/pulls/<PR>/comments/<comment-id>/replies -f body='<text>'
+# edit your own comment in place
+gh api -X PATCH repos/<owner>/<repo>/issues/comments/<comment-id> -F body=@<file>
+```
+
+A denied resolve or edit is an optional write (see "Command shape"): say so on the
+`❌ Not done:` line and finish the handoff.
 
 ## Commenting cadence (issue + PR, every lane)
 
@@ -146,9 +188,15 @@ Block exits use the same header (`[<role>] [blocker] 🛑 blocked`) and the fiel
 and moved to Done with a `[<role>] [report] 🤷 dropped · <reason>` comment — there is no Skipped
 column.
 
-## Root-cause hash (used by the rebuild-cap gate)
+## Round cap
 
-To detect "same root cause" without depending on a model classifier, each lane writes a deterministic hash to its failure handoff comment:
+On a bounce, the card carries `loop:rebuild-N`. If N + 1 ≥ the zone's `max_rounds`
+(`super-board-zone.py` on the changed files), the card goes to **Blocked** with the §4
+template, `Why blocked: round cap — needs a ruling or split`, instead of bouncing again.
+
+## Root-cause hash
+
+Each lane writes a deterministic hash to its failure handoff comment, so a reader can see when two failures share a cause:
 
 ```
 root-cause-hash: <sha256 first 12 hex chars>
@@ -160,9 +208,7 @@ The hash inputs (joined with `|`):
 2. Error class — first matched: `test_assertion`, `test_runtime`, `build_fail`, `lint_fail`, `merge_conflict`, `network`, `auth`, `quota`, `other`.
 3. First 3 unique `file:line` frames from the captured stack trace / test output (sorted, normalized — strip absolute paths to repo-relative).
 
-Two consecutive failures on the same card with **identical hash** AND **same lane** count as the same root cause. Hits `rebuild_cap` → Blocked.
-
-Different hash on the same card resets the counter — the bot recognizes that progress has been made even if the card hasn't reached Review yet.
+The hash is evidence only; the round cap above decides when a card stops bouncing.
 
 ## Worker rate-limit etiquette (read before any burst of gh calls)
 

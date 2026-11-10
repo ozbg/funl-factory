@@ -49,7 +49,7 @@ Read `common.md` (this folder) first: branch + PR model, PR template, review thr
    - Every bounce puts `citation: "<value>"` (or `"none"` for a Gate 1 bounce) in the structured result.
    - **CI-budget block (💳, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[qa]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Write the PR's `redcheck` block (`> [!WARNING]` · `🔴 Merged with a failing check: <check> · CI budget block`) and a `[reviewer] [report] ✅ merged · CI-budget bypass` comment on the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `💳` — never for `🛡` truth-fail, `🔐` missing creds, or `🧑` human-only decisions.
    - **Human gate (destructive schema, API contract, money, auth, live-DB migration)** → write the full Block template (see §4), move card Review → Blocked. A clean PR that only *touches* money, auth or schema is not a blocker — run the merge protocol; the gate's `merge_policy` routes it to a human (exit 7 → 🙋 Blocked).
-8. Write the **Reviewer report** on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and writes none). It is ONE comment per PR, **edited in place** each round: find it by the marker (step 3b's lookup, plus `.url` — the number after `#issuecomment-` is its id) and `gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`; post a new comment only when none exists. It is what step 3b reads next time, so the first line is the stable marker and every finding keeps its id (writing-standard.md § 4):
+8. Write the **Reviewer report** on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and writes none). It is ONE comment per PR, **edited in place** each round: find it by the marker (step 3b's lookup, plus `.url` — the number after `#issuecomment-` is its id) and edit it with the one allowed route (`common.md` → "Thread and comment writes"); post a new comment only when none exists. If the edit is denied, post the report as a new comment and carry on — a denied optional write never stops the handoff. It is what step 3b reads next time, so the first line is the stable marker and every finding keeps its id (writing-standard.md § 4):
 
    ```
    <!-- super-review:report -->
@@ -98,6 +98,12 @@ on the base branch**.
    base into a scratch worktree at $HEAD, runs `config.verify_commands`, and only then
    squash-merges with `--match-head-commit $HEAD`. After a merge it runs `cleanup-wt --post-merge`
    when the `.claude/hooks/cleanup-wt.py` hook is installed (local only; a cleanup failure never changes the exit). Route by exit code:
+    10 → deep review: a non-red PR over `auto_max_lines` (600 source lines). Stdout
+          has a `deep-review: <why>` line. No human. Run the **deep review** below,
+          then re-run the gate with the same `--expect-head`
+    11 → the PR is a draft: `gh pr ready <PR>`, then re-run the gate. Never Blocked
+    12 → a GitHub read came back empty or malformed: leave the card in Review, the
+          next wave re-runs the gate. Never Blocked, never a halt
      9 → verification-readiness: halt the run and preserve card, approval, claims, and worktree. Repair `config.verify_commands` with the project's real checks, then restart explicitly. Never bounce to Build, retry a rebase, or bypass the gate.
      0 → merged; continue to step 4
      2 → the branch no longer builds against the base → **rebase pass** (see below)
@@ -128,9 +134,25 @@ on the base branch**.
           block; link it from the PR without duplicating the request.
    → do NOT leave a card in Review on exit 2, 3, 5, 7 or 8. A card left in Review is
      re-picked next wave and re-reviewed forever, which is the re-dispatch waste
-     tracked in issue #10. Exits 4 and 6 are the exceptions: 4 simply queued, and
-     6 needs a fresh review of a commit nobody has reviewed yet.
+     tracked in issue #10. Exits 4, 6 and 12 are the exceptions: 4 simply queued,
+     6 needs a fresh review of a commit nobody has reviewed yet, 12 is a retry.
 ```
+
+**Deep review (gate exit 10).** A big PR gets a deeper review, not the owner.
+1. Run the full review again on the strongest model the host offers (Opus). If
+   this lane runs on a smaller model, spawn the review as one sub-agent on it.
+2. Run every step, whatever the tier: step 4's code review (no green-card skip),
+   the step 5 test rerun, and step 6's truth-check.
+3. Post the result as the Reviewer report (step 8) with `deep review` in its
+   `Did:` line.
+4. Clean → add the label: `gh pr edit <PR> --add-label deep-reviewed`, then re-run
+   the gate. The label counts only when added after the head commit. If GitHub
+   says the label does not exist, create it once with
+   `gh label create deep-reviewed --color 0E8A16` and add it again.
+5. A cited Blocker or a truth-check below threshold → bounce or block as step 7
+   says. Never add the label.
+
+A human is involved only when the tier is red: the gate then exits 7, not 10.
 
 **Ordering invariant.** `Done` means "merged" — or closed as not planned on purpose, with a 🤷
 comment (there is no Skipped column). If step 3 cannot be satisfied, the card goes to Blocked,

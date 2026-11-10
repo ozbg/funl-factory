@@ -84,6 +84,11 @@ label picks its path — three labels, no per-board variant:
 `super-board-wave-plan.sh` puts `lane` (`build` / `qa` / `review`) and `labels` on every picked
 card; `super-board-wave.js` sends a `qa` card from Ready straight to the Tester.
 
+**Green skips QA.** When the Builder's zone step reports `green` (and no `zone:amber`/`zone:red`
+label), the Builder moves the card Building → Review and the wave runs the Reviewer next, with
+no Tester. A `qa` card still goes to QA. A ticket with a `Zone:` line skips the classify
+agent: green, amber, red mean low, medium, high complexity.
+
 ```
 Builder:   Ready → Building → QA
            worker   = super-build skill
@@ -114,7 +119,8 @@ A live site with no repo is not a board. `/super-qa <url>` tests it on its own.
 
 | Gate | Action |
 |---|---|
-| `config.rebuild_cap` reached on same card + same root-cause hash (`lanes/common.md` → "Root-cause hash") | Move card to Blocked with full §4 template (reason 🛡), continue run |
+| Round cap: a cited QA or Review bounce when the card has `loop:rebuild-N` and N + 1 ≥ the zone's `max_rounds` (green 1, amber 2, red 3 rounds in all; tier = the higher of `super-board-zone.py` on the PR's files and any `zone:<tier>` label) | The wave moves the card to Blocked with the §4 template (reason 🛡), `round cap: needs a ruling or split`, never back to Building; continue run |
+| A QA or Review bounce with no citation (`AC<n>`, `I<n>`, `bar: …`, `bug: …`) | The wave rejects it: logged `uncited-bounce`, the finding is a Note and the card moves on to Review |
 | No card progresses for 3 consecutive waves | Halt, dump state |
 | Auth expires mid-run | Halt, ping user with refresh instruction |
 | Pre-flight check fails on re-validation | Halt with the specific missing item |

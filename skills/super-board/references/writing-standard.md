@@ -227,7 +227,7 @@ status alert.
 | Section | Content | Required |
 |---|---|---|
 | `## Problem` | 1–3 sentences: what is wrong or missing, from the user's side | yes |
-| `## Context` | `- **Where:**` + lettered steps (one per line), `- **Who:**`, screenshot embedded | yes · screenshot for UI |
+| `## Context` | `- **Where:**` + lettered steps (one per line), `- **Who:**`, the six card lines ([ticket-format](ticket-format.md)), screenshot embedded | yes · screenshot for UI |
 | `## Evidence` | the folded 12-row table below | bugs |
 | `## Fix` | the intended change in 1–3 lines. No implementation plan | yes |
 | `## Acceptance Criteria` | 2–5 `- [ ]` items, each checkable by a test | yes |
@@ -252,6 +252,12 @@ A 12 MB PDF spins forever. The 413 is never handled.
   - b. Click **Receipts**
   - c. Drag `12mb.pdf` onto the drop zone
 - **Who:** any signed-in user
+- **Scenario:** owner uploads a large receipt and is told it is too big
+- **Zone:** green
+- **Files:** app/api/receipts/, components/receipts/
+- **Fit for purpose:** a clear size message; no resumable uploads
+- **Out of scope:** raising the 10 MB limit
+- **Must-have served:** 2
 
 ![receipts · desktop](https://github.com/acme/app/raw/5a2363b/docs/super-board/runs/issue-790-qa-v1/desktop.png)
 

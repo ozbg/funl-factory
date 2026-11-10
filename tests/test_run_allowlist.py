@@ -17,6 +17,7 @@ CALLERS = [
     ROOT / "skills/super-build/SKILL.md",
     ROOT / "skills/super-qa/SKILL.md",
     ROOT / "skills/super-review/SKILL.md",
+    *sorted((REF / "lanes").glob("*.md")),
 ]
 # The merge gate is offered with the merge lines (onboard -> Permissions), listed below the base.
 REF = re.compile(r"(?:(bash|python3|source) )?\.claude/bin/([A-Za-z0-9_-]+\.(?:sh|py))")
@@ -56,6 +57,19 @@ for path in CALLERS:
 for rule in ("Bash(python3 .claude/bin/super-board-github-read.py:*)",
              "Bash(.claude/bin/super-board-github-read.py:*)"):
     check(rule in base_rules, f"base allowlist misses {rule}")
+
+# Lanes' one route to resolve threads, edit comments, and create the deep-review label (#8).
+for rule in ("Bash(gh api:*)", "Bash(gh api graphql:*)", "Bash(gh label create:*)"):
+    check(rule in base_rules, f"base allowlist misses {rule}")
+
+# A gh or board command behind `cd … &&` or in a loop matches no rule (#37).
+SHAPE = re.compile(r"\bcd [^`\n]*?&&\s*(?:gh |(?:bash |python3 )?\.claude/bin/)|\bfor \w+ in [^`\n]*?;\s*do\s+gh ")
+for path in CALLERS:
+    for m in SHAPE.finditer(path.read_text()):
+        failures.append(f"{path.relative_to(ROOT)}: `{m.group(0)}` puts a gh or board command behind cd or a loop")
+common = (ROOT / "skills/super-board/references/lanes/common.md").read_text()
+check("resolveReviewThread" in common and "gh api -X PATCH" in common,
+      "lanes/common.md must give the one route to resolve threads and edit comments")
 
 check(re.search(r'claude -p "/super-board run"', section) is not None,
       "onboard.md must say whether claude -p \"/super-board run\" is supported")

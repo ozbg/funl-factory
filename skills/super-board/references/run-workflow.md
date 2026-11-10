@@ -102,7 +102,7 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 
 ## The wave loop
 
-Repeat until a done condition or halt gate fires:
+Repeat until a done condition, a halt or a stop:
 
 1. **Rate guard** — `sb_gh_guard_check 200` (super-board-gh-guard.sh; `gh api rate_limit` misreports GraphQL); if GraphQL remaining < 200, wait for
    reset (same thresholds as run.md). A failing `gh` call outranks the reading:
@@ -192,10 +192,14 @@ Repeat until a done condition or halt gate fires:
    reports those as `preflight:blocked`; `preflight:failed` means pre-flight was blind and the card
    stays in Ready for the next wave. Sequenced cards carry a `blocked-by:` line, so this same sweep
    frees them when the overlapping PR's issue closes.
-   Wave width is every card the dependency graph says is free, in flight
-   first (Review → QA → Ready), cut to `max_workers` when it is set (0 or
-   absent = no cap). `max_workers` is the GitHub-limit valve: step 5 lowers it
-   after a wave that hit the hourly limit. If `cards` is empty and
+   Wave width is the ramp stage (`ramp.stage`, 1–3; a foundation goal runs 1),
+   counted after the planner drops overlapping cards and cards the ticket gate
+   refuses, in flight first (Review → QA → Ready), and never above `max_workers`
+   when that is set. `max_workers` is the GitHub-limit valve: step 5 lowers it
+   after a wave that hit the hourly limit. Health (step 5) steps `ramp.stage` down
+   on a breach; raising it is the owner's call. After a `pause-new` health action,
+   drop the planner's Ready cards from this wave; in-flight cards still run.
+   If `cards` is empty and
    Building/QA/Review counts are 0 → done. If empty but cards sit in Blocked
    only → report and stop. **Goal reached:** when the goal milestone has no open
    issues, stop, report `🎯 <title> reached`, and ask the owner for the next goal
@@ -223,6 +227,8 @@ Repeat until a done condition or halt gate fires:
    `laneModels` is the config's `lane_models`, passed as is (omit it when unset). It sets
    the model per lane (classify, preflight, build, qa, review) over the tier; a lane it
    leaves out keeps the tier's choice. A bad value fails the wave before any agent runs.
+   `laneModelsByTier` is the config's `lane_models_by_tier` (omit when unset): per zone tier,
+   then per lane, for example the strongest model on red build and review.
 5. **Reconcile** (when the run completes) — read the returned `cards`
    summary. If `halted: true`, any card is `halted`, or the GitHub helper's `--check`
    fails, preserve claims and stop. For verification-readiness (exit 9), repair
@@ -238,6 +244,32 @@ Repeat until a done condition or halt gate fires:
    The transcript folder is the one the Workflow result names; agent logs inside it
    give tokens and minutes per card. `cardsWithoutLogs` above 0 means the logs were not
    found: say so once in the report, the rest of the row still counts.
+   Pass `--milestone <goal.milestone>` to `record`. Each card's `citation` and
+   `round_capped` and the result's `uncited-bounce` events are read when present.
+   **Health** — right after `record`, run
+   `python3 .claude/bin/super-board-scorecard.py health --config <config-path> --wave <date>-<N> --goal-done <closed> --goal-total <total>`
+   (the goal milestone's issue counts). Four metrics act: a card round-capped this wave,
+   rolling rounds per merged card above 2, budget burn (80% of `goal.budget_usd`
+   in API-equivalent dollars with under 60% of the goal merged), and over 2
+   failed/halted lane exits today. A breach has already written `ramp.stage` one
+   lower (floor 1). Act on `action`:
+   - `continue` → plan the next wave as usual.
+   - `pause-new` → the next wave takes no new Ready cards; in-flight cards finish.
+   - `stop-ask` → post ONE `needs-you` item (below) asking the owner about the
+     budget, and launch nothing new until they answer.
+   Health never halts the run. A `warnings` entry (the wave wrote no rows) goes in
+   the report once. The report-only numbers (cited bounces, tokens per merge, days
+   since the last accepted demo) never act. Record an accepted demo with
+   `super-board-scorecard.py demo --accepted`.
+   **Digest** — then run
+   `python3 .claude/bin/super-board-scorecard.py digest --config <config-path> --plan <the wave's plan.json> --wave <date>-<N> --goal-done <closed> --goal-total <total>`.
+   It prints goal, merges, health, budget and asks only when there was a merge, a
+   breach or an ask (every wave when `digest` is `every-wave`). Non-empty output is
+   sent as is with the PushNotification tool.
+   **Owner asks.** Every question for the owner is a `needs-you` item: a comment
+   on the card's PR (on the issue when there is no PR) with the `needs-you` label,
+   never only a chat line. The wave-start sweep never sends a `needs-you` card back
+   to a builder (#38); it waits for the owner's answer.
    Then the GitHub-limit step-down: save the returned `cards` to a temp file and run
    `bash .claude/bin/super-board-throttle.sh --config <config-path> --results <file>`.
    `hit: true` (GraphQL at 0, or a lane failed on the limit) has already written
@@ -264,14 +296,14 @@ Repeat until a done condition or halt gate fires:
    Merged and bounced cards are counts, not lines — they need nobody. Every
    `human-gate`/`blocked` card gets its line and its owner: that is the
    human's queue. Never report a card as done that is not on the base branch.
-7. **Halt gates** — stop with a report if: 3 consecutive waves made zero
-   progress (every card bounced/failed); block-rate exceeds
-   `block_rate_alert_pct` of initial Ready; or the user says stop. The halt
-   note is four lines: `🛑 halted — <gate>` · the evidence (counts, the cards
+7. **Health gates** — the health action (step 5) replaces the old zero-progress
+   and block-rate gates: it pauses new cards or asks the owner, never halts. The
+   run stops only on a GitHub halt, a readiness halt, the usage guard, a done
+   condition, or the user saying stop. The stop note is four lines: `🛑 halted — <gate>` · the evidence (counts, the cards
    that kept bouncing) · what is left in flight or claimed · `Resume:
    /super-board run <slug> [--low|--high]` (retain the run's choice) and who must act first.
 8. Loop to 1. For unattended cadence, the user may wrap this loop in /loop;
-   the orchestrator must still stop at halt gates.
+   the orchestrator must still act on the health action and stop when told.
 
 After normal completion, confirm all selected waves and lane tasks have ended,
 finish final reconciliation, and release only the `workflow-wave.lock` created
