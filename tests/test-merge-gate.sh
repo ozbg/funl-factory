@@ -170,6 +170,8 @@ DIFF
     # The paginated file list the gate reads instead of `pr view --json files` (which stops at 100).
     case "$*" in */issues/*/events*) printf '%s' "${STUB_EVENTS:-[[]]}"; exit 0 ;; esac
     case "$*" in */pulls/*/files*) ;; *) exit 1 ;; esac
+    # A file list too big for an environment variable comes from a file.
+    if [ -n "${STUB_FILES_PAGES:-}" ]; then cat "$STUB_FILES_PAGES"; exit 0; fi
     meta="${STUB_META:-{\"files\":[]}}"
     if [ -n "${STUB_META_AFTER:-}" ] && [ -f "$STUB_VERIFIED" ]; then meta="$STUB_META_AFTER"; fi
     printf '%s' "$meta" | jq -c --argjson size "${STUB_PAGE_SIZE:-100}" \
@@ -304,6 +306,19 @@ teardown
 head_setup
 RC=0; STUB_OID="$SHA" STUB_META="$(jq -cn --argjson f "$BIGFILES" '{labels: [], body: "", additions: 130, deletions: 0, files: $f, changedFiles: 150}')" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 79 ] || fail "a file list shorter than changedFiles must halt (79), got $RC"
+
+# 21b — a file list bigger than the OS argument limit (#68: 188 files with patches crashed jq
+#       with "Argument list too long", exit 70). The gate reads it from files and gets past it.
+head_setup
+N=6000
+jq -cn --argjson n "$N" '[[range(0; $n) | {filename: ("src/a/really/long/path/to/a/module/number-\(.)/that/keeps/going/index.ts"), additions: 1, deletions: 0, patch: ("@@ -0,0 +1 @@\n+" + ("x" * 200))}]]' > "$TMP/bigpages.json"
+[ "$(wc -c < "$TMP/bigpages.json")" -gt 1100000 ] || fail "the big file list fixture should pass the argument limit"
+RC=0; STUB_FILES_PAGES="$TMP/bigpages.json" STUB_OID="$SHA" STUB_META="$(jq -cn --argjson n "$N" '{labels: [], body: "", additions: $n, deletions: 0, changedFiles: $n}')" gate --expect-head "$SHA" > "$TMP/big.out" 2>&1 || RC=$?
+grep -q "Argument list too long" "$TMP/big.out" && fail "a big file list must not hit the argument limit"
+# Past the file read: no exit 70, and not read_meta's own "file list incomplete" halt. (The stub's
+# fake diff names no files, so the later diff read stops; that step is covered by scenario 21.)
+[ "$RC" -ne 70 ] || fail "a big file list must not crash the file read (70): $(tail -3 "$TMP/big.out")"
+grep -q "PR #1 file list incomplete" "$TMP/big.out" && fail "a big file list must be read whole: $(tail -3 "$TMP/big.out")"
 grep -q '^pr merge' "$GH_LOG" && fail "no merge may run on an incomplete file list"
 teardown
 
