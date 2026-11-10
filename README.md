@@ -127,10 +127,11 @@ Add cards to `Ready`. The board drains on its own.
 | [`/super-review`](skills/super-review/README.md) | Reviewer lane: own hypotheses, remembers prior findings, merge gate. |
 | [`/pr-security-review`](skills/pr-security-review/README.md) | Security pass on red and boundary amber cards; super-qa runs it, findings fail QA. |
 
-**Kept here, not installed into apps — 2 skills**
+**Kept here, not installed into apps — 3 skills**
 
 | Skill | What it does |
 |---|---|
+| [`/mockup`](skills/mockup/SKILL.md) | One-hour clickable mock-up of the core loop; installing it is #60. |
 | [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
 
