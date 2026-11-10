@@ -461,7 +461,7 @@ jq -e '.skills | (has("grill-me") or has("security-audit") or has("implement-spe
 jq -e '(.skills | has("tdd") and has("code-review")) and .version == 1' "$T/skills-lock.json" >/dev/null || fail "helper lock entries and other keys must stay"
 echo "$OUT" | grep -q "🧹 pruned .* retired: .*grill-me.*(backup: .claude/super-board/backup/" || fail "prune should be one grouped line naming the backup: $OUT"
 echo "$OUT" | grep -q "💡 want them user-wide? npx skills add -g mattpocock/skills --skill setup-matt-pocock-skills" || fail "prune should suggest npx skills add -g for the moved-out skills: $OUT"
-echo "$OUT" | grep -q "ozbg/funl-factory --skill visual" || fail "the suggestion should cover visual: $OUT"
+echo "$OUT" | grep -q "ozbg/funl-factory-master --skill visual" || fail "the suggestion should cover visual: $OUT"
 BEFORE=$(snapshot "$T")
 OUT=$("$INSTALL" "$T" 2>&1)
 [ "$(snapshot "$T")" = "$BEFORE" ] || fail "a second install after a prune changed the tree: $(diff <(echo "$BEFORE") <(snapshot "$T"))"

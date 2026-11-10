@@ -38,13 +38,13 @@ Before you start:
 In your project folder:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ozbg/funl-factory/main/get.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ozbg/funl-factory-master/main/get.sh | bash
 ```
 
 Or as a Claude Code plugin:
 
 ```
-/plugin marketplace add ozbg/funl-factory
+/plugin marketplace add ozbg/funl-factory-master
 /plugin install super-board@super-board
 ```
 
@@ -78,7 +78,7 @@ canonical skill files; the package bundles no private skill. See
 ### 1. Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ozbg/funl-factory/main/get.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ozbg/funl-factory-master/main/get.sh | bash
 ```
 
 ### 2. Onboard
@@ -209,7 +209,7 @@ Commits, tickets, PR bodies and comments all follow [one writing standard](https
 
 ## Credits
 
-`funl-factory` is the owner's copy of the pack; `super-board` stays the engine and skill name. It is the `ozbg/funl-factory` fork of Eric Tech's original [EricTechPro/super-board](https://github.com/EricTechPro/super-board), forked at v3.3.0 and kept under the same MIT license; all credit for the pack goes to Eric. MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://github.com/obra/superpowers), [mattpocock/skills](https://github.com/mattpocock/skills), [BuilderIO/skills](https://github.com/BuilderIO/skills) and [tt-a1i/archify](https://github.com/tt-a1i/archify). `pr-security-review` is ported from [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review) (MIT © 2025 Anthropic, [notice](skills/pr-security-review/LICENSE)).
+`funl-factory-master` is the owner's copy of the pack; `super-board` stays the engine and skill name. It is the `ozbg/funl-factory-master` fork of Eric Tech's original [EricTechPro/super-board](https://github.com/EricTechPro/super-board), forked at v3.3.0 and kept under the same MIT license; all credit for the pack goes to Eric. MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://github.com/obra/superpowers), [mattpocock/skills](https://github.com/mattpocock/skills), [BuilderIO/skills](https://github.com/BuilderIO/skills) and [tt-a1i/archify](https://github.com/tt-a1i/archify). `pr-security-review` is ported from [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review) (MIT © 2025 Anthropic, [notice](skills/pr-security-review/LICENSE)).
 
 ---
 
