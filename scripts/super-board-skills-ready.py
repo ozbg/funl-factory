@@ -17,25 +17,26 @@ import subprocess
 import sys
 
 POLICY = 'skills/super-build/references/decision-policy.md'
+# Every required name here is a pack or helper skill in skills/families.json, or has a
+# fallback below; a name the installers never fetch would halt every lane.
 REGISTRY = {
     'build_rows': [(['bug'], ['mattpocock-skills:diagnosing-bugs', 'mattpocock-skills:tdd']),
-                   (['feature'], ['mattpocock-skills:implement', 'mattpocock-skills:tdd', 'mattpocock-skills:codebase-design']),
-                   (['ux'], ['mattpocock-skills:implement', 'mattpocock-skills:tdd']),
-                   (['refactor', 'tech-debt'], ['mattpocock-skills:codebase-design', 'mattpocock-skills:tdd']),
+                   (['feature'], ['mattpocock-skills:tdd']),
+                   (['ux'], ['mattpocock-skills:tdd']),
+                   (['refactor', 'tech-debt'], ['mattpocock-skills:tdd']),
                    (['tests'], ['mattpocock-skills:tdd']), (['docs'], [])],
     'default': ['mattpocock-skills:tdd'],
     'boundaries': {
-        'build': ['ponytail:ponytail', 'verification-before-completion', 'mattpocock-skills:code-review'],
+        'build': ['ponytail:ponytail', 'verification-before-completion'],
         'qa': ['mattpocock-skills:tdd', 'mattpocock-skills:diagnosing-bugs', 'verification-before-completion',
                'testing-strategy', 'mattpocock-skills:code-review', 'pr-security-review'],
         'review': ['mattpocock-skills:code-review', 'mattpocock-skills:codebase-design']},
     'conditional': {
-        'build': ['vitest', 'playwright-best-practices', 'testing-strategy',
-                  'mattpocock-skills:resolving-merge-conflicts', 'mattpocock-skills:domain-modeling'],
-        'qa': ['mattpocock-skills:ask-matt', 'vitest', 'playwright-best-practices'], 'review': []},
-    'optional': {'build': [], 'qa': ['security-audit'], 'review': ['ponytail:ponytail-review']},
-    'aliases': {'mattpocock-skills': ['diagnosing-bugs', 'tdd', 'implement', 'codebase-design', 'code-review',
-                                   'resolving-merge-conflicts', 'domain-modeling', 'ask-matt', 'to-spec', 'to-tickets', 'implement-spec', 'improve-codebase-architecture'],
+        'build': ['vitest', 'playwright-best-practices', 'testing-strategy', 'mattpocock-skills:domain-modeling'],
+        'qa': ['vitest', 'playwright-best-practices'], 'review': []},
+    'optional': {'build': [], 'qa': [], 'review': ['ponytail:ponytail-review']},
+    'aliases': {'mattpocock-skills': ['diagnosing-bugs', 'tdd', 'codebase-design', 'code-review', 'domain-modeling',
+                                   'improve-codebase-architecture', 'to-spec', 'to-tickets'],
                 'ponytail': ['ponytail', 'ponytail-review']},
     # Skills no installer fetches fall back to a checklist in the decision policy (#29).
     'fallbacks': {'ponytail:ponytail': {'id': 'simplest-solution-first', 'source': POLICY + '#simplest-solution-first'},
@@ -43,7 +44,7 @@ REGISTRY = {
                   'testing-strategy': {'id': 'testing-strategy', 'source': POLICY + '#testing-strategy'},
                   'ponytail:ponytail-review': {'id': 'over-engineering-ladder', 'source': 'skills/super-review/SKILL.md#over-engineering'}},
 }
-CORE = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'visual', 'git-sync', 'ui-refine-loop', 'pr-security-review']
+CORE = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'git-sync', 'pr-security-review', 'north-star']
 LANES = ['build', 'qa', 'review']
 NAME = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]*(?::[a-zA-Z0-9][a-zA-Z0-9._-]*)?\Z')
 INTERACTIVE = {'grilling', 'shape', 'clarify', 'mattpocock-skills:grilling', 'mattpocock-skills:shape', 'mattpocock-skills:clarify'}
@@ -404,7 +405,7 @@ def report(root, host, cards=None, profile=None, lane=None, require=(), home=Non
             raise ValueError('each card needs number, status and literal body')
         chain = list(requirements(card, lane, require))
         if profile:
-            chain += [('setup', name, 'required', 'boundary: setup nine-skill installation') for name in CORE]
+            chain += [('setup', name, 'required', 'boundary: setup eight-skill pack installation') for name in CORE]
             for _, names in REGISTRY['build_rows']:
                 chain += [('build', name, 'required', 'label: ' + POLICY) for name in names]
         seen = set()

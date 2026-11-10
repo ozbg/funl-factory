@@ -1,6 +1,6 @@
 ---
 name: super-collect
-description: Find problems in one project, verify each, write one findings doc and hand it to Matt Pocock's /to-spec then /to-tickets; 1–5 tickets go to /implement-spec, 6+ to the super-board Backlog (no /to-spec or /to-tickets installed → files straight into Backlog). Source plug-ins - sentry (app errors), posthog (exceptions, rage/dead clicks, failure events, web vitals, tracking gaps), github (issues not on the board), prs (recurring problems in merged PRs and their review comments), architecture (refactor findings), plus any custom source added in onboard (an MCP server, HTTP API, CLI command or app). Each candidate is checked by one fresh verifier first. Dry-run by default. Use when the user says "super-collect", "/super-collect", "/super-collect sentry", "collect tickets", "triage errors onto the board", "what keeps breaking", or "find refactors".
+description: Find problems in one project, verify each, write one findings doc and hand it to Matt Pocock's /to-spec then /to-tickets; every ticket goes to the super-board Backlog (no /to-spec or /to-tickets installed → files straight into Backlog). Source plug-ins - sentry (app errors), posthog (exceptions, rage/dead clicks, failure events, web vitals, tracking gaps), github (issues not on the board), prs (recurring problems in merged PRs and their review comments), architecture (refactor findings), plus any custom source added in onboard (an MCP server, HTTP API, CLI command or app). Each candidate is checked by one fresh verifier first. Dry-run by default. Use when the user says "super-collect", "/super-collect", "/super-collect sentry", "collect tickets", "triage errors onto the board", "what keeps breaking", or "find refactors".
 ---
 
 # super-collect — find problems, hand them to the planning chain
@@ -12,8 +12,8 @@ One job: find problems and turn them into tickets. The flow:
 3. Write ONE findings doc that groups what survived: `docs/super-board/findings/collect-<YYYY-MM-DD>.md`.
 4. `/to-spec` turns the findings doc into a spec.
 5. `/to-tickets` turns the spec into tickets.
-6. Build fork: **1–5 tickets → `/implement-spec`** (one session, no QA lane). **6+ tickets →
-   super-board**: each ticket goes to **Backlog**, then `/super-board lint` and `run`.
+6. Build fork: **every ticket → super-board**: 1–5 tickets and 6+ tickets alike go to **Backlog**,
+   then `/super-board lint` and `run`. (`/implement-spec` is retired and no longer installed.)
 
 No `/to-spec` or `/to-tickets` in this project → file each finding straight into Backlog
 (today's path, "Filing" below) and print why. super-collect never edits app code and never
@@ -161,8 +161,8 @@ After Verify, pick the route:
 python3 $S/collect_handoff.py route --root .     # {"route": "planning" | "backlog", "missing": [...], "reason": ...}
 ```
 
-It resolves `to-spec`, `to-tickets` and `implement-spec` (Matt Pocock's skills, installed by
-`get.sh`) with the pack's skills-ready resolver. `route: backlog` (either of the first two
+It resolves `to-spec` and `to-tickets` (Matt Pocock's skills, installed by `get.sh`; its
+`implement_spec` field is always null now that `implement-spec` is retired) with the pack's skills-ready resolver. `route: backlog` (either of the first two
 missing) or `--direct` → skip to **Filing** below and print the `reason` line in the report.
 
 `route: planning`:
@@ -179,11 +179,9 @@ missing) or `--direct` → skip to **Filing** below and print the `reason` line 
    `--adopt <n>`: it is already a ticket.
 3. Run `/to-spec` on the findings doc. It writes the spec; answer its seam question from the doc.
 4. Run `/to-tickets` on that spec. Count the tickets it publishes.
-5. `python3 $S/collect_handoff.py fork --tickets <n>` (add `--no-implement-spec` when route
-   said `implement_spec: null`):
-   - **1–5 tickets → `/implement-spec <spec>`**: one session, its own review, no QA lane.
-     super-collect does not build: it prints the command; on confirm it starts it.
-   - **6+ tickets → super-board**: add each ticket to Backlog with
+5. `python3 $S/collect_handoff.py fork --tickets <n> --no-implement-spec` (always: the
+   1–5 ticket `/implement-spec` fork is retired):
+   - **1–5 tickets and 6+ tickets → super-board**: add each ticket to Backlog with
      `$S/super-collect-file.sh --config <cfg> --adopt <n> --type bug|feature|refactor --yes`,
      then `/super-board lint`. Build → QA (with the security check) → Review → merge gate.
    - Tickets in a local tracker (files, not GitHub issues) cannot go on the board: report
@@ -239,7 +237,7 @@ Report     docs/super-board/runs/collect-funnel-2026-10-02.md
 Next       /super-board lint  — nothing here is in Ready
 ```
 
-1–5 tickets: `Build 3 tickets → /implement-spec #430` and `Next /implement-spec #430`.
+1–5 tickets report the same Backlog lines as 6+; `/implement-spec` is no longer suggested.
 Direct path: a `Route backlog — /to-tickets not installed in <root> …` line, then today's
 `Filed` / `Recurrence` / `Gaps` lines (`Filed #412 bug Checkout 500 on empty cart (err|sentry|4411)`).
 

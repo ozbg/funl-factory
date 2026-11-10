@@ -12,8 +12,9 @@ import time
 import unittest
 
 KIT = Path(os.environ.get('SB_TEST_PACK', Path(__file__).resolve().parents[1]))
-NAMES = ['super-board','super-build','super-qa','super-review','super-collect','visual','git-sync','ui-refine-loop','pr-security-review',
-         'tdd','implement','codebase-design','code-review','diagnosing-bugs','verification-before-completion','testing-strategy']
+MANIFEST = json.loads((KIT / 'skills/families.json').read_text())
+NAMES = [n for f in MANIFEST.values() if f.get('install') == 'pack' for n in f['skills']] + [
+         'tdd','codebase-design','code-review','diagnosing-bugs','verification-before-completion','testing-strategy']
 
 class Dispatch(unittest.TestCase):
     def setUp(self):
@@ -107,7 +108,7 @@ output.write_text(json.dumps(result))
 
     def test_removed_skill_after_wave_check_halts_before_worker(self):
         self.full()
-        self.env['REMOVE_AFTER_GRADE']=str(self.root/'.agents/skills/code-review/SKILL.md')
+        self.env['REMOVE_AFTER_GRADE']=str(self.root/'.agents/skills/tdd/SKILL.md')
         result=self.invoke('super-board-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready","body":""}]','--codex')
         self.assertEqual(result.returncode,10,result.stderr)
         calls=[c for c in self.calls() if c['tool']=='codex']
@@ -286,20 +287,21 @@ else:sys.exit('unexpected gh call: '+str(args))
             self.assertTrue(any(e['status']=='missing' for e in output['helper_readiness']['entries']))
             self.assertNotIn("Matt Pocock's coding skills added",output.get('fixed',[]))
         npx=[c['args'] for c in self.calls() if c['tool']=='npx']
-        # One `fix` without --no-helpers: Matt Pocock's pack, then the optional security-audit.
+        # One `fix` without --no-helpers: each helper source once, every helper named.
         self.assertEqual(len(npx),2,npx)
-        self.assertIn('mattpocock/skills',npx[0])
-        self.assertEqual(npx[1][npx[1].index('add'):],['add','cloudflare/security-audit-skill','--skill','security-audit','-a','claude-code','-y'])
+        self.assertIn('mattpocock/skills',npx[0]); self.assertNotIn('*',npx[0])
+        self.assertEqual(npx[1][npx[1].index('add'):],['add','obra/superpowers','--skill','verification-before-completion','-a','claude-code','-y'])
+        named={a for c in npx for a in c[c.index('add'):]}
+        self.assertTrue(set(MANIFEST['helpers']['skills']) <= named)
+        self.assertFalse(named & {'security-audit','cloudflare/security-audit-skill'})
 
-    def test_setup_security_audit_is_optional_and_lock_detected(self):
+    def test_setup_no_longer_installs_security_audit(self):
         self.full('claude')
-        (self.root/'skills-lock.json').write_text('{"mattpocock/skills":true,"cloudflare/security-audit-skill":true}')
         for command,extra in [('check',[]),('fix',[])]:
             result=subprocess.run([sys.executable,str(KIT/'scripts/super-board-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
             output=json.loads(result.stdout)
-            self.assertTrue(output['security_audit'],result.stdout)
-            entry=next(e for e in output['helper_readiness']['entries'] if e['name']=='security-audit')
-            self.assertEqual(entry['requirement'],'optional')
-        self.assertEqual([c for c in self.calls() if c['tool']=='npx'],[])
+            self.assertNotIn('security_audit',output,result.stdout)
+            self.assertNotIn('security-audit',[e['name'] for e in output['helper_readiness']['entries']])
+        self.assertFalse(any('security-audit' in ' '.join(c['args']) for c in self.calls() if c['tool']=='npx'))
 
 if __name__=='__main__':unittest.main()

@@ -27,18 +27,20 @@ decoys_intact() { [ "$(ls "$1/.claude/skills" | grep -c '^decoy')" -eq 3 ]; }
 unset CODEX_THREAD_ID CODEX_SESSION_ID SUPER_BOARD_HOST
 
 SKILLS="super-board super-build super-qa super-review"
-ALL_SKILLS="$SKILLS super-collect ui-refine-loop visual git-sync pr-security-review"
+# The pack, from the manifest: the families install.sh puts in an app.
+ALL_SKILLS="$(python3 -c 'import json; d=json.load(open("../skills/families.json")); print(" ".join(n for f in d.values() if f.get("install") == "pack" for n in f["skills"]))')"
+[ "$(echo $ALL_SKILLS | wc -w | tr -d ' ')" -eq 8 ] || fail "the manifest should name 8 pack skills, got: $ALL_SKILLS"
 
-# 1 — a fresh project: plain directories, nothing to preserve. Every primary and
-#     secondary skill lands, and both workflows.
+# 1 — a fresh project: plain directories, nothing to preserve. Exactly the 8 pack
+#     skills land (not ui-refine-loop or visual), and the wave workflow alone.
 T=$(mktemp -d)
 "$INSTALL" "$T" >/dev/null 2>&1
 for s in $ALL_SKILLS; do
   [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "plain layout: $s/SKILL.md missing"
 done
-for w in super-board-wave.js ui-refine-loop.js; do
-  [ -f "$T/.claude/workflows/$w" ] || fail "workflow $w was not installed"
-done
+[ "$(ls "$T/.claude/skills" | wc -l | tr -d ' ')" -eq 8 ] || fail "fresh install should hold exactly 8 skills, got: $(ls "$T/.claude/skills")"
+[ "$(ls "$T/.claude/workflows")" = "super-board-wave.js" ] || fail "only the wave workflow ships, got: $(ls "$T/.claude/workflows")"
+[ -e "$T/.claude/super-board/backup" ] && fail "a fresh install has nothing to prune or back up"
 rm -rf "$T"
 
 # 2 — a project that symlinks .claude/skills/<name> at a real tree elsewhere.
@@ -123,7 +125,7 @@ for flags in '--protect-main' '--no-hooks --protect-main'; do
   for group in scripts workflows hooks; do
     diff -qr "../$group" "$PACK/$group" >/dev/null || fail "linked helper refresh changed source $group"
   done
-  for file in bin/super-board-run.sh workflows/super-board-wave.js hooks/guard-protected-push.py; do
+  for file in bin/super-board-wave-plan.sh workflows/super-board-wave.js hooks/guard-protected-push.py; do
     [ -L "$T/.claude/$file" ] || fail "linked helper refresh replaced $file"
     [ -s "$T/.claude/$file" ] || fail "linked helper refresh emptied $file"
   done
@@ -168,14 +170,17 @@ rm -rf "$T"
 #     whose script was never installed fails only when a user reaches for it.
 T=$(mktemp -d)
 "$INSTALL" "$T" >/dev/null 2>&1
-for s in super-board-run.sh super-board-stop.sh super-board-wave-plan.sh \
-         super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-card.sh super-board-throttle.sh super-board-scorecard.py super-board-host.sh \
+for s in super-board-stop.sh super-board-wave-plan.sh \
+         super-board-card.sh super-board-throttle.sh super-board-scorecard.py super-board-host.sh \
          super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-usage.sh super-board-pr-body.sh \
          super-review-file-refactor.sh super-qa-file-bug.sh; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
 done
-# The Codex shim runs the shared launcher installed beside it.
-[ -x "$T/.agents/bin/super-board-lane.sh" ] && [ -e "$T/.agents/bin/super-board-codex-lane.sh" ] || fail "super-board-lane.sh must sit next to its codex shim in .agents/bin"
+# The retired lane and codex launchers are not installed.
+for s in super-board-run.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh; do
+  [ ! -e "$T/.agents/bin/$s" ] && [ ! -e "$T/.claude/bin/$s" ] || fail "retired $s was installed"
+done
+[ -f "$T/.claude/bin/super-board-manifest.json" ] || fail "the manifest must ride along in bin/ for the setup script"
 rm -rf "$T"
 
 # 6 — guard hooks: scripts copied, settings merged into an existing file without
@@ -290,7 +295,7 @@ rm -rf "$T"
 T=$(mktemp -d); printf '# AGENTS.md\n- mine\n' > "$T/AGENTS.md"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
 [ "$(cat "$T/AGENTS.md")" = "$(printf '# AGENTS.md\n- mine')" ] || fail "install must not add a block uninvited"
-for s in super-board-skills-ready.py super-board-host.sh super-board-codex-wave.sh super-board-codex-lane.sh super-board-env-check.sh super-board-merge-policy.py super-board-agents-md.py super-board-settings.py super-board-setup.py; do
+for s in super-board-skills-ready.py super-board-host.sh super-board-env-check.sh super-board-merge-policy.py super-board-agents-md.py super-board-settings.py super-board-setup.py; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed"
 done
 rm -rf "$T"
@@ -306,7 +311,7 @@ T=$(mktemp -d)
 OUT=$("$INSTALL" "$T" 2>&1)
 [ -d "$T/.agents/skills/super-board" ] && [ ! -L "$T/.agents/skills/super-board" ] || fail "fresh: .agents/skills/super-board should be a real directory"
 [ -f "$T/.agents/bin/super-board-host.sh" ] && [ ! -L "$T/.agents/bin/super-board-host.sh" ] || fail "fresh: .agents/bin should hold real files"
-[ -x "$T/.agents/bin/super-board-run.sh" ] || fail "fresh: .agents/bin scripts must be executable"
+[ -x "$T/.agents/bin/super-board-wave-plan.sh" ] || fail "fresh: .agents/bin scripts must be executable"
 resolves "$T" claude
 [ -L "$T/.claude/skills/super-board" ] || fail "fresh: .claude/skills/super-board should be a link"
 [ "$(readlink "$T/.claude/skills/super-board")" = "../../.agents/skills/super-board" ] || fail "fresh: links must be relative, got $(readlink "$T/.claude/skills/super-board")"
@@ -352,12 +357,12 @@ mkdir -p "$T/.claude/skills/super-board" "$T/.claude/skills/super-qa" "$T/.claud
 echo "1.8.2" > "$T/.claude/skills/super-board/VERSION"; echo old > "$T/.claude/skills/super-board/SKILL.md"
 echo old > "$T/.claude/skills/super-board/stale-file.md"
 echo mine > "$T/.claude/skills/other-skill/SKILL.md"
-echo old > "$T/.claude/bin/super-board-run.sh"; echo mine > "$T/.claude/bin/mine.sh"
+echo old > "$T/.claude/bin/super-board-wave-plan.sh"; echo mine > "$T/.claude/bin/mine.sh"
 echo old > "$T/.claude/workflows/super-board-wave.js"; echo mine > "$T/.claude/hooks/my-hook.py"
 echo old > "$T/.claude/hooks/guard-secrets.py"
 "$INSTALL" "$T" >/dev/null 2>&1 || fail "upgrade from a real-directory install failed"
 resolves "$T" claude
-for p in skills/super-board skills/super-qa bin/super-board-run.sh workflows/super-board-wave.js hooks/guard-secrets.py; do
+for p in skills/super-board skills/super-qa bin/super-board-wave-plan.sh workflows/super-board-wave.js hooks/guard-secrets.py; do
   [ -L "$T/.claude/$p" ] || fail "upgrade: .claude/$p should now be a link into .agents/"
 done
 [ ! -e "$T/.agents/skills/super-board/stale-file.md" ] || fail "upgrade: stale files must not carry over"
@@ -393,7 +398,7 @@ ln -s ../.agents/skills "$T/.claude/skills"; ln -s ../.agents/bin "$T/.claude/bi
 plant_decoys "$T"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1 || fail "whole-folder link layout failed"
 [ -d "$T/.agents/skills/super-board" ] && [ ! -L "$T/.agents/skills/super-board" ] || fail "whole-folder link: skill turned into a self-link"
-[ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/super-board-run.sh" ] || fail "whole-folder link: files missing"
+[ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/super-board-wave-plan.sh" ] || fail "whole-folder link: files missing"
 decoys_intact "$T" || fail "whole-folder link: DECOYS DESTROYED"
 rm -rf "$T"
 
@@ -409,6 +414,82 @@ done
 echo "$OUT" | grep -q "copied" || fail "no-symlink install should say it copied, got: $OUT"
 rm -rf "$T" "$FAKE"
 
+# 20 — upgrade over an app that grew to 49 skills: the 9 skills an older pack installed
+#      (.agents/ copies linked from .claude/), Matt Pocock's whole set (--skill '*') and
+#      Cloudflare's security-audit in skills-lock.json, plus one helper the owner added
+#      by hand. The install ends with exactly the 26 the manifest names; every pruned
+#      entry and the old lock are backed up first; a second run changes nothing.
+MATT="ask-matt chief-of-staff claude-handoff code-review codebase-design diagnosing-bugs domain-modeling
+git-guardrails-claude-code grill-me grill-with-docs grilling handoff implement implement-spec
+improve-codebase-architecture loop-me migrate-to-shoehorn pr prototype research retro scaffold-exercises
+setup-matt-pocock-skills setup-pre-commit setup-ts-deep-modules tdd teach to-questionnaire to-spec to-tickets
+triage wait-what wayfinder wizard writing-beats writing-for-agents writing-fragments writing-shape"
+OLD_PACK="super-board super-build super-qa super-review super-collect git-sync pr-security-review ui-refine-loop visual"
+skill() { mkdir -p "$1/$2"; printf -- '---\nname: %s\ndescription: x\n---\n' "$2" > "$1/$2/SKILL.md"; }
+T=$(mktemp -d); mkdir -p "$T/.agents/bin" "$T/.agents/workflows" "$T/.claude/bin" "$T/.claude/workflows"
+for s in $OLD_PACK; do skill "$T/.agents/skills" "$s"; mkdir -p "$T/.claude/skills"; ln -s "../../.agents/skills/$s" "$T/.claude/skills/$s"; done
+for s in super-board-run.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh; do
+  echo old > "$T/.agents/bin/$s"; ln -s "../../.agents/bin/$s" "$T/.claude/bin/$s"
+done
+echo old > "$T/.agents/workflows/ui-refine-loop.js"; ln -s ../../.agents/workflows/ui-refine-loop.js "$T/.claude/workflows/ui-refine-loop.js"
+for s in $MATT security-audit verification-before-completion; do skill "$T/.claude/skills" "$s"; done
+python3 - "$T/skills-lock.json" $MATT <<'PY'
+import json, sys
+skills = {n: {"source": "mattpocock/skills", "sourceType": "github"} for n in sys.argv[2:]}
+skills["security-audit"] = {"source": "cloudflare/security-audit-skill", "sourceType": "github"}
+json.dump({"version": 1, "skills": skills}, open(sys.argv[1], "w"), indent=2)
+PY
+[ "$(ls "$T/.claude/skills" | wc -l | tr -d ' ')" -eq 49 ] || fail "fixture should start with 49 skills"
+cp "$T/skills-lock.json" "$T/lock-before.json"
+OUT=$("$INSTALL" "$T" 2>&1) || fail "upgrade over 49 skills failed: $OUT"
+WANT=$(python3 -c 'import json; d=json.load(open("../skills/families.json")); print("\n".join(sorted([n for f in d.values() if f.get("install") == "pack" for n in f["skills"]] + list(d["helpers"]["skills"]))))')
+[ "$(echo "$WANT" | wc -l | tr -d ' ')" -eq 26 ] || fail "the manifest should name 26 installed skills"
+[ "$(ls "$T/.claude/skills" | sort)" = "$WANT" ] || fail "upgrade should leave exactly the 26 manifest skills: $(diff <(echo "$WANT") <(ls "$T/.claude/skills" | sort))"
+[ "$(ls "$T/.agents/skills" | sort)" = "$(echo $ALL_SKILLS | tr ' ' '\n' | sort)" ] || fail ".agents/skills should hold the 8 pack skills, got: $(ls "$T/.agents/skills")"
+for s in super-board-run.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh; do
+  [ ! -e "$T/.agents/bin/$s" ] && [ ! -L "$T/.claude/bin/$s" ] || fail "retired $s was not pruned"
+done
+[ ! -e "$T/.agents/workflows/ui-refine-loop.js" ] && [ ! -L "$T/.claude/workflows/ui-refine-loop.js" ] || fail "ui-refine-loop.js was not pruned"
+B=$(ls -d "$T"/.claude/super-board/backup/*/ | head -1)
+[ "$(ls -d "$T"/.claude/super-board/backup/*/ | wc -l | tr -d ' ')" -eq 1 ] || fail "one prune should write one backup folder"
+[ -f "$B/.claude/skills/grill-me/SKILL.md" ] && [ -f "$B/.claude/skills/security-audit/SKILL.md" ] || fail "pruned helpers must be backed up first"
+[ -f "$B/.agents/skills/visual/SKILL.md" ] && [ -L "$B/.claude/skills/visual" ] || fail "pruned pack copies and links must be backed up (links as links)"
+[ -f "$B/.agents/bin/super-board-run.sh" ] && [ -f "$B/.agents/workflows/ui-refine-loop.js" ] || fail "pruned scripts and workflows must be backed up"
+cmp -s "$B/skills-lock.json" "$T/lock-before.json" || fail "skills-lock.json must be backed up before it changes"
+jq -e '.skills | (has("grill-me") or has("security-audit") or has("implement-spec")) | not' "$T/skills-lock.json" >/dev/null || fail "pruned lock entries must be dropped"
+jq -e '(.skills | has("tdd") and has("to-spec")) and .version == 1' "$T/skills-lock.json" >/dev/null || fail "helper lock entries and other keys must stay"
+echo "$OUT" | grep -q "🧹 pruned .* retired: .*grill-me.*(backup: .claude/super-board/backup/" || fail "prune should be one grouped line naming the backup: $OUT"
+echo "$OUT" | grep -q "💡 want them user-wide? npx skills add -g mattpocock/skills --skill setup-matt-pocock-skills" || fail "prune should suggest npx skills add -g for the moved-out skills: $OUT"
+echo "$OUT" | grep -q "ozbg/funl-factory --skill visual" || fail "the suggestion should cover visual: $OUT"
+BEFORE=$(snapshot "$T")
+OUT=$("$INSTALL" "$T" 2>&1)
+[ "$(snapshot "$T")" = "$BEFORE" ] || fail "a second install after a prune changed the tree: $(diff <(echo "$BEFORE") <(snapshot "$T"))"
+echo "$OUT" | grep -q "pruned" && fail "a second install must prune nothing: $OUT"
+rm -rf "$T"
+
+# 21 — never the owner's: a retired name with no lock entry, one locked to another source,
+#      a retired pack name the owner links elsewhere, and a skills folder outside the
+#      target all stay. A link locked to Matt is removed without touching its target.
+T=$(mktemp -d); OUTSIDE=$(mktemp -d)
+skill "$T/.claude/skills" wayfinder; skill "$T/.claude/skills" grill-me; skill "$T/.claude/skills" ui-refine-loop
+skill "$T/my-visual" visual; ln -s ../../my-visual/visual "$T/.claude/skills/visual"
+skill "$OUTSIDE" implement; ln -s "$OUTSIDE/implement" "$T/.claude/skills/implement"
+mkdir -p "$T/.codex"; skill "$OUTSIDE/codex-skills" teach; ln -s "$OUTSIDE/codex-skills" "$T/.codex/skills"
+printf '{"skills":{"grill-me":{"source":"acme/skills"},"ui-refine-loop":{"source":"acme/skills"},"implement":{"source":"mattpocock/skills"},"teach":{"source":"mattpocock/skills"}}}\n' > "$T/skills-lock.json"
+plant_decoys "$T"
+"$INSTALL" --no-hooks "$T" >/dev/null 2>&1 || fail "owner-protection install failed"
+for s in wayfinder grill-me ui-refine-loop visual; do
+  [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "the owner's $s was pruned"
+done
+[ "$(readlink "$T/.claude/skills/visual")" = "../../my-visual/visual" ] || fail "the owner's visual link was changed"
+[ ! -L "$T/.claude/skills/implement" ] || fail "a link whose lock entry is Matt's should be pruned"
+[ -f "$OUTSIDE/implement/SKILL.md" ] || fail "pruning a link must never touch its target"
+[ -f "$OUTSIDE/codex-skills/teach/SKILL.md" ] || fail "a skills folder outside the target must never be pruned"
+jq -e '.skills | has("grill-me") and has("ui-refine-loop") and (has("implement") | not)' "$T/skills-lock.json" >/dev/null \
+  || fail "only retired-source lock entries may be dropped: $(cat "$T/skills-lock.json")"
+decoys_intact "$T" || fail "owner protection: DECOYS DESTROYED"
+rm -rf "$T" "$OUTSIDE"
+
 # 9 — the snippet the installer merges is the one hooks/README.md documents.
 python3 - ../hooks/README.md ../hooks/settings-snippet.json <<'PY' || fail "hooks/README.md snippet and hooks/settings-snippet.json differ"
 import json, re, sys
@@ -416,4 +497,4 @@ doc = re.search(r"```json\n(.*?)```", open(sys.argv[1]).read(), re.S).group(1)
 sys.exit(0 if json.loads(doc) == json.load(open(sys.argv[2])) else 1)
 PY
 
-echo "PASS: test-install.sh (24 scenarios)"
+echo "PASS: test-install.sh (26 scenarios)"

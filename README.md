@@ -8,7 +8,7 @@
 
 <p>Stop babysitting coding agents: cards you drop in Ready come back as tested, reviewed PRs.</p>
 
-<p>9 skills (5 you type, 4 the board runs) · 9 commands · 6 guard hooks</p>
+<p>8 skills (4 you type, 4 the board runs) · 9 commands · 6 guard hooks</p>
 
 <p>
 <img alt="Version" src="https://img.shields.io/badge/version-3.3.0-1f883d?style=flat-square">
@@ -51,16 +51,19 @@ Or as a Claude Code plugin:
 > [!NOTE]
 > The plugin ships the skills only. Run `/super-board:super-board onboard` and its 🔍 Checks step adds the guard hooks, scripts and workflows. Needs Claude Code, `gh`, `jq`, bash 3.2+ and Python 3.9+; the installer checks.
 
-### Security
+### What lands in your app
 
-Two security skills come with every install, and they stay separate:
+Exactly 26 skills: the 8 pack skills and the 18 helpers in the tables under [Skills](#skills),
+all listed in [`skills/families.json`](skills/families.json). Re-running the installer prunes
+retired skills (Cloudflare's `security-audit`, `implement`, `grill-me`, `visual`, the setup
+skills and the rest in the manifest's `retired` list), but only super-board's own copies and
+skills your `skills-lock.json` says came from `mattpocock/skills` or Cloudflare. Each is backed
+up first to `.claude/super-board/backup/<timestamp>/`. Skills you added from anywhere else stay.
+`--no-helper-skills` skips the helper download; `/super-board onboard` adds them later.
 
-| Skill | Runs | Covers |
-|---|---|---|
-| [`pr-security-review`](skills/pr-security-review/README.md) | **On every PR**, inside the QA lane. Each finding fails QA and goes back to Build. | The PR's diff against its base: high-confidence, exploitable bugs only. From Anthropic's [claude-code-security-review](https://github.com/anthropics/claude-code-security-review). |
-| `security-audit` | **Only when you ask** (`/security-audit`). The board never runs it. | The whole repository, in depth. From Cloudflare's [security-audit-skill](https://github.com/cloudflare/security-audit-skill), fetched at install with `npx skills`. |
-
-`--no-helper-skills` skips the `security-audit` download; `/super-board onboard` adds it later.
+[`pr-security-review`](skills/pr-security-review/README.md) runs on every PR inside the QA lane;
+each finding fails QA and goes back to Build. It is from Anthropic's
+[claude-code-security-review](https://github.com/anthropics/claude-code-security-review).
 Claude Code's built-in `/security-review` is left as it is.
 
 Running from Codex or OpenCode? See [supported hosts](docs/hosts.md) for tested versions, sign-in and gaps.
@@ -103,18 +106,17 @@ Add cards to `Ready`. The board drains on its own.
 
 ## Skills
 
-**9 skills (5 you type, 4 the board runs).** Uses [Matt Pocock skills](https://github.com/mattpocock/skills), ponytail, impeccable, humanizer, [Anthropic's security review](https://github.com/anthropics/claude-code-security-review) and [Cloudflare's security-audit](https://github.com/cloudflare/security-audit-skill).
+**8 skills (4 you type, 4 the board runs).** Uses [Matt Pocock skills](https://github.com/mattpocock/skills), ponytail, impeccable, humanizer, [Anthropic's security review](https://github.com/anthropics/claude-code-security-review).
 
 <!-- skills:start -->
-**You type — 5 skills**
+**You type — 4 skills**
 
 | Skill | What it does |
 |---|---|
 | [`/super-board`](skills/super-board/README.md) | Orchestrator: plans waves, runs Build → QA → Review, merges when green. |
 | [`/super-collect`](skills/super-collect/README.md) | Finds problems, verifies them, writes a findings doc for /to-spec and /to-tickets. |
-| [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
-| [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
 | [`/git-sync`](skills/git-sync/README.md) | Commit per logical change, merge-pull, push without force, report. |
+| [`/north-star`](skills/north-star/SKILL.md) | One short interview that fixes an app's why, must-haves and destination. |
 
 **The board runs — 4 skills**
 
@@ -124,6 +126,36 @@ Add cards to `Ready`. The board drains on its own.
 | [`/super-qa`](skills/super-qa/README.md) | Tester lane: evidence, test-gap check, screenshots, or bounce to Build. |
 | [`/super-review`](skills/super-review/README.md) | Reviewer lane: own hypotheses, remembers prior findings, merge gate. |
 | [`/pr-security-review`](skills/pr-security-review/README.md) | Security pass on every PR diff; super-qa runs it, findings fail QA. |
+
+**Kept here, not installed into apps — 2 skills**
+
+| Skill | What it does |
+|---|---|
+| [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
+| [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
+
+**Helpers installed beside the pack — 18 skills**
+
+| Skill | What it does |
+|---|---|
+| `/tdd` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Build lane: every change goes red, green, refactor. |
+| `/diagnosing-bugs` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Build lane on bug cards: reproduce and pin the cause first. |
+| `/code-review` ([mattpocock/skills](https://github.com/mattpocock/skills)) | QA and Review lanes: standards and spec review of a diff. |
+| `/codebase-design` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Review lane and refactors: deep-module design vocabulary. |
+| `/domain-modeling` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Build lane when a card touches domain terms, glossary or ADRs. |
+| `/verification-before-completion` ([obra/superpowers](https://github.com/obra/superpowers)) | Every lane: run the checks before claiming done. |
+| `/prototype` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Throwaway prototype that settles a design question before a ticket. |
+| `/to-spec` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Turns a findings doc or idea into a spec; super-collect hands off here. |
+| `/to-tickets` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Splits a spec into board tickets with acceptance criteria. |
+| `/grilling` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Stress-tests a plan with hard questions before it becomes tickets. |
+| `/research` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Primary-source research written up as a Markdown file in the repo. |
+| `/triage` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Sorts incoming issues into actionable, duplicate or won't-fix. |
+| `/improve-codebase-architecture` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Finds refactor candidates; feeds /super-collect architecture. |
+| `/handoff` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Writes a handoff note so the next session picks up cleanly. |
+| `/claude-handoff` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Hands the current task to a fresh Claude session. |
+| `/to-questionnaire` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Turns open questions into a questionnaire the owner answers. |
+| `/wizard` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Interactive bash wizard for steps only the owner can do. |
+| `/retro` ([mattpocock/skills](https://github.com/mattpocock/skills)) | Run retro: what worked, what broke, what to change next. |
 <!-- skills:end -->
 
 Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and `README.md`, add a line to `skills/families.json`, and this table updates itself.
@@ -195,7 +227,7 @@ Commits, tickets, PR bodies and comments all follow [one writing standard](https
 
 ## Credits
 
-`funl-factory` is the owner's copy of the pack; `super-board` stays the engine and skill name. It is the `ozbg/funl-factory` fork of Eric Tech's original [EricTechPro/super-board](https://github.com/EricTechPro/super-board), forked at v3.3.0 and kept under the same MIT license; all credit for the pack goes to Eric. MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://github.com/obra/superpowers), [mattpocock/skills](https://github.com/mattpocock/skills), [BuilderIO/skills](https://github.com/BuilderIO/skills) and [tt-a1i/archify](https://github.com/tt-a1i/archify). `pr-security-review` is ported from [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review) (MIT © 2025 Anthropic, [notice](skills/pr-security-review/LICENSE)); `security-audit` is [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT © 2025-2026 Cloudflare, Inc.), installed from its own repo, not bundled.
+`funl-factory` is the owner's copy of the pack; `super-board` stays the engine and skill name. It is the `ozbg/funl-factory` fork of Eric Tech's original [EricTechPro/super-board](https://github.com/EricTechPro/super-board), forked at v3.3.0 and kept under the same MIT license; all credit for the pack goes to Eric. MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://github.com/obra/superpowers), [mattpocock/skills](https://github.com/mattpocock/skills), [BuilderIO/skills](https://github.com/BuilderIO/skills) and [tt-a1i/archify](https://github.com/tt-a1i/archify). `pr-security-review` is ported from [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review) (MIT © 2025 Anthropic, [notice](skills/pr-security-review/LICENSE)).
 
 ---
 
@@ -220,8 +252,8 @@ Claude or Codex host. Missing required skills halt before claims or workers;
 lockfiles and arbitrary plugin caches do not count. The shared registry in
 `scripts/super-board-skills-ready.py` owns lane dependencies, overrides and the
 two declared ponytail fallbacks. The QA lane requires the bundled
-`pr-security-review`; Cloudflare's `security-audit` is an optional QA entry,
-so a missing copy never halts a run. Setup's full helper union may be red while a
+`pr-security-review`. Every required skill is a pack or helper skill in
+`skills/families.json`, or has a fallback. Setup's full helper union may be red while a
 selected card is runnable. Read-only checks never install; explicit onboard
 repair rechecks files after installation.
 

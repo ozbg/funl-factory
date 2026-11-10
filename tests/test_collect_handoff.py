@@ -66,7 +66,9 @@ class Handoff(unittest.TestCase):
         out = json.loads(self.run_cli("route", "--root", str(self.root)).stdout)
         self.assertEqual(out["route"], "planning")
         self.assertEqual(out["missing"], [])
-        self.assertTrue(out["implement_spec"])
+        # implement-spec is retired: the resolver no longer knows it, so even a leftover
+        # copy never routes 1–5 tickets away from the board Backlog.
+        self.assertIsNone(out["implement_spec"])
 
     def test_route_backlog_names_the_missing_skill(self):
         self.put("to-spec")

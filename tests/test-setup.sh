@@ -345,4 +345,34 @@ done
 N=$(find "$R/.claude/super-board/backup" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
 [ "$N" = 2 ] || fail "two fixes must keep two distinct backups, got $N"
 
-echo "PASS: test-setup.sh (14 scenarios)"
+# 15 — a config still naming a retired backend (claude-p, codex, a --codex flag) gets a
+#      one-line fix in check, and never turns the check red on its own.
+R="$WORK/legacy"; mkdir -p "$R"; git -C "$R" init -q
+python3 "$SETUP" fix --root "$R" --no-helpers >/dev/null || true
+C="$R/.claude/super-board/configs"; mkdir -p "$C"
+for v in '"worker_backend":"claude-p"' '"worker_backend":"codex"' '"worker_backend":"workflow","worker_args":"--codex"'; do
+  printf '{%s}' "$v" > "$C/a.json"; python3 "$SETUP" migrate-config "$C/a.json" >/dev/null
+  OUT=$(python3 "$SETUP" check --root "$R" || true)
+  echo "$OUT" | q '.legacy_backend | length == 1 and (.[0] | test("set \"worker_backend\": \"workflow\""))' \
+    || fail "legacy backend ($v) should get a one-line fix: $OUT"
+  GREEN=$(echo "$OUT" | jq -c '[.green, (.missing|length), (.configs|length)]')
+  TXT=$(python3 "$SETUP" check --root "$R" --text || true)
+  [ "$(echo "$TXT" | grep -c 'backend is retired')" = 1 ] || fail "text check should print the fix once: $TXT"
+done
+printf '{"worker_backend":"workflow"}' > "$C/a.json"; python3 "$SETUP" migrate-config "$C/a.json" >/dev/null
+OUT=$(python3 "$SETUP" check --root "$R" || true)
+echo "$OUT" | q '.legacy_backend == []' || fail "workflow backend needs no fix"
+[ "$(echo "$OUT" | jq -c '[.green, (.missing|length), (.configs|length)]')" = "$GREEN" ] || fail "a legacy backend alone must not change the check result"
+
+# 16 — helpers come from the manifest by name, never --skill '*', and no security-audit.
+python3 - "$SETUP" "$PACK/skills/families.json" <<'PY' || fail "HELPERS_CMD must name the 18 manifest helpers"
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("s", sys.argv[1]); s = importlib.util.module_from_spec(spec); spec.loader.exec_module(s)
+m = json.load(open(sys.argv[2]))
+assert "*" not in s.HELPERS_CMD and "security-audit" not in s.HELPERS_CMD, s.HELPERS_CMD
+assert all(f"--skill {n} " in s.HELPERS_CMD for n in m["helpers"]["skills"]), s.HELPERS_CMD
+assert s.SKILLS == [n for f in m.values() if f.get("install") == "pack" for n in f["skills"]]
+assert not {"super-board-run.sh", "super-board-lane.sh", "super-board-codex-lane.sh", "super-board-codex-wave.sh"} & set(s.BIN)
+PY
+
+echo "PASS: test-setup.sh (16 scenarios)"

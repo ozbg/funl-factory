@@ -2,7 +2,7 @@
 
 Finds problems in one project, checks each one, and writes one findings doc. Matt Pocock's
 `/to-spec` turns that doc into a spec and `/to-tickets` turns the spec into tickets. Then 1–5
-tickets go to `/implement-spec`; 6+ go to the super-board Backlog. See [routing](../../docs/super-board/routing.md).
+tickets and 6+ alike go to the super-board Backlog. See [routing](../../docs/super-board/routing.md).
 
 ## What It Does
 

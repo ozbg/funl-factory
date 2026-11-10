@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-"""Rewrite README.md's skill tables from skills/*/SKILL.md + skills/families.json.
+"""Rewrite README.md's skill tables from skills/*/SKILL.md + skills/families.json (the manifest).
 
     super-board-readme-sync.py           # rewrite README.md in place if stale
     super-board-readme-sync.py --check   # exit 1 if README.md is stale, write nothing
     super-board-readme-sync.py --hook    # Claude Code PostToolUse: sync only when the
                                          # edited file is under skills/; always exit 0
 
-Reads each skill's `name` and `description` frontmatter, groups skills by
-skills/families.json (you_type / board_runs, one brief each, under 15 words; an
-empty brief falls back to the description's first sentence), and
-replaces everything between <!-- skills:start --> and <!-- skills:end -->. Also
-updates every "N skills (N you type, N the board runs)" count, "**N skills**",
-the "— N skills" in each family title, and the skills badge.
+Reads each skill's `name` and `description` frontmatter, groups skills by the
+manifest's families (one brief each, under 15 words; an empty brief falls back to
+the description's first sentence), and replaces everything between
+<!-- skills:start --> and <!-- skills:end -->. Families marked "install": "pack"
+(you_type, board_runs) are what install.sh puts in an app; "none" (standalone) live
+in skills/ only; "helper" lists the helper skills get.sh fetches (one job each, no
+SKILL.md here); "prune" (retired) is not rendered. Also updates every "N skills
+(N you type, N the board runs)" count, "**N skills**", the "— N" in each family
+title, and the skills badge; those totals count the pack families only.
 
-Exit codes: 0 ok / rewritten, 1 stale (--check), 2 bad input (a skill missing
-from families.json or vice versa, a brief of 15+ words, missing markers).
+Exit codes: 0 ok / rewritten, 1 stale (--check), 2 bad input (a skill folder missing
+from families.json or vice versa, a helper missing from its sources, a brief of 15+
+words, missing markers).
 Stdlib only. Runs from any cwd; paths are relative to the pack root.
 """
 from __future__ import annotations
@@ -69,7 +73,8 @@ def render() -> tuple[str, dict[str, int]]:
     except (OSError, ValueError) as e:
         die(f"cannot read {FAMILIES.relative_to(ROOT)}: {e}")
     on_disk = {p.parent.name: p for p in SKILLS.glob("*/SKILL.md")}
-    listed = [s for fam in families.values() for s in fam["skills"]]
+    local = {k: f for k, f in families.items() if f.get("install", "pack") in ("pack", "none")}
+    listed = [s for fam in local.values() for s in fam["skills"]]
     missing = sorted(set(on_disk) - set(listed))
     extra = sorted(set(listed) - set(on_disk))
     if missing:
@@ -80,9 +85,23 @@ def render() -> tuple[str, dict[str, int]]:
     counts: dict[str, int] = {}
     parts: list[str] = []
     for fam_key, fam in families.items():
-        counts[fam_key] = len(fam["skills"])
+        kind = fam.get("install", "pack")
+        if kind == "prune":
+            continue
+        if kind == "pack":
+            counts[fam_key] = len(fam["skills"])
         title = re.sub(r"— \d+ ", f"— {len(fam['skills'])} ", fam["title"])
         parts += [f"**{title}**", "", "| Skill | What it does |", "|---|---|"]
+        if kind == "helper":
+            by_source = {n: src for src, names in fam.get("sources", {}).items() for n in names}
+            if sorted(by_source) != sorted(fam["skills"]):
+                die("helpers: every helper needs exactly one source in skills/families.json")
+            for skill, brief in fam["skills"].items():
+                if not brief or len(brief.split()) >= 15:
+                    die(f"helper {skill} needs a one-line job under 15 words")
+                parts.append(f"| `/{skill}` ([{by_source[skill]}](https://github.com/{by_source[skill]})) | {brief} |")
+            parts.append("")
+            continue
         for skill, brief in fam["skills"].items():
             fm = frontmatter(on_disk[skill])
             name = fm.get("name") or skill
