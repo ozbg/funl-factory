@@ -101,6 +101,10 @@
     "review": "session"
   },
 
+  // Optional (v2): per zone tier, then per lane. Wins over `lane_models` for that tier,
+  // e.g. {"red": {"build": "opus", "review": "opus"}}. Omit to keep `lane_models`.
+  "lane_models_by_tier": {},
+
   // DEPRECATED (v2): the `codex` block. Still accepted so old configs load.
   // Optional Codex lane settings. Used by explicit `run --codex` and usage
   // fallback; never selects the backend or grants Review/merge ownership.

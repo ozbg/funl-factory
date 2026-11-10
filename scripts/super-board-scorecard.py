@@ -207,9 +207,9 @@ def record(a):
             "cacheRead": sum(g["cache_read"] for g in mine),
             "tokenSplit": split,
             "usd": round(sum(g["usd"] for g in mine), 4),
-            "citation": None if c.get("number") in uncited else citation,
-            "uncited": c.get("number") in uncited,
-            "roundCapped": bool(c.get("round_capped") or a.round_capped),
+            "citation": None if (c.get("number") in uncited or c.get("uncitedBounce")) else citation,
+            "uncited": c.get("number") in uncited or bool(c.get("uncitedBounce")),
+            "roundCapped": bool(c.get("roundCapped") or c.get("round_capped") or a.round_capped),
             "minutes": round(sum(g["minutes"] for g in mine), 1),
             "agents": [g["id"] for g in mine],
         })

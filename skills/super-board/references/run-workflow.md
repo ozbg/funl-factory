@@ -227,6 +227,8 @@ Repeat until a done condition, a halt or a stop:
    `laneModels` is the config's `lane_models`, passed as is (omit it when unset). It sets
    the model per lane (classify, preflight, build, qa, review) over the tier; a lane it
    leaves out keeps the tier's choice. A bad value fails the wave before any agent runs.
+   `laneModelsByTier` is the config's `lane_models_by_tier` (omit when unset): per zone tier,
+   then per lane, for example the strongest model on red build and review.
 5. **Reconcile** (when the run completes) — read the returned `cards`
    summary. If `halted: true`, any card is `halted`, or the GitHub helper's `--check`
    fails, preserve claims and stop. For verification-readiness (exit 9), repair
