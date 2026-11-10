@@ -29,7 +29,28 @@
   // requires dynamic workflows enabled in /config. "claude-p" is the legacy
   // headless dispatcher (.claude/bin/super-board-run.sh) — explicit opt-in
   // only; the dispatcher refuses to run (exit 78) unless set here.
+  // DEPRECATED (v2): every value other than "workflow". Still accepted so old
+  // configs load; v2 lanes only run on the workflow backend.
   "worker_backend": "workflow",
+
+  // v2 zone map in the app repo: which paths are green, amber or red, and how hard
+  // each card is checked. Read by scripts/super-board-zone.py (card tier = highest
+  // zone of any file it touches; an unlisted file is amber). Default
+  // "docs/agents/zones.yaml". No file = every card is amber.
+  "zones": "docs/agents/zones.yaml",
+
+  // v2 fix rounds per zone before a card stops for a design decision or a split.
+  // Defaults green 1, amber 2, red 3. A zone's `max_rounds` in zones.yaml wins.
+  "max_rounds": { "green": 1, "amber": 2, "red": 3 },
+
+  // v2 ramp. stage: 1 | 2 | 3 (default 1). How much autonomy the factory has
+  // earned on this project; later tickets define what each stage unlocks.
+  "ramp": { "stage": 1 },
+
+  // v2 owner report. "merge-breach-ask" (default): report only on a merge, a
+  // breach of a red invariant or budget, or a question for the owner.
+  // "every-wave": one report per wave.
+  "digest": "merge-breach-ask",
 
   // Agent host this project runs on: "claude" | "codex" | "opencode". Separate from
   // worker_backend. Onboard and setup's fix ALWAYS write it (setup fills a missing key
@@ -62,7 +83,10 @@
   // The run's goal: a GitHub milestone title (factory #40). The planner runs Ready
   // cards from this milestone only; in-flight cards always finish. Each run starts
   // by asking the owner to confirm or change it. Absent = no goal filter.
-  "goal": { "milestone": null },
+  //   budget_usd — v2: spend cap for the goal, in API-equivalent dollars
+  //                (number; null = no cap).
+  //   foundation — v2: true when this goal lays the foundation (bool, default false).
+  "goal": { "milestone": null, "budget_usd": null, "foundation": false },
 
   // Optional per-lane models for Claude waves, over model_tier (factory #25).
   // Each lane is a model name, "session" (this orchestrator session's model),
@@ -77,6 +101,7 @@
     "review": "session"
   },
 
+  // DEPRECATED (v2): the `codex` block. Still accepted so old configs load.
   // Optional Codex lane settings. Used by explicit `run --codex` and usage
   // fallback; never selects the backend or grants Review/merge ownership.
   "codex": {
@@ -272,11 +297,12 @@
 
   // Controls Reviewer's adversarial mode (folded-in super-truth pattern).
   //   "off"          — never adversarial.
-  //   "non-trivial"  — (default) activates on cards with diff ≥10 lines OR
-  //                    labels in {security, migration, payments, auth}.
+  //   "red"          — (default, v2) only cards whose zone tier is red.
   //   "always"       — every card gets adversarial review
   //                    (cost: 2 sub-agent dispatches per card).
-  "truth_gate": "non-trivial",
+  //   "non-trivial"  — DEPRECATED (pre-v2 default): diff ≥10 lines OR labels in
+  //                    {security, migration, payments, auth}. Still accepted.
+  "truth_gate": "red",
 
   // Minimum aggregated sub-agent confidence (0-100) required to approve.
   // Default `70`. Below threshold, Reviewer must NOT approve; card moves to
@@ -310,6 +336,7 @@
   //             (super-board-codex-lane.sh without --codex). Review stays on
   //             Claude: cards that reach Review wait there for the next Claude
   //             wave. The launcher refuses a fallback lane without this value.
+  // DEPRECATED (v2): still accepted so old configs load.
   "usage_fallback": "none",
 
   // Required for Board dispatch and Board-controlled merges: at least one non-blank
@@ -346,6 +373,8 @@
   // Max consecutive failures in the same lane on the same root-cause hash
   // before the card auto-moves to Blocked. Default `2`. Root-cause hash
   // defined in §7 Halt gates.
+  // DEPRECATED (v2): replaced by per-zone `max_rounds`. Still accepted so old
+  // configs load.
   "rebuild_cap": 2,
 
   // When the count of Blocked cards exceeds this percent of the initial Ready
