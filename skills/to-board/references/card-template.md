@@ -50,6 +50,7 @@ Same sections. Differences:
 - **Mock-up:** the first screen of the core loop, when there is a mock-up.
 - ACs (test hints as usual):
   - the test command runs and passes
+  - the test command also runs the formatter check, the linter (no empty catch, no unhandled promises, no unused code, no `any`), strict type checking and a high-severity dependency audit, and all pass
   - the data model in spec.md § Data model exists, with a migration if there is a database
   - seed data matches the mock-up's sample data
   - one screen renders seed data, as in the mock-up

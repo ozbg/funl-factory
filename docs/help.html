@@ -68,6 +68,16 @@ th{font:600 12px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;col
 tr:last-child td{border-bottom:0}
 td:first-child{white-space:nowrap}
 .groupcap{font:600 12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 0}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin:0 0 12px;min-width:0}
+.stage .sh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.stage .sh h3{margin:0;font-size:18px}
+.stage .n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--panel);font:700 13px var(--f-mono)}
+.stage dl{display:grid;grid-template-columns:90px 1fr;gap:8px 16px;margin:0}
+.stage dt{font:600 12px/1.9 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.stage dd{margin:0;min-width:0;max-width:78ch}
+.stage ol{margin:0;padding-left:20px}
+.stage li{margin:2px 0}
+@media (max-width:560px){.stage dl{grid-template-columns:1fr;gap:2px}.stage dd{margin-bottom:8px}}
 .callout{border-left:3px solid var(--you);background:var(--you-soft);padding:12px 14px;border-radius:0 6px 6px 0;margin:8px 0 16px;max-width:76ch}
 .callout p:last-child{margin:0}
 footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid var(--line);margin-top:36px}
@@ -83,7 +93,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
 </header>
 
 <nav class="bar" aria-label="Sections"><div class="in">
-  <a href="#path">The path</a><a href="#stages">Stages</a><a href="#board">The board</a><a href="#zones">Zones</a><a href="#done">Done</a><a href="#models">Models</a><a href="#numbers">Numbers</a><a href="#you">Your calls</a><a href="#skills">Skills</a>
+  <a href="#path">The path</a><a href="#stages">Step by step</a><a href="#files">Where things live</a><a href="#board">The board</a><a href="#zones">Zones</a><a href="#security">Security</a><a href="#standards">Code standards</a><a href="#qa">QA</a><a href="#done">Done</a><a href="#models">Models</a><a href="#numbers">Numbers</a><a href="#you">Your calls</a><a href="#skills">Skills</a>
 </div></nav>
 
 <main class="wrap">
@@ -165,61 +175,76 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
 </section>
 
 <section id="stages">
-  <h2>Stages</h2>
-  <p class="sub">What goes in, what comes out, and who does the work.</p>
+  <h2>Step by step</h2>
+  <p class="sub">What each step does, what you do, what it produces, and how it feeds the next. Run every step in the same app folder: each one finds the last one's files by itself.</p>
+
+  <div class="stage">
+    <div class="sh"><span class="n">1</span><h3><span class="cmd">/north-star</span> · the vision</h3><span class="tag you">you answer</span></div>
+    <dl>
+      <dt>Does</dt><dd>A short interview. It listens first, then offers one-line guesses you accept or fix. It pins down why the app exists, the few things it must do, what it must never do, the one thing users do most (the core loop), and one small moment of delight. It reads back a <strong>postcard</strong>: two or three sentences describing a good day with the app. Then a fresh agent sketches the app from the postcard alone, and you score how close it is.</dd>
+      <dt>You</dt><dd>Answer at most 12 questions, say yes, nearly or no to the postcard, and score the sketch 1–5. Re-read it the next morning.</dd>
+      <dt>Output</dt><dd>A <strong>one-page vision</strong>, not a spec: <code>docs/shape/north-star.md</code>. It has the postcard, the north-star outcome, the core loop, numbered must-haves, must-nevers, the sparkle, nice-laters and what was assumed. No screens, fields or tech. Details you mentioned go to <code>docs/shape/later.md</code>; the run is logged in <code>docs/shape/north-star-log.jsonl</code>.</dd>
+      <dt>Next</dt><dd>Run <span class="cmd">/mockup</span> in the same folder. It reads <code>north-star.md</code> itself; you pass nothing.</dd>
+    </dl>
+  </div>
+
+  <div class="stage">
+    <div class="sh"><span class="n">2</span><h3><span class="cmd">/mockup</span> · the feel</h3><span class="tag you">you click</span></div>
+    <dl>
+      <dt>Does</dt><dd>Builds 2–3 <strong>radically different mock-ups</strong> of the core loop, all in one web page with fake but realistic data: one tab per step of the loop, a switch at the bottom to flip between versions, buttons that really do something. The sparkle is shown working, and every must-never visibly doesn't happen.</dd>
+      <dt>You</dt><dd>Click through each version, pick one, ask for at most two rounds of tweaks, then answer "Is that the postcard?" If a must-have turns out wrong, it sends you back to <span class="cmd">/north-star</span>.</dd>
+      <dt>Output</dt><dd><strong>A clickable mock-up</strong>: <code>docs/shape/mockup.html</code>, one file that opens with a double-click in any browser, your pick showing first. Each screen has a fixed name (<code>#screen-capture</code>) that the build cards link to, so builders copy the look. It adds a <code>Mock-up: … · postcard: yes</code> line to <code>north-star.md</code>; small tweaks go to <code>later.md</code>.</dd>
+      <dt>Next</dt><dd>Run <span class="cmd">/to-board</span> in the same folder. It reads the north star and the mock-up itself.</dd>
+    </dl>
+  </div>
+
+  <div class="stage">
+    <div class="sh"><span class="n">3</span><h3><span class="cmd">/to-board</span> · the plan and the cards</h3><span class="tag fac">factory decides</span></div>
+    <dl>
+      <dt>Does</dt><dd>
+        <ol>
+          <li>Reads the north star, the mock-up and any existing code, then makes the technical calls: stack, data model, how it's tested.</li>
+          <li>Writes the <strong>one-page build spec</strong>.</li>
+          <li>Drafts the zone map: which files are risky (red), features (amber) or looks only (green).</li>
+          <li>Cuts the work into cards: a foundation card first (the skeleton and one finished example of each pattern), a thin slice for each step of the core loop, and a Demo card last that walks the whole loop.</li>
+          <li>Blind review: a fresh agent checks the cards against the north star without seeing the spec, and Haiku reads every card and lists any question it would need answered. One round of fixes.</li>
+          <li>Shows you the card table with the verdict.</li>
+          <li>Commits and pushes its files, so builders can see them, then files the cards to the board and writes the coverage map.</li>
+        </ol>
+      </dd>
+      <dt>You</dt><dd>Look at the table once and say what's missing or unwanted. That's scope only; how it's cut is the factory's call. Then sign the zone map.</dd>
+      <dt>Output</dt><dd>
+        <code>docs/shape/spec.md</code>: the build spec (postcard on top, must-haves, must-nevers as numbered rules <code>I1</code>, <code>I2</code>…, volumes, tech decisions, data model, the data shapes where cards meet, the test command).<br>
+        <code>docs/agents/zones.yaml</code>: the draft zone map, for you to sign.<br>
+        <code>docs/shape/coverage.md</code>: which cards deliver each must-have, and the Demo card.<br>
+        The cards themselves, in the board's Ready column on GitHub.
+      </dd>
+      <dt>Next</dt><dd>Sign <code>zones.yaml</code>, then <span class="cmd">/super-board lint</span>. The files are already committed: builders work from <code>main</code> and only see what's there, so run <span class="cmd">/to-board</span> on <code>main</code>. Try it first with <span class="cmd">/to-board --dry-run</span>: it writes the spec and shows the table but files nothing.</dd>
+    </dl>
+  </div>
+
+  <div class="stage">
+    <div class="sh"><span class="n">4</span><h3><span class="cmd">/super-board run</span> · the build</h3><span class="tag fac">factory</span></div>
+    <dl>
+      <dt>Does</dt><dd>Drains the board in waves. For each card: a builder (Haiku, or Sonnet for red and flagged cards) works in its own copy of the code, writes the tests first, makes the change and opens a draft PR. QA proves every check. An Opus reviewer reads it, and the merge gate re-runs everything against the latest <code>main</code> before merging. Cards that don't pass go back, at most 1–3 times by zone, then wait in Blocked with the reason.</dd>
+      <dt>You</dt><dd>Nothing, unless a digest asks: a 🙋 card (money, auth, a destructive schema change, a live database) or a budget question.</dd>
+      <dt>Output</dt><dd>Merged PRs on <code>main</code>, cards in Done, a short digest on each merge, breach or question. <span class="cmd">/super-board status</span> shows where it is any time.</dd>
+      <dt>Next</dt><dd>When the Demo card is Done, use the app and check it against the postcard.</dd>
+    </dl>
+  </div>
+
+  <div class="stage">
+    <div class="sh"><span class="n">5</span><h3><span class="cmd">/super-board report</span> · the score</h3><span class="tag you">you read</span></div>
+    <dl>
+      <dt>Does</dt><dd>Puts the whole app on one page: how long Define took, days to build, cost against budget, how many cards passed first time, rework, rounds, whether the demo passed, and the postcard. Each against a target, with up to three things to change next time.</dd>
+      <dt>Output</dt><dd>Printed in the chat. With <code>--log</code>, one line in <code>docs/super-board/factory-log.jsonl</code>; <code>--compare</code> lists every app side by side.</dd>
+    </dl>
+  </div>
+
+  <p class="groupcap">Any time</p>
   <div class="grid">
     <div class="step">
-      <div class="n">1 · Define the destination</div>
-      <h3><span class="cmd">/north-star</span> <span class="tag you">you answer</span></h3>
-      <ul>
-        <li>≤ 3 questions a round, 12 at most</li>
-        <li>Must list: 3 for a prototype, 5 for a product</li>
-        <li>Ends with the postcard and a blind test you score 1–5</li>
-        <li>Out: <code>docs/shape/north-star.md</code>, <code>later.md</code>, a log line</li>
-      </ul>
-    </div>
-    <div class="step">
-      <div class="n">2 · Feel it</div>
-      <h3><span class="cmd">/mockup</span> <span class="tag you">you click</span></h3>
-      <ul>
-        <li>One HTML file, fake data, one tab per core-loop step</li>
-        <li>2–3 radically different versions; you pick one</li>
-        <li>At most 2 tweak rounds, then the postcard question</li>
-        <li>Out: <code>docs/shape/mockup.html</code>, a <code>Mock-up:</code> line on the north star</li>
-      </ul>
-    </div>
-    <div class="step">
-      <div class="n">3 · Plan the route</div>
-      <h3><span class="cmd">/to-board</span> <span class="tag fac">factory decides</span></h3>
-      <ul>
-        <li>One-page spec: postcard, must-haves, must-nevers as invariants, contracts</li>
-        <li>Cards Haiku can build without guessing; foundation first, Demo last</li>
-        <li>Blind reviewer + a Haiku read of every card, one fix round</li>
-        <li>You see the table and the verdict, and change scope only</li>
-        <li>Out: <code>spec.md</code>, <code>coverage.md</code>, draft <code>zones.yaml</code>, cards in Ready</li>
-      </ul>
-    </div>
-    <div class="step">
-      <div class="n">4 · Build</div>
-      <h3><span class="cmd">/super-board lint</span> then <span class="cmd">run</span> <span class="tag fac">factory</span></h3>
-      <ul>
-        <li>Lint checks Ready cards and coverage</li>
-        <li>Each wave: build, QA, review and merge through the gate</li>
-        <li>A digest on a merge, breach or ask; nothing else interrupts you</li>
-        <li><span class="cmd">status</span> any time; <span class="cmd">stop</span> to halt cleanly</li>
-      </ul>
-    </div>
-    <div class="step">
-      <div class="n">5 · Score it</div>
-      <h3><span class="cmd">/super-board report</span> <span class="tag you">you read</span></h3>
-      <ul>
-        <li>Define, Build, Cost, Done, each against a target</li>
-        <li><code>--log</code> adds the app to the factory log</li>
-        <li><code>--compare</code> shows every app side by side</li>
-      </ul>
-    </div>
-    <div class="step">
-      <div class="n">Any time · Keep it healthy</div>
+      <div class="n">After real use</div>
       <h3><span class="cmd">/super-collect</span> <span class="tag fac">factory</span></h3>
       <ul>
         <li>Pulls problems from Sentry, PostHog, GitHub, merged PRs, architecture</li>
@@ -227,7 +252,70 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
         <li>Verified findings go to Backlog in the card format</li>
       </ul>
     </div>
+    <div class="step">
+      <div class="n">Rescope</div>
+      <h3><span class="cmd">/north-star</span> again, then <span class="cmd">/to-board</span></h3>
+      <ul>
+        <li>Change the vision first, re-sign the postcard</li>
+        <li><span class="cmd">/to-board</span> updates the spec, files only new cards, and lists the ones to drop for you to close</li>
+      </ul>
+    </div>
+    <div class="step">
+      <div class="n">Try an idea</div>
+      <h3>An empty folder</h3>
+      <ul>
+        <li>Run <span class="cmd">/north-star</span> and <span class="cmd">/mockup</span> there, then <span class="cmd">/to-board --dry-run</span></li>
+        <li>Keep it? Copy its <code>docs/shape/</code> into the app's repo</li>
+      </ul>
+    </div>
   </div>
+</section>
+
+<section id="files">
+  <h2>Where things live</h2>
+  <p class="sub">Everything is a file in the app's repo, except the cards, which are on GitHub. Open the files in the Code tab's file pane, in your editor, or on GitHub once committed.</p>
+  <div class="diagram" role="img" aria-label="Files: north-star.md feeds mockup.html; both feed to-board, which writes spec.md, zones.yaml, coverage.md and the cards on the board.">
+  <svg viewBox="0 0 980 200" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+    <g font-size="13">
+      <rect x="10" y="20" width="200" height="56" rx="6" fill="var(--panel)" stroke="var(--you)"/>
+      <text x="110" y="44" text-anchor="middle" font-family="var(--f-mono)" fill="var(--fg)">north-star.md</text>
+      <text x="110" y="64" text-anchor="middle" fill="var(--muted)" font-size="12">vision · /north-star</text>
+      <rect x="10" y="120" width="200" height="56" rx="6" fill="var(--panel)" stroke="var(--you)"/>
+      <text x="110" y="144" text-anchor="middle" font-family="var(--f-mono)" fill="var(--fg)">mockup.html</text>
+      <text x="110" y="164" text-anchor="middle" fill="var(--muted)" font-size="12">look · /mockup</text>
+      <path d="M110 76V116" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar3)"/>
+      <rect x="320" y="70" width="170" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <text x="405" y="96" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">/to-board</text>
+      <text x="405" y="114" text-anchor="middle" fill="var(--muted)" font-size="12">reads both</text>
+      <path d="M210 48 C270 48, 270 90, 316 94" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar3)"/>
+      <path d="M210 148 C270 148, 270 106, 316 102" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar3)"/>
+      <rect x="600" y="8" width="200" height="40" rx="6" fill="var(--panel)" stroke="var(--line)"/><text x="700" y="33" text-anchor="middle" font-family="var(--f-mono)" fill="var(--fg)">spec.md</text>
+      <rect x="600" y="58" width="200" height="40" rx="6" fill="var(--panel)" stroke="var(--line)"/><text x="700" y="83" text-anchor="middle" font-family="var(--f-mono)" fill="var(--fg)">zones.yaml (you sign)</text>
+      <rect x="600" y="108" width="200" height="40" rx="6" fill="var(--panel)" stroke="var(--line)"/><text x="700" y="133" text-anchor="middle" font-family="var(--f-mono)" fill="var(--fg)">coverage.md</text>
+      <rect x="600" y="158" width="200" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="700" y="181" text-anchor="middle" fill="var(--accent)" font-weight="600">cards · GitHub board</text>
+      <path d="M490 90 C540 90, 550 28, 596 28" fill="none" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#ar3)"/>
+      <path d="M490 96 C540 96, 560 78, 596 78" fill="none" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#ar3)"/>
+      <path d="M490 102 C540 102, 560 128, 596 128" fill="none" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#ar3)"/>
+      <path d="M490 108 C540 108, 550 176, 596 176" fill="none" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#ar3)"/>
+      <text x="890" y="80" text-anchor="middle" fill="var(--muted)" font-size="12">committed by</text>
+      <text x="890" y="98" text-anchor="middle" fill="var(--muted)" font-size="12">/to-board; builders</text>
+      <text x="890" y="116" text-anchor="middle" fill="var(--muted)" font-size="12">read them from main</text>
+    </g>
+  </svg>
+  </div>
+  <div class="tablebox"><table>
+    <tr><th>File</th><th>Made by</th><th>Read by</th><th>How to view it</th></tr>
+    <tr><td><code>docs/shape/north-star.md</code></td><td><span class="cmd">/north-star</span></td><td>mockup, to-board, the planner (must-have numbers), report</td><td>Any editor or the file pane; one page</td></tr>
+    <tr><td><code>docs/shape/later.md</code></td><td>north-star, mockup</td><td>to-board (out of scope)</td><td>Editor</td></tr>
+    <tr><td><code>docs/shape/mockup.html</code></td><td><span class="cmd">/mockup</span></td><td>to-board, builders (via card links), the Demo card</td><td>Double-click to open in a browser</td></tr>
+    <tr><td><code>docs/shape/spec.md</code></td><td><span class="cmd">/to-board</span></td><td>builders (contracts, test command), reviewers</td><td>Editor, or on GitHub once committed</td></tr>
+    <tr><td><code>docs/agents/zones.yaml</code></td><td>to-board (draft), you (sign)</td><td>every lane, the merge gate</td><td>Editor; comments explain each zone</td></tr>
+    <tr><td><code>docs/shape/coverage.md</code></td><td><span class="cmd">/to-board</span></td><td>lint, status, report</td><td>Editor; <span class="cmd">/super-board status</span> shows progress</td></tr>
+    <tr><td>Cards</td><td><span class="cmd">/to-board</span>, super-collect</td><td>the board run</td><td>The GitHub Project board</td></tr>
+    <tr><td><code>.claude/super-board/configs/*.json</code></td><td><span class="cmd">/super-board onboard</span></td><td>everything</td><td>Editor: milestone, budget, targets, models</td></tr>
+    <tr><td><code>docs/shape/north-star-log.jsonl</code> · <code>docs/super-board/factory-log.jsonl</code></td><td>north-star · report <code>--log</code></td><td>report <code>--compare</code></td><td>One JSON line per run</td></tr>
+  </table></div>
 </section>
 
 <section id="board">
@@ -298,6 +386,63 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Milestone</td><td>Every must-have done, and the Demo card walked the whole core loop against the mock-up.</td><td>Demo card · status line</td></tr>
     <tr><td>App</td><td>You use it and say yes to the postcard.</td><td>You</td></tr>
   </table></div>
+</section>
+
+<section id="security">
+  <h2>Where security happens</h2>
+  <p class="sub">In layers, from every session down to the merge. Sized for small business apps: tight where data can be lost or leaked, light elsewhere.</p>
+  <div class="tablebox"><table>
+    <tr><th>Where</th><th>What protects you</th></tr>
+    <tr><td>Every session</td><td>Guard hooks block reading secrets (<code>.env</code>, keys, credentials), writing a live API key into a file, deleting anything outside the project, and work outside the project's worktree folder. Agents check a key exists by name only, never its value.</td></tr>
+    <tr><td><span class="cmd">/north-star</span></td><td>You name the must-nevers: lose data, leak it, send without asking, show it to the wrong person.</td></tr>
+    <tr><td><span class="cmd">/to-board</span></td><td>Each must-never becomes a numbered rule (<code>I1</code>…) with a test. Files that could break one go in the red zone of <code>zones.yaml</code>, which you sign.</td></tr>
+    <tr><td>Build</td><td>Red cards run on Sonnet and write a test for each rule they touch first. Auth, billing, upgrades and third-party APIs: the builder reads the official docs before writing code.</td></tr>
+    <tr><td>QA</td><td>On red and boundary amber cards, <span class="cmd">/pr-security-review</span> checks the diff for injection, auth bypass, secrets, code execution and data exposure. A finding fails the card. Red cards also get one deliberate break per guarded line, to prove the test catches it.</td></tr>
+    <tr><td>Review</td><td>Red cards get an adversarial check: the reviewer tries to prove the code wrong.</td></tr>
+    <tr><td>Merge</td><td>Money, auth and destructive schema changes (drop, truncate, rename) wait for you. Additive migrations run only on databases you allowed. A live database is always yours.</td></tr>
+  </table></div>
+  <p>Not covered: a whole-system penetration test. The security pass reads each change, not the whole repo.</p>
+</section>
+
+<section id="standards">
+  <h2>Code standards</h2>
+  <p class="sub">No written style guide, on purpose. The models already name things well and keep functions short, and a rule only a person can judge becomes a reason to bounce cards. So the standard is what a tool checks, plus a few rules aimed at how parallel AI builders actually go wrong: different names for the same thing, and building too much.</p>
+  <div class="tablebox"><table>
+    <tr><th>Rule</th><th>What it means</th><th>Enforced by</th></tr>
+    <tr><td>Checked by tools</td><td>The foundation card sets up a formatter, a linter (no empty catch, no unhandled async errors, no unused code, no <code>any</code>), strict types and a high-severity dependency audit. All of it runs in the test command, so every later card inherits it.</td><td>Every build, then the merge gate</td></tr>
+    <tr><td>The app's checks pass</td><td>Typecheck, lint and tests: the <code>verify_commands</code> in the config (this app: <code>pnpm verify</code>).</td><td>Builder, then the merge gate again against the latest <code>main</code></td></tr>
+    <tr><td>One name per thing</td><td>Name domain things exactly as <code>spec.md</code> does (its data model and contracts), so parallel cards don't invent different names for the same thing.</td><td>Builder, review</td></tr>
+    <tr><td>Validate at the edge</td><td>Inputs are checked where they enter: forms, APIs, files. Part of the amber bar, so QA can cite it.</td><td>QA</td></tr>
+    <tr><td>Test first</td><td>Every acceptance check gets a test that fails before the change and passes after.</td><td>Builder (<span class="cmd">/tdd</span>), QA, merge gate</td></tr>
+    <tr><td>Smallest safe change</td><td>Only the files the card lists. Copy the pattern the foundation card set; don't invent a new one.</td><td>Review: scope drift</td></tr>
+    <tr><td>Small cards</td><td>About 5 files and 200 lines. A PR over 600 source lines gets a deeper review.</td><td><span class="cmd">/to-board</span>, merge policy</td></tr>
+    <tr><td>No gold plating</td><td>Build what the checks need, nothing more. Extra is flagged as over-engineering (a note, never a bounce).</td><td>Review</td></tr>
+    <tr><td>Reuse, not DRY</td><td>Use what already exists (the card's Pattern, an existing helper). Don't build new shared abstractions mid-card, or touch other cards' files to share code. Real repetition gets cleaned up after the milestone by a refactor card from <span class="cmd">/super-collect architecture</span>.</td><td>Review: "already in the codebase?"</td></tr>
+    <tr><td>Project conventions</td><td>Whatever the app's <code>AGENTS.md</code> / <code>CLAUDE.md</code> says.</td><td>Builder, review</td></tr>
+    <tr><td>Commits and PRs</td><td><code>✨ [feat] scope: subject</code> plus short bullets; PR body has the problem, the fix and each check with its proof.</td><td>Writing standard, gate</td></tr>
+  </table></div>
+  <p>The reviewer sorts every finding as a Gap (something asked for is missing), a Bug, a Verification miss (the proof doesn't prove it), Scope drift, or Over-engineering. Only a finding that cites a check, a rule, a zone bar line or a reproducible bug can send a card back.</p>
+</section>
+
+<section id="qa">
+  <h2>What QA looks like</h2>
+  <p class="sub">QA proves the card does what it says. How hard it looks depends on the zone.</p>
+  <div class="tablebox"><table>
+    <tr><th>Zone</th><th>What QA does</th></tr>
+    <tr><td><span class="tag g">green</span></td><td>No QA lane. The reviewer re-runs the tests and ticks each check that passed.</td></tr>
+    <tr><td><span class="tag a">amber</span></td><td>Every acceptance check proven by a passing test. The zone's bar: the scenario works in the real app, errors say what happened in one line, empty, loading and error states exist, inputs are validated where they enter, no data skips the safe write path. Plus the ticket's own edge cases.</td></tr>
+    <tr><td><span class="tag r">red</span></td><td>All of amber, plus a test for each rule (<code>I1</code>…) the card touches, one deliberate break per guarded line to prove the test catches it, and the security pass.</td></tr>
+  </table></div>
+  <div class="tablebox"><table>
+    <tr><th>Standard</th><th>What it means</th></tr>
+    <tr><td>Cite or it's a note</td><td>A fail must point at a check (<code>AC2</code>), a rule (<code>I3</code>), a bar line, or a bug with steps to reproduce. Anything else is a note and doesn't send the card back.</td></tr>
+    <tr><td>Proof is a file</td><td>Each ticked check names the test that proves it. "Looked fine" doesn't count; the merge gate refuses it.</td></tr>
+    <tr><td>Evidence stays local</td><td>Screenshots, logs and recordings go to <code>.claude/super-board/evidence/</code> (not committed). The PR gets a text table: check, result, proof.</td></tr>
+    <tr><td>Stay in scope</td><td>A real problem outside the card becomes a new Backlog card; it doesn't fail this one.</td></tr>
+    <tr><td>Round caps</td><td>Green 1, amber 2, red 3 tries. Then Blocked with "split, steer or ask".</td></tr>
+    <tr><td>The whole loop</td><td>The Demo card is the final QA: it walks the core loop end to end against the mock-up.</td></tr>
+  </table></div>
+  <p>Standalone: <span class="cmd">/super-qa &lt;url&gt;</span> crawls a live site with a real browser, records screenshots and logs, and files what it finds as plain-English issues.</p>
 </section>
 
 <section id="models">
