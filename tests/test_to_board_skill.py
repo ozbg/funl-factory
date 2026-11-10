@@ -56,6 +56,21 @@ class ToBoardSkill(unittest.TestCase):
     def test_line_limit(self):
         self.assertLessEqual(len(TEXT.splitlines()), 200)
 
+    def test_commits_before_filing(self):
+        self.assertIn("### 8. Commit, then file to Ready", TEXT)
+        self.assertIn("push the current branch without force", TEXT)
+        self.assertIn("`--dry-run` commits nothing", TEXT)
+
+    def test_checked_standards(self):
+        root = Path(__file__).resolve().parent.parent
+        card = (root / "skills/to-board/references/card-template.md").read_text()
+        self.assertIn("no empty catch, no unhandled promises, no unused code, no `any`", card)
+        self.assertIn("high-severity dependency audit", card)
+        zones = (root / "skills/to-board/references/zones-draft.md").read_text()
+        self.assertIn("Inputs are validated where they enter", zones)
+        build = (root / "skills/super-board/references/lanes/build.md").read_text()
+        self.assertIn("exactly as `docs/shape/spec.md`", build)
+
 
 if __name__ == "__main__":
     unittest.main()

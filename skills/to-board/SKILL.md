@@ -108,13 +108,15 @@ Then ask at most two things in one message:
 
 Apply the answer. Moving a feature in or out is the owner's; how it is cut is yours. Do not ask again unless they added something new. `--dry-run` stops here; with no config it asks no milestone question.
 
-### 8. File to Ready
+### 8. Commit, then file to Ready
 
-File in build order, so each `## Blocked by` can name real numbers. Commands: [references/filing.md](references/filing.md). Each card goes to the **Ready** column (the owner approved the scope in step 7), on the milestone, with **no label** (`bug` and `qa` change routing; slice cards are neither). `--dry-run` files nothing.
+First commit `docs/shape/` and the draft `docs/agents/zones.yaml` in one commit (`📝 [docs] shape: spec, zones and cards for <app>`) and push the current branch without force. Builders branch from the base branch, so they see only what is committed there; if the current branch is not `config.base_branch`, say so. `--dry-run` commits nothing.
+
+Then file in build order, so each `## Blocked by` can name real numbers. Commands: [references/filing.md](references/filing.md). Each card goes to the **Ready** column (the owner approved the scope in step 7), on the milestone, with **no label** (`bug` and `qa` change routing; slice cards are neither). `--dry-run` files nothing.
 
 ### 9. Write `docs/shape/coverage.md`
 
-Exactly this shape (lint parses it). One row per must-have, slice cards only. The foundation card does not count as coverage.
+Commit and push it the same way once the card numbers are in. Exactly this shape (lint parses it). One row per must-have, slice cards only. The foundation card does not count as coverage.
 
 ```
 | Must-have | Cards |

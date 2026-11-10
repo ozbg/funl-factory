@@ -38,7 +38,7 @@ zones:
       - <routes, actions, feature modules>
     bar: >
       The card's scenario works in the real app. Errors say what happened in one line.
-      Empty, error and loading states exist.
+      Empty, error and loading states exist. Inputs are validated where they enter (forms, API, files).
     checks: [typecheck, tests, invariant-suite, scenario-run, review]
     max_rounds: 2
 
