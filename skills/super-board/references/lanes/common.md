@@ -54,7 +54,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 | `status` (alert card) | writes | rewrites on exit | rewrites on exit |
 | `problem` (lettered steps under Where, screenshot embedded) | writes from the ticket's Context | — | — |
 | `solution` (plain bullets, `Docs:` bullets last) | writes, updates on rebuild | — | — |
-| `ac` (checklist + one proof line each) | writes all unchecked | ticks with proof, or leaves unchecked with the reason | unticks one it disproved |
+| `ac` (checklist + one proof line each) | writes all unchecked | ticks with proof, or leaves unchecked with the reason | unticks one it disproved · on a green card (no QA) ticks each it confirmed, with proof |
 | `history` (Lane · Done · Time · Details) | appends a row | appends a row | appends a row |
 | `visual` (Before \| After, UI only) | — | writes | — |
 | `risk` (🟢/🟡/🔴 + one line, Door, Blast radius) | writes | — | adjusts |

@@ -253,7 +253,7 @@ const lanePrompt = (lane, card, { greenEntry = false } = {}) => [
     ? [`Return tier and maxRounds from your zone step (3c). Green tier, and no zone:amber or zone:red label → no QA lane: move the card Building → Review, not QA, and return column Review.`]
     : []),
   ...(greenEntry
-    ? [`Green card: it skips QA and comes straight from Building. If the board still shows it in Building or QA, move it to Review first; there is no Tester report — check the builder's AC proof and rerun its tests (lanes/review.md step 4).`]
+    ? [`Green card: it skips QA and comes straight from Building. If the board still shows it in Building or QA, move it to Review first; there is no Tester report — check the builder's AC proof, rerun its tests, and tick each AC whose test passed with its proof line before the gate (lanes/review.md step 4).`]
     : []),
   ...(lane === 'qa' && card.status === 'Ready'
     ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (lanes/qa.md → "qa cards").`]
