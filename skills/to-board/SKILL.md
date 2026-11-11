@@ -177,7 +177,10 @@ Report: the spec path, the card numbers, the zone map path and the Needs-judgeme
 
 ## Rescope
 
-Run again after the north star changes. Read `coverage.md` and the open cards first. Update spec.md in place. File only new cards; edit an open card only if it is still in Backlog or Ready. Never close a card: list the ones the new scope drops and let the owner close them. Rewrite `coverage.md` with the new numbers.
+Run again after the north star changes, or for a body of work once its brief is signed
+(`.claude/skills/super-board/references/iteration.md`). Read `coverage.md`, the open cards and
+the brief first. Every card cut for a body of work carries the `body-of-work` label and a
+`- **Brief:** docs/shape/briefs/<date>-<slug>.md` line in Context; lint fails it if the brief is unsigned. Update spec.md in place. File only new cards; edit an open card only if it is still in Backlog or Ready. Never close a card: list the ones the new scope drops and let the owner close them. Rewrite `coverage.md` with the new numbers.
 
 ## Not this skill's job
 

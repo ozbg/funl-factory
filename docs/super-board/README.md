@@ -94,7 +94,7 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 | `/super-build` | `Ready` → `QA`. Worktree, smallest safe change, draft PR. |
 | `/super-qa` | `QA` → `Review`. Tests per AC, test-gap check, screenshots/logs/HARs on the PR, or a bounce with a rebuild label. Off-ticket findings file as `source:qa` cards. |
 | `/super-review` | `Review` → `Done`. Re-runs the Tester's tests, adversarial truth-check, merges through the gate or hands to a human. On a re-review it first checks every finding from its last report. Shape problems are filed to `Backlog`, never blocked on. |
-| `/super-collect` | Finding problems in Sentry, PostHog, unboarded issues, recurring PR problems and architecture, each checked by one verifier, then one findings doc; every verified finding is filed straight into `Backlog` in the ticket format. |
+| `/super-collect` | Finding problems in Sentry, PostHog, unboarded issues, recurring PR problems and architecture, each checked by one verifier, then one findings doc; triage files each in the ticket format: a fix to `Ready` (capped per run), everything else straight into `Backlog` as a proposal. |
 | `/ui-refine-loop` | Polishing one page or component, standalone: Impeccable check → fix rounds ending in a draft PR. The board never runs it. |
 | `/git-sync` | Secondary helper: commit per logical change, merge-pull, push without force. |
 | `/visual` | Secondary helper: a visual recap or plan. Merged-worktree cleanup is a hook (`hooks/cleanup-wt.py`): the merge gate runs it after each merge and SessionStart runs it when a base moved. |

@@ -12,7 +12,8 @@ Board: Backlog · Ready · Building · QA · Review · Blocked · Done. Labels r
 | Build one ticket | `/super-build` | NEVER build outside the card's worktree |
 | QA a branch, or a live URL alone | `/super-qa` · `/super-qa <url>` | NEVER mark QA pass without evidence |
 | Review a PR, merge | `/super-review` | NEVER `gh pr merge` direct — merge gate only |
-| Turn Sentry, PostHog, PR problems into tickets | `/super-collect` | DON'T skip the verifier; it files straight into Backlog |
+| Turn Sentry, PostHog, PR problems into tickets | `/super-collect` | DON'T skip the verifier; triage files fixes to Ready, proposals to Backlog |
+| Change the app after v1: bug, tweak, body of work | `.claude/skills/super-board/references/iteration.md` | NEVER put a body-of-work card in Ready without a signed brief |
 | Commit, pull, push this branch | `/git-sync` | NEVER force push or rebase shared history |
 
 | Rule | Value |

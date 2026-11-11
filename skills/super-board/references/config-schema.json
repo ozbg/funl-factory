@@ -478,6 +478,11 @@
       // Cap on refactor findings filed per run. Default 5.
       "max_findings": 5
     },
+    // Triage (references/iteration.md): fix cards filed to Ready per run. Past the
+    // cap, a fix goes to Backlog as a proposal recommending it. Default 5.
+    "triage": {
+      "max_fix_cards": 5
+    },
     // Extra sources added in onboard's "➕ Add another source" (v3.0.0). Each
     // was pinged read-only before it was saved. `/super-collect` runs them with
     // skills/super-collect/scripts/collect_custom.py, turns the output into
