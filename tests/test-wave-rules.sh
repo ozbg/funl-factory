@@ -127,6 +127,14 @@ const amber = '## Context\n- **Zone:** amber\n'
   eq(g.card.lanesRun, 'build:advanced → review:advanced', 'green lanes')
   eq(g.card.tier, 'green', 'summary tier')
   ;/Building → Review, not QA/.test(g.prompts['build:#6']) || fail('build prompt must route green to Review')
+  // A green screen card (Mock-up line or block) still runs QA for the screen match (#105).
+  for (const body of ['- **Mock-up:** docs/shape/mockup.html#screen-pipeline', '## Mock-up\n- **Anchor:** x']) {
+    const sc = await run({ cards: [card(13, { lane: 'build', body })] },
+      { 'build:#13': { status: 'advanced', column: 'QA', detail: 'built', tier: 'green', maxRounds: 1 } })
+    sc.prompts['qa:#13'] || fail(`a green screen card runs QA (${JSON.stringify(body)})`)
+    ;/Green card/.test(sc.prompts['review:#13']) && fail('a green screen card has a Tester report')
+    ;/screen card .*Building → QA/.test(sc.prompts['build:#13']) || fail('build prompt must route a screen card to QA')
+  }
   // Amber still goes through QA, and the built card's QA entry passes skills-ready (was exit 64).
   const am = await run({ cards: [card(7, { lane: 'build' })] },
     { 'build:#7': { status: 'advanced', column: 'QA', detail: 'built', tier: 'amber' } })

@@ -31,7 +31,9 @@ Win condition: every card is **mechanical**, every must-have has a card, and the
 | `docs/agents/zones.yaml` | if present | the signed zone map; never overwrite it |
 | the board config | only to file (not for `--dry-run`) | `project`, `repo.remote`, `goal.milestone` |
 
-List the mock-up screens once: `grep -o 'id="screen-[a-z0-9-]*"' docs/shape/mockup.html`.
+List the mock-up screens once: `grep -oE '(^|[^A-Za-z0-9_-])screen-[A-Za-z0-9_-]*[A-Za-z0-9]' docs/shape/mockup.html | grep -oE 'screen-.*' | sort -u`.
+It matches every `screen-<name>` token, as `scripts/super-board-coverage.py` does, so screens a
+JS mock-up builds from strings (`#screen-pipeline` in its router or tabs) count too.
 
 ## Steps
 
