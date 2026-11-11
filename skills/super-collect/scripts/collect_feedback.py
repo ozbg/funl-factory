@@ -4,6 +4,7 @@
 
     collect_feedback.py list [--dir D] [--config C] [--since 14d]
     collect_feedback.py mark --ids ID[,ID…] --issue N --fingerprint FP [--dir D] [--config C]
+    collect_feedback.py show REF [--dir D] [--config C]
 
 list  Reads every new item in the folder (`--dir`, else the config's collect.feedback.dir,
       else `data/feedback`), redacts it, groups repeats and prints candidates shaped like
@@ -17,16 +18,21 @@ list  Reads every new item in the folder (`--dir`, else the config's collect.fee
       (Jaccard >= 0.5) are one candidate. A candidate that matches an item already filed
       reuses that item's fingerprint, so the filer adds "Seen again" to the open issue.
       Fingerprint `feedback|<route>|<element>|<text hash>` (collect_common.fingerprint).
+      Each candidate carries `refs`: one opaque `fb-<8 hex>` per item (a hash of its id, so no
+      user text), for the card's `Feedback:` line.
+show  Resolves a `fb-<8 hex>` ref to the local item JSON and PNG, so the build and QA lanes on
+      this machine can see the screenshot and markup. Not here: exit 3.
 mark  Records the filed issue for each id in `<dir>/filed.json` (the app's list reads it),
       so an item is never filed twice.
 
-Output: one JSON object. Exit 0 ok · 2 folder missing or unreadable · 64 usage.
+Output: one JSON object. Exit 0 ok · 2 folder missing or unreadable · 3 ref not on this machine · 64 usage.
 No network. Stdlib only.
 """
 from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -141,6 +147,11 @@ def redact(item):
     }
 
 
+def ref(item_id):
+    """Opaque card reference for one item: no slug of the user's text survives."""
+    return "fb-" + hashlib.sha256(str(item_id).encode()).hexdigest()[:8]
+
+
 def route_key(route):
     path = str(route or "").split("?", 1)[0].split("#", 1)[0] or "/"
     return re.sub(r"/(\d+|[0-9a-f]{8,}|[0-9a-f-]{36})(?=/|$)", "/N", path.lower())
@@ -185,6 +196,7 @@ def load(d, since):
             if at < since:
                 continue
         shot = os.path.basename(str(item.get("screenshot") or ""))
+        item["_file"] = os.path.join(d, name)
         item["_shot"] = os.path.join(d, shot) if shot and os.path.isfile(os.path.join(d, shot)) else None
         items.append(item)
     return items, skipped
@@ -235,6 +247,7 @@ def cmd_list(args):
             "element": None if element == "screen" else element,
             "count": len(g["items"]),
             "ids": [i["id"] for i in g["items"]],
+            "refs": [ref(i["id"]) for i in g["items"]],
             "words": sorted(ws),
             "items": g["items"],
             "screenshots_local": g["shots"],
@@ -244,6 +257,23 @@ def cmd_list(args):
     status = "read" if candidates else "empty"
     print(json.dumps({"status": status, "dir": d, "new": len(new), "already_filed": len(items) - len(new),
                       "skipped": skipped, "candidates": candidates}, indent=2))
+    return 0
+
+
+def cmd_show(args):
+    d = folder(args)
+    if not re.fullmatch(r"fb-[0-9a-f]{8}", args.ref or ""):
+        print("collect-feedback: a ref looks like fb-<8 hex>", file=sys.stderr)
+        return 64
+    items, _ = load(d, None) if os.path.isdir(d) else ([], [])
+    hit = next((i for i in items if ref(i["id"]) == args.ref), None)
+    if hit is None:
+        print(json.dumps({"status": "not-here", "ref": args.ref, "dir": d,
+                          "error": "this item is not on this machine: ask the owner for the screenshot"}))
+        return 3
+    print(json.dumps({"status": "found", "ref": args.ref, "json": hit["_file"],
+                      "png": hit["_shot"], "marked_up": bool(hit.get("marked_up")),
+                      "route": hit["route"]}, indent=2))
     return 0
 
 
@@ -286,18 +316,20 @@ class Parser(argparse.ArgumentParser):
 def main(argv=None):
     p = Parser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True, parser_class=Parser)
-    for name in ("list", "mark"):
+    for name in ("list", "mark", "show"):
         s = sub.add_parser(name)
         s.add_argument("--dir")
         s.add_argument("--config")
-        if name == "list":
+        if name == "show":
+            s.add_argument("ref")
+        elif name == "list":
             s.add_argument("--since")
         else:
             s.add_argument("--ids", required=True)
             s.add_argument("--issue", required=True)
             s.add_argument("--fingerprint", required=True)
     args = p.parse_args(argv)
-    return {"list": cmd_list, "mark": cmd_mark}[args.cmd](args)
+    return {"list": cmd_list, "mark": cmd_mark, "show": cmd_show}[args.cmd](args)
 
 
 if __name__ == "__main__":

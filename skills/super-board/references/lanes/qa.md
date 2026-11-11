@@ -45,6 +45,10 @@ No key for the real model → Blocked, 🙋, `blocked-by: model key`. Never run 
    card fails the match AC, citing it. A mock-up screen that won't open is never a pass.
    Record the verdict for the report:
    `python3 .claude/bin/super-board-scorecard.py screen --card <N> --screen screen-<name> --passed|--failed`.
+7c. **Feedback before.** A card with a `Feedback: fb-…` line: `collect_feedback.py show <ref>`
+   (`.claude/skills/super-collect/scripts/`) gives the user's screenshot and markup. It is the
+   "before" in the before and after: compare the fixed screen with it locally, and say in words
+   what changed. It holds client data, so never commit, embed or upload it.
 8. **Sort findings.** A fail cites `AC<n>`, `I<n>`, `bar: <line>` or `bug: <repro steps>`.
    Anything else is a note. Out-of-scope privacy, data-loss or visible bug → Backlog card via
    `super-qa-file-bug.sh --column Backlog`; it does not fail this card.

@@ -116,6 +116,28 @@ class Feedback(unittest.TestCase):
         self.assertNotIn("/clients/N", self.by_route(again))
         self.assertEqual(again["already_filed"], 3)
 
+    def test_refs_are_opaque_and_show_resolves_them_locally(self):
+        c = self.by_route(self.listed())["/clients/N"]
+        self.assertEqual(len(c["refs"]), 2)
+        for r, i in zip(c["refs"], c["ids"]):
+            self.assertRegex(r, r"^fb-[0-9a-f]{8}$")
+            self.assertNotIn("save", r)
+        out = json.loads(self.run_cli("show", c["refs"][0], "--dir", str(self.dir)).stdout)
+        self.assertEqual(out["status"], "found")
+        self.assertTrue(out["json"].endswith("20261110T090000Z-save-does-nothing.json"))
+        self.assertTrue(out["png"].endswith("20261110T090000Z-save-does-nothing.png"))
+        self.assertTrue(out["marked_up"])
+        cfg = self.root / "cfg.json"
+        cfg.write_text(json.dumps({"collect": {"feedback": {"dir": "data/feedback"}}}))
+        out = json.loads(self.run_cli("show", c["refs"][1], "--config", str(cfg)).stdout)
+        self.assertEqual(out["png"], None, "an item with no screenshot")
+
+    def test_show_says_when_a_ref_is_not_here(self):
+        p = self.run_cli("show", "fb-00000000", "--dir", str(self.dir), expected=3)
+        self.assertEqual(json.loads(p.stdout)["status"], "not-here")
+        self.run_cli("show", "fb-00000000", "--dir", str(self.root / "nope"), expected=3)
+        self.run_cli("show", "save-does-nothing", "--dir", str(self.dir), expected=64)
+
     def test_mark_refuses_bad_input(self):
         self.run_cli("mark", "--dir", str(self.dir), "--ids", "no-such", "--issue", "1",
                      "--fingerprint", "feedback|/x|y|z", expected=64)
@@ -146,6 +168,17 @@ class FeedbackText(unittest.TestCase):
         self.assertIn("custom|walk|feedback", self.SKILL)
         self.assertIn('feedback) FP_PREFIX="feedback|"',
                       (KIT / "skills/super-collect/scripts/super-collect-file.sh").read_text())
+
+    def test_cards_carry_the_ref_and_lanes_open_it(self):
+        self.assertIn("`- **Feedback:** fb-b7d9560a, fb-22734fb7`", self.SKILL)
+        lanes = KIT / "skills/super-board/references/lanes"
+        build, qa = (lanes / "build.md").read_text(), (lanes / "qa.md").read_text()
+        self.assertIn("`Feedback: fb-…` line", build)
+        self.assertIn("collect_feedback.py show <ref>", build)
+        self.assertIn("7c. **Feedback before.**", qa)
+        self.assertIn("collect_feedback.py show <ref>", qa)
+        self.assertIn('"before" in the before and after', qa)
+        self.assertIn("never commit, embed or upload it", qa)
 
     def test_walk_findings_go_through_triage(self):
         findings = self.WALK.split("## Findings", 1)[1].split("## Record", 1)[0]

@@ -60,7 +60,9 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
 2. Create branch `issue-<N>-<slug>` from `config.base_branch` — unless one already exists
    (the card came back from Building after a stopped run): then check it out, keep its
    commits and open PR, and continue from where it stopped.
-3. Read issue body + ALL comments + PROJECT.md.
+3. Read issue body + ALL comments + PROJECT.md. A card with a `Feedback: fb-…` line in Context:
+   run `python3 .claude/skills/super-collect/scripts/collect_feedback.py show <ref>` and look at
+   the screenshot, its markup and the item before working. Never copy them into the repo or the PR.
 3b. Touches a third-party API/SDK, an upgrade, or auth/billing? Read the current official docs
     for the installed version first (super-build → "Docs first").
 3c. Get the tier: `python3 .claude/bin/super-board-zone.py --zones docs/agents/zones.yaml --files …` on the files the card touches (unplaced = amber).

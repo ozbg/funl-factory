@@ -78,8 +78,10 @@ and sends nothing. `collect_feedback.py list` reads the items not yet in that fo
   wherever they appear), query-string values and token-like log strings are replaced before the
   JSON is printed. Work only from that output; never open the raw item.
   Item ids and file paths are local only (`ids`, `screenshots_local`): they never go in a card,
-  a comment or the findings doc. A name the script missed in the user's own words, you replace
-  with `[name]` too.
+  a comment or the findings doc. The card carries the opaque `refs` instead, one line in Context:
+  `- **Feedback:** fb-b7d9560a, fb-22734fb7`. The build and QA lanes on this machine open them
+  with `collect_feedback.py show <ref>` to see the screenshot and markup. A name the script
+  missed in the user's own words, you replace with `[name]` too.
 - **Screenshots stay local.** They are never uploaded or embedded. The candidate lists the local
   PNG paths. You may look at one and describe the problem in a line of words in the card's
   Context ("the save button sits under the panel"), never a name, number or text read off it.
