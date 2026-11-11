@@ -10,7 +10,7 @@ card. The wave's `Pre-flight` phase does it, one agent per batch of up to 5 Read
 cards, before `runLane('build')`.
 
 ```
-[ ] source .claude/bin/super-board-gh-guard.sh; sb_gh_guard_check 200
+[ ] bash .claude/bin/super-board-gh-guard.sh check 200
 [ ] build the in-flight list: .claude/bin/super-board-card.sh --config <cfg> items (one call) → [{number,title,status}] for
     Building / QA / Review / Ready cards; save it to a temp file
 [ ] bash .claude/bin/super-board-preflight.sh --repo <owner/name> --issues <N[,M…]> \

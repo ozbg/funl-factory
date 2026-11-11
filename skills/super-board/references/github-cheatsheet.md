@@ -3,40 +3,40 @@
 Every GitHub call a lane makes is on this page. Copy the command, change only `<N>`,
 `<branch>`, `<file>` or `<cfg>`. A command not on this page is a mistake.
 
-```bash
-R=.claude/bin/super-board-github-read.py      # required reads go through this
-source .claude/bin/super-board-gh-guard.sh   # quota checks
-```
+Each row is **one plain call**: run it exactly as written, one Bash call per row. No shell
+variables for paths, no `&&`, `;` or `echo $?`. An allow rule matches one plain command, and
+anything else prompts the owner (`lanes/common.md` → "Command shape"). The exit code is in
+the tool result. Required reads go through `.claude/bin/super-board-github-read.py`.
 
 ## Before any write
 
 | Need | Command |
 |---|---|
-| Quota | `sb_gh_guard_check 200` |
-| Run still live? | `python3 $R --check` (exit 79 = stop) |
+| Quota | `bash .claude/bin/super-board-gh-guard.sh check 200` |
+| Run still live? | `python3 .claude/bin/super-board-github-read.py --check` (exit 79 = stop) |
 
 ## Reads (required evidence)
 
 | Need | Command |
 |---|---|
-| Issue title + body | `python3 $R --kind issue -- issue view <N> --json number,title,body` |
-| Issue comments | `python3 $R --kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp` |
-| Issue state | `python3 $R --kind state -- issue view <N> --json state --jq .state` |
-| Open PRs (overlap, duplicate) | `python3 $R --kind prs-open -- pr list --state open --limit 100 --json number,title,body,url,headRefName,files` |
-| Merged PRs | `python3 $R --kind prs-merged -- pr list --state merged --limit 50 --json number,title,body,url` |
-| Closed issues | `python3 $R --kind issues-closed -- issue list --state closed --limit 50 --json number,title,body,stateReason` |
-| My PR for a branch | `python3 $R --kind json -- pr list --head <branch> --state all --json number,url,state,isDraft` |
-| PR branch + head SHA | `python3 $R --kind head -- pr view <N> --json headRefName,headRefOid --jq '"\(.headRefName) \(.headRefOid)"'` |
-| PR body + head SHA | `python3 $R --kind body -- pr view <N> --json body,headRefOid` |
-| PR size, files, labels | `python3 $R --kind metadata -- pr view <N> --json files,labels,body,additions,deletions,changedFiles > <file>` |
-| PR diff (needs the metadata file) | `python3 $R --kind diff --meta <file> -- pr diff <N>` |
-| PR merged? | `python3 $R --kind merge-state -- pr view <N> --json state,headRefOid,mergeCommit` |
-| PR inline review comments | `python3 $R --kind json -- api repos/{owner}/{repo}/pulls/<N>/comments --paginate --slurp` |
-| One inline review comment by id | `python3 $R --kind json -- api repos/{owner}/{repo}/pulls/comments/<id>` — no PR number in the path |
-| One issue/PR conversation comment by id | `python3 $R --kind json -- api repos/{owner}/{repo}/issues/comments/<id>` — no issue number in the path |
-| PR base + head branch | `python3 $R --kind json -- pr view <N> --json baseRefName,headRefName,headRefOid` |
-| Anything else, `issue`/`pr` | `python3 $R --kind json -- issue view <N> --json <fields>` (or `pr view`, `pr list`, `issue list`) — no `--jq` |
-| Anything else, `gh api` | `python3 $R --kind json -- api repos/{owner}/{repo}/<path>` — `gh api` has NO `--json` flag; it already returns full JSON |
+| Issue title + body | `python3 .claude/bin/super-board-github-read.py --kind issue -- issue view <N> --json number,title,body` |
+| Issue comments | `python3 .claude/bin/super-board-github-read.py --kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp` |
+| Issue state | `python3 .claude/bin/super-board-github-read.py --kind state -- issue view <N> --json state --jq .state` |
+| Open PRs (overlap, duplicate) | `python3 .claude/bin/super-board-github-read.py --kind prs-open -- pr list --state open --limit 100 --json number,title,body,url,headRefName,files` |
+| Merged PRs | `python3 .claude/bin/super-board-github-read.py --kind prs-merged -- pr list --state merged --limit 50 --json number,title,body,url` |
+| Closed issues | `python3 .claude/bin/super-board-github-read.py --kind issues-closed -- issue list --state closed --limit 50 --json number,title,body,stateReason` |
+| My PR for a branch | `python3 .claude/bin/super-board-github-read.py --kind json -- pr list --head <branch> --state all --json number,url,state,isDraft` |
+| PR branch + head SHA | `python3 .claude/bin/super-board-github-read.py --kind head -- pr view <N> --json headRefName,headRefOid --jq '"\(.headRefName) \(.headRefOid)"'` |
+| PR body + head SHA | `python3 .claude/bin/super-board-github-read.py --kind body -- pr view <N> --json body,headRefOid` |
+| PR size, files, labels | `python3 .claude/bin/super-board-github-read.py --kind metadata -- pr view <N> --json files,labels,body,additions,deletions,changedFiles > <file>` |
+| PR diff (needs the metadata file) | `python3 .claude/bin/super-board-github-read.py --kind diff --meta <file> -- pr diff <N>` |
+| PR merged? | `python3 .claude/bin/super-board-github-read.py --kind merge-state -- pr view <N> --json state,headRefOid,mergeCommit` |
+| PR inline review comments | `python3 .claude/bin/super-board-github-read.py --kind json -- api repos/{owner}/{repo}/pulls/<N>/comments --paginate --slurp` |
+| One inline review comment by id | `python3 .claude/bin/super-board-github-read.py --kind json -- api repos/{owner}/{repo}/pulls/comments/<id>` — no PR number in the path |
+| One issue/PR conversation comment by id | `python3 .claude/bin/super-board-github-read.py --kind json -- api repos/{owner}/{repo}/issues/comments/<id>` — no issue number in the path |
+| PR base + head branch | `python3 .claude/bin/super-board-github-read.py --kind json -- pr view <N> --json baseRefName,headRefName,headRefOid` |
+| Anything else, `issue`/`pr` | `python3 .claude/bin/super-board-github-read.py --kind json -- issue view <N> --json <fields>` (or `pr view`, `pr list`, `issue list`) — no `--jq` |
+| Anything else, `gh api` | `python3 .claude/bin/super-board-github-read.py --kind json -- api repos/{owner}/{repo}/<path>` — `gh api` has NO `--json` flag; it already returns full JSON |
 
 ## Board
 

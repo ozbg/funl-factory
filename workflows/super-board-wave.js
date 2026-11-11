@@ -108,6 +108,7 @@ let halted = false
 // Valid form per --kind, from validate() in scripts/super-board-github-read.py (#32).
 const READ_SHAPES = [
   `Every GitHub command, ready to copy: .claude/skills/super-board/references/github-cheatsheet.md. Never run the helper's --resume.`,
+  `Command shape: run each command as one literal call, exactly as written, e.g. python3 .claude/bin/super-board-github-read.py --check. No shell variables for paths or values, no &&, ;, | or echo $?. Each Bash call is a fresh shell; the exit code is in the tool result. An allow rule matches one plain command; anything else prompts the owner.`,
   `Read shapes (helper: .claude/bin/super-board-github-read.py --kind <kind> -- <gh args>):`,
   `- issue title+body: --kind issue -- issue view <N> --json number,title,body`,
   `- issue comments: --kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp (zero comments = [[]])`,
@@ -116,7 +117,7 @@ const READ_SHAPES = [
   `- PR body+head: --kind body -- pr view <N> --json body,headRefOid`,
   `- PR metadata: --kind metadata -- pr view <N> --json files,labels,body,additions,deletions,changedFiles`,
   `- issue state: --kind state -- issue view <N> --json state --jq .state`,
-  `- quota: use the guard's sb_gh_guard_check; never pass --jq to --kind quota`,
+  `- quota: bash .claude/bin/super-board-gh-guard.sh check 200 (one plain call, never sourced); never pass --jq to --kind quota`,
   `A read whose output misses its shape (incl. any you reshaped with --jq/-q/--template) exits 64 for that call only and prints the valid form: fix the read, do not halt.`,
 ].join('\n')
 const READ_FAILURE = READ_SHAPES + '\n' + `Verification-readiness exit 9 means missing/unusable config.verify_commands: preserve card/worktree/approval/claims, report status=halted (preflight verdict=halted), stop dispatch, repair project configuration before explicit restart; no Build bounce or automatic retries. ` + `Required GitHub reads use .claude/bin/super-board-github-read.py: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
@@ -230,8 +231,8 @@ const BOARD_IO = () =>
 // The orchestrator resolves every remaining chain before claims. The runtime has
 // no subprocess API; each worker repeats the deterministic CLI before its writes.
 const SKILLS_CHECK = (cards, lane) => [
-  `First operation, before worktree creation, classification, comments, labels or moves: run python3 .claude/bin/super-board-skills-ready.py --root "$PWD" --host claude --cards - --hydrate${lane ? ' --lane ' + lane : ''},`,
-  `with this JSON array as stdin (data, never interpolate a body into shell code): ${JSON.stringify(cards)}.`,
+  `First operation, before worktree creation, classification, comments, labels or moves: run, as ONE plain call from the project root, python3 .claude/bin/super-board-skills-ready.py --root . --host claude --cards - --hydrate${lane ? ' --lane ' + lane : ''} <<'CARDS'`,
+  `followed by this JSON array on its own lines and a closing CARDS line (a quoted heredoc is data, never shell code; no variables, no && or |): ${JSON.stringify(cards)}.`,
   `Exit 10 means status=halted (preflight verdict=halted), detail beginning "skills-readiness:"; preserve all existing claims/worktrees/approval evidence. Exit 64 means invalid input: halt and repair it. Exit 79 uses the read halt policy.`,
   `Load the exact resolved_path files. Only declared fallback IDs are allowed. Before using a conditional/custom helper repeat this CLI with --require <exact-name>.`,
 ].join('\n')

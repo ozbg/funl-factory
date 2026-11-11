@@ -30,9 +30,11 @@ Two modes:
 Scope is the PR's diff against its base. Resolve its zone:
 
 ```bash
-git diff --name-only "$(git merge-base HEAD origin/<base>)"...HEAD \
-  | python3 .claude/bin/super-board-zone.py --zones <config.zones> --files-from -
+git -C <worktree> merge-base HEAD origin/<base>                     # → <base-sha>
+git -C <worktree> diff --name-only <base-sha>...HEAD                # → <files>
+python3 .claude/bin/super-board-zone.py --zones <config.zones> --files <files>
 ```
+Three plain calls; paste each result into the next (`lanes/common.md` → "Command shape").
 
 The JSON gives `tier`, `max_rounds`, `bar`, `invariants`, `accepted_limits`, `boundary`. No
 zones file → every card is amber, and `max_rounds` comes from config `max_rounds.<tier>`. A `qa`
@@ -107,9 +109,10 @@ Evidence stays out of the repo. Write it under the main checkout, not the card w
 removed on exit):
 
 ```bash
-EV="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.claude/super-board/evidence"
-mkdir -p "$EV/<issue>/v<V>"; [ -f "$EV/.gitignore" ] || echo '*' > "$EV/.gitignore"
+git -C <worktree> rev-parse --path-format=absolute --git-common-dir   # → <main>/.git; <ev> = <main>/.claude/super-board/evidence
+mkdir -p <ev>/<issue>/v<V>
 ```
+Then, if `<ev>/.gitignore` is missing, write it (one line: `*`) with the Write tool.
 
 Screenshots, logs, HARs and test output go there. Never `git add` them, never embed images in a
 comment. The PR comment carries the AC table as text:

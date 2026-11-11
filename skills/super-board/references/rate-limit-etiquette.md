@@ -47,16 +47,20 @@ The rules that follow from it:
 - **One read per decision.** Read a thing when a step needs it; a `sleep` loop
   around `gh` spends a point every turn of the loop.
 
-## 1. Source the guard at worker start
+## 1. Check the guard at worker start
+
+Lane agents run the guard as one plain call each (every Bash call is a fresh shell, so a
+sourced function would be gone by the next call, and a chain matches no allow rule, #94):
 
 ```bash
-source scripts/super-board-gh-guard.sh
-sb_gh_budget_init 150      # per-worker soft cap on gh calls
-sb_gh_guard_check 200      # sleep if GraphQL remaining < 200
-sb_gh_guard_summary        # log starting quota for the run manifest
+bash .claude/bin/super-board-gh-guard.sh check 200      # sleep if GraphQL remaining < 200
+bash .claude/bin/super-board-gh-guard.sh summary        # log starting quota for the run manifest
 ```
 
-## 2. Use `sb_gh_guard_check` before any burst
+Scripts that run in one shell may still `source .claude/bin/super-board-gh-guard.sh` and call
+`sb_gh_guard_check`, `sb_gh_budget_init` and `sb_gh_budget_spend` directly.
+
+## 2. Run `check` before any burst
 
 Call it before:
 
@@ -71,7 +75,7 @@ It's a no-op if quota is healthy. It sleeps to reset only if remaining is below 
 The Worker self-check item "Card column move re-read and verified" previously required `gh project item-list --limit 500` on every worker exit — ~200 points per worker per lane transition, for very little signal. **Rule:**
 
 - Trust the exit code of `super-board-card.sh move` (it already re-reads stale ids and retries once).
-- If it returned non-zero, re-try once with `sb_gh_guard_check 200` first.
+- If it returned non-zero, re-try once after `bash .claude/bin/super-board-gh-guard.sh check 200`.
 - If still non-zero, write the halt comment and exit. Do not re-query the whole board.
 
 ## 4. Adversarial mode — sub-agent gh-call cap
@@ -82,7 +86,7 @@ When `truth_gate` triggers adversarial mode, each sub-agent (Code-grounder, Hist
 
 ## 5. Backoff on 403 / secondary rate limit
 
-If a `gh` call returns 403 or a body containing `secondary rate limit`, do NOT retry immediately. Sleep 60s, then re-check with `sb_gh_guard_check 500` (stricter threshold) before resuming.
+If a `gh` call returns 403 or a body containing `secondary rate limit`, do NOT retry immediately. Sleep 60s, then re-check with `bash .claude/bin/super-board-gh-guard.sh check 500` (stricter threshold) before resuming.
 
 ## 6. Log remaining quota in your exit handoff comment
 
@@ -92,7 +96,7 @@ Every worker's PR handoff comment MUST include a final line:
 gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000
 ```
 
-Use `sb_gh_guard_summary` to grab the snapshot. This gives the run manifest visibility into which lane is the heaviest consumer over time.
+Use `bash .claude/bin/super-board-gh-guard.sh summary` to grab the snapshot. This gives the run manifest visibility into which lane is the heaviest consumer over time.
 
 ## 7. Per-worker hard cap
 

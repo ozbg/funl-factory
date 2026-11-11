@@ -121,8 +121,8 @@ If the input is ambiguous, default to reviewing the current branch against its u
    - If a blocker is a functional regression, hand it to **Super QA**.
    - If a blocker is visual/design fidelity, file a UI ticket; a human can run `/ui-refine-loop` (the board never triggers it).
    - If it is Backlog, file it and carry on to the merge decision. Do not open a PR thread for it; do not bounce the card.
-     A deepening opportunity → `scripts/super-review-file-refactor.sh`. A bug outside the card's
-     scope → `SUPER_QA_TARGET_OPTION_NAME=Backlog scripts/super-qa-file-bug.sh --kind bug`.
+     A deepening opportunity → `.claude/bin/super-review-file-refactor.sh`. A bug outside the card's
+     scope → `.claude/bin/super-qa-file-bug.sh --kind bug --column Backlog`.
      `--title` is the bare problem: the filer adds the `♻️ [refactor] <scope>:` prefix, so never pass one.
      The `--body-file` uses the ticket format (writing-standard.md § 3): `## Problem`,
      `## Context` (`- **Where:**` the module and files), `## Fix` — the filer refuses a body

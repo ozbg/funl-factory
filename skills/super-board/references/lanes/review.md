@@ -88,18 +88,19 @@ on the base branch**.
 3. Confirm the merge LANDED, do not trust the exit code:
      gh pr view <PR> --json state,mergeCommit -q '.state + " " + (.mergeCommit.oid // "none")'
      Expect: MERGED <sha>.  Then verify the sha is reachable from the base branch:
-     git fetch origin <base> && git merge-base --is-ancestor <sha> origin/<base>
+     git -C <worktree> fetch origin <base>
+     git -C <worktree> merge-base --is-ancestor <sha> origin/<base>     (exit 0 = reachable)
 4. Only after step 3 passes: close the issue, move card Review → Done, rewrite `status` (`> [!TIP]` ✅ Merged) and append the `history` row, post the `[reviewer] [report] ✅ merged` comment
    citing the merge commit sha.
 5. Merge through the gate, never with a bare `gh pr merge`. Record the head you
    reviewed when review passes, and hand it to the gate:
-     HEAD=$(gh pr view <N> --json headRefOid -q .headRefOid)   # at the moment review passes
-     bash .claude/bin/super-board-merge-gate.sh --config <config> --pr <N> --expect-head "$HEAD" \
+     gh pr view <N> --json headRefOid -q .headRefOid     → <head-sha>, at the moment review passes
+     bash .claude/bin/super-board-merge-gate.sh --config <config> --pr <N> --expect-head <head-sha> \
        --subject "<PR title>" --body-file <msg.md>
    <msg.md> = the PR's commit bullets, deduplicated, plus `Closes #<issue>` (writing-standard.md § 1).
-   The gate takes the merge mutex, checks the PR head is still $HEAD, merges the CURRENT
-   base into a scratch worktree at $HEAD, runs `config.verify_commands`, and only then
-   squash-merges with `--match-head-commit $HEAD`. After a merge it runs `cleanup-wt --post-merge`
+   The gate takes the merge mutex, checks the PR head is still <head-sha>, merges the CURRENT
+   base into a scratch worktree at <head-sha>, runs `config.verify_commands`, and only then
+   squash-merges with `--match-head-commit <head-sha>`. After a merge it runs `cleanup-wt --post-merge`
    when the `.claude/hooks/cleanup-wt.py` hook is installed (local only; a cleanup failure never changes the exit). Route by exit code:
     10 → deep review: a non-red PR over `auto_max_lines` (600 source lines). Stdout
           has a `deep-review: <why>` line. No human. Run the **deep review** below,

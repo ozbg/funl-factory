@@ -18,7 +18,15 @@ There is **exactly one branch per issue** and **exactly one PR per issue**. All 
 ## Command shape — every lane, every command
 
 A permission rule matches one plain command. Anything else misses the allowlist and goes to
-the permission checker, which denies GitHub writes and strands the card (#37).
+the permission checker, which denies GitHub writes and strands the card (#37), and in Accept
+edits mode prompts the owner on every call (#94).
+
+- **One literal call per Bash call.** Copy commands as written, with literal paths
+  (`python3 .claude/bin/super-board-github-read.py --check`). No shell variables for paths
+  or values (`R=…`, `SP=…`, `$R`, `"$(…)"`), no `&&`, `;`, `|` or `echo $?`. Every Bash call is
+  a fresh shell, so a variable or a sourced function is gone by the next call anyway. The
+  exit code is in the tool result; read it there. A value you need later (a sha, a path),
+  read it with its own call and paste the literal into the next one.
 
 - `gh`, `.claude/bin/…` and board commands run as one plain command: no `cd … &&` in front,
   no shell loop, no `;` or `&&` chain. Name the repo with `-R <owner>/<repo>` (or
@@ -28,8 +36,9 @@ the permission checker, which denies GitHub writes and strands the card (#37).
   `git -C <worktree> rev-parse --show-toplevel` and `git -C <worktree> branch --show-current`
   name your worktree and branch: lanes can share a shell's working directory (#23).
 - Tests and builds run from the worktree: as the lane's own cwd when it was started there,
-  else pinned in the command (`pnpm -C <worktree> …`, `npm --prefix <worktree> …`, or
-  `cd <worktree> && <test command>` — a local command, never a GitHub one).
+  else pinned with the runner's own flag (`pnpm -C <worktree> …`, `npm --prefix <worktree> …`,
+  `npx playwright test --config <worktree>/playwright.config.ts`). `cd <worktree> && …` only
+  when the runner has no such flag: it is a local command, never a GitHub one, and it prompts.
 - Verify runs in the **foreground** and you wait for it: never `run_in_background`, `&` or
   `nohup`. A lane that hands back while verify runs hands back nothing.
 - Cap test workers at 2 per lane, or parallel lanes overload the machine and timing tests
@@ -222,10 +231,9 @@ Workers share the orchestrator's gh-auth token bucket. Every worker MUST follow 
 
 - Move and read cards with `.claude/bin/super-board-card.sh --config <cfg> move <issue> <Status>` / `status <issue>` — 1 GraphQL point. Every "move card X → Y" in the lane lifecycles means this call. Comments, labels and PR reads go over REST (`rate-limit-etiquette.md` → "Price list").
 
-- Source `scripts/super-board-gh-guard.sh` at worker start.
-- Call `sb_gh_guard_check 200` before any burst of gh calls (thread reads, sub-agent spawn, exit verification).
+- Call `bash .claude/bin/super-board-gh-guard.sh check 200` before any burst of gh calls (thread reads, sub-agent spawn, exit verification). One plain call; never `source` it from a lane.
 - Adversarial sub-agents are capped at 50 gh calls each — prefer `git blame` (local) over `gh api graphql`.
-- Final PR handoff comment MUST include `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` (use `sb_gh_guard_summary`).
+- Final PR handoff comment MUST include `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` (use `bash .claude/bin/super-board-gh-guard.sh summary`).
 - On 403 / secondary-rate-limit: sleep 60s, re-check at threshold 500, then resume.
 
 ## Worker self-check (mandatory on exit, every lane)

@@ -58,6 +58,18 @@ for rule in ("Bash(python3 .claude/bin/super-board-github-read.py:*)",
              "Bash(.claude/bin/super-board-github-read.py:*)"):
     check(rule in base_rules, f"base allowlist misses {rule}")
 
+# Read-only commands and the guard's one-call form are in the base list; test runners come
+# from the project itself (#94).
+for rule in ("Bash(bash .claude/bin/super-board-gh-guard.sh:*)", "Bash(git status:*)",
+             "Bash(git diff:*)", "Bash(git log:*)", "Bash(git rev-parse:*)", "Bash(git merge-base:*)",
+             "Bash(gh pr list:*)", "Bash(gh issue list:*)", "Bash(ls:*)", "Bash(cat:*)",
+             "Bash(grep:*)", "Bash(jq:*)"):
+    check(rule in base_rules, f"base allowlist misses {rule}")
+for rule in ("Bash(find:*)", "Bash(sed:*)", "Bash(node:*)", "Bash(bash .claude/bin/:*)"):
+    check(rule not in rules, f"allowlist must not pre-approve {rule}")
+check(text.count("super-board-settings.py runner-rules .") >= 2,
+      "onboard must add the project's test runners from super-board-settings.py runner-rules (base list and step 6)")
+
 # Lanes' one route to resolve threads, edit comments, and create the deep-review label (#8).
 for rule in ("Bash(gh api:*)", "Bash(gh api graphql:*)", "Bash(gh label create:*)"):
     check(rule in base_rules, f"base allowlist misses {rule}")
@@ -67,7 +79,55 @@ SHAPE = re.compile(r"\bcd [^`\n]*?&&\s*(?:gh |(?:bash |python3 )?\.claude/bin/)|
 for path in CALLERS:
     for m in SHAPE.finditer(path.read_text()):
         failures.append(f"{path.relative_to(ROOT)}: `{m.group(0)}` puts a gh or board command behind cd or a loop")
+# Lane commands are one literal call each: no shell variables for paths or values, no
+# chaining, no `echo $?` (#94). Every Bash call is a fresh shell, and a chain matches no rule.
+LANE_DOCS = [p for p in CALLERS if p.suffix == ".md"] + [
+    ROOT / "skills/super-board/references/github-cheatsheet.md",
+    ROOT / "skills/super-board/references/rate-limit-etiquette.md",
+    ROOT / "skills/to-board/references/filing.md",
+    ROOT / "skills/super-collect/SKILL.md",
+]
+# A command, or an env-prefixed command (`NAME=x cmd …`). A bare `NAME=1` names a setting.
+CMD_START = re.compile(r"(?:python3|bash|sh|source|gh|git|npm|npx|pnpm|yarn|mkdir|node|\.claude/bin/)\b|[A-Z][A-Z0-9_]*=\S*\s+\S")
+CHAIN = re.compile(r"&&|\|\||;\s*\S|\$\?|\$\(|\$\{?[A-Z][A-Z0-9_]*\b|^[A-Z][A-Z0-9_]*=")
+
+
+def command_spans(text):
+    """Commands a lane might copy: lines of fenced blocks, and inline code spans."""
+    fenced = False
+    for n, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if "No shell variables" in line:  # the rule itself names the forbidden forms
+            continue
+        if fenced:
+            yield n, line.split("  #")[0].strip()
+        else:
+            for span in re.findall(r"`([^`]+)`", line):
+                yield n, span.strip()
+
+
+for path in LANE_DOCS:
+    for n, span in command_spans(path.read_text()):
+        if CMD_START.match(span) and CHAIN.search(span):
+            failures.append(f"{path.relative_to(ROOT)}:{n}: `{span}` chains commands or uses a shell variable")
+
+wave = (ROOT / "workflows/super-board-wave.js").read_text()
+WAVE_BAD = re.compile(r'\$PWD\b|\$\(|&&\s*(?:python3|bash|gh|git|\.claude/)|;\s*echo|echo \$\?|\b[A-Z]{1,4}=\.claude/bin'
+                      r"|sb_gh_guard_check|source \.claude/bin")
+for n, line in enumerate(wave.splitlines(), 1):
+    if line.lstrip().startswith("`Command shape:"):
+        continue
+    for m in WAVE_BAD.finditer(line):
+        failures.append(f"workflows/super-board-wave.js:{n}: `{m.group(0)}` in a lane prompt is not one plain call")
+check("one literal call" in wave and "python3 .claude/bin/super-board-github-read.py --check" in wave,
+      "lane prompts must state the command shape with a literal example")
+check("bash .claude/bin/super-board-gh-guard.sh check 200" in wave,
+      "lane prompts must give the guard as one plain call")
+
 common = (ROOT / "skills/super-board/references/lanes/common.md").read_text()
+check("**One literal call per Bash call.**" in common, "lanes/common.md must give the one-call rule")
 check("resolveReviewThread" in common and "gh api -X PATCH" in common,
       "lanes/common.md must give the one route to resolve threads and edit comments")
 

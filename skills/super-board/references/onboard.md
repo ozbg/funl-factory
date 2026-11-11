@@ -331,7 +331,10 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    Permission lines: the base list in "Mid-run permission prompts" below, plus the
    merge lines when merge_policy.default is "auto" ("Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
    "Bash(gh pr merge:*)"), one "Bash(<migrate command>)" per allowed env, "Bash(bash
-   .claude/bin/super-board-env-check.sh:*)" and the test runner. N counts what is NOT already in
+   .claude/bin/super-board-env-check.sh:*)" and the test-runner lines that
+   `python3 $SB/super-board-settings.py runner-rules .` prints (npm/pnpm/yarn/bun scripts,
+   npx playwright, vitest, jest, tsc, eslint, prettier, vite; pytest; make test; go and cargo
+   test; one per line, from the project's own files). N counts what is NOT already in
    settings.json: `super-board-settings.py allow .claude/settings.json <rules…> --dry-run`.
 
 7. 📥 BUG SOURCES — tick sources; "Add another source" is the free-text box
@@ -442,7 +445,20 @@ don't stall on prompts:
     "Bash(bash .claude/bin/super-board-stop.sh:*)",
     "Bash(gh api graphql:*)", "Bash(gh label create:*)",
     "Bash(source .claude/bin/super-board-gh-guard.sh:*)",
-    plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
+    "Bash(bash .claude/bin/super-board-gh-guard.sh:*)",
+    "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)",
+    "Bash(git rev-parse:*)", "Bash(git merge-base:*)", "Bash(git ls-files:*)",
+    "Bash(git ls-remote:*)", "Bash(git config --get:*)", "Bash(git branch --show-current:*)",
+    "Bash(gh pr list:*)", "Bash(gh issue list:*)", "Bash(gh project view:*)",
+    "Bash(gh project field-list:*)", "Bash(gh auth status:*)",
+    "Bash(ls:*)", "Bash(cat:*)", "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)",
+    "Bash(grep:*)", "Bash(jq:*)", "Bash(sleep:*)",
+    plus your project's test runners, from `python3 .claude/bin/super-board-settings.py runner-rules .`
+    (e.g. "Bash(npm test:*)", "Bash(npm run:*)", "Bash(npx playwright:*)", "Bash(npx vitest:*)").
+
+The read-only lines are safe to pre-approve because the guard-secrets hook still denies any
+of them that touches a secrets file. Not in the list on purpose: `find` (`-delete`, `-exec`),
+`sed` (`-i`), `node` and wildcards over `.claude/bin/` (they would cover the merge gate).
 
 A rule matches one plain command only. A lane command behind `cd … &&`, in a
 shell loop or chained with `;` misses every rule and goes to the permission
