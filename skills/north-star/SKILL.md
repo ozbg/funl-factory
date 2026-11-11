@@ -28,7 +28,7 @@ Win condition: the owner says **yes** to the postcard with every must-have **at 
 - **Business is theirs, tech is yours.** Never ask about tech unless it changes cost, privacy or hosting.
 - **Pillars, not details.** If you catch yourself asking about a field, a button or a colour, stop. Park it in `later.md`.
 - **Count out loud.** From the drill on, every answer ends with the clarity line (step 5).
-- **No cap, no padding.** Drill only what is below the bar. The moment every must-have meets it and the north star, core loop and never list are clear, go to the sparkle.
+- **No cap, no padding.** Drill only what is below the bar. The moment every must-have meets it and the north star, core loop and never list are clear, run the clarity review (step 5), then go to the sparkle.
 - **"Enough" always ends it.** The owner can say it at any time. Stop drilling; each must-have still below the bar goes under `## Assumed (not asked)` as `M<n>: assumed <missing items> (owner closed)`.
 
 ## Steps
@@ -71,6 +71,10 @@ Score each must-have 0 to 4 against the bar, in your draft. Then, one question a
 - **One missing item per question**, with your guess, worded so "yes" accepts it.
 - **A clear must-have gets one confirming question** ("M2 is <one line>: right?"), then stop drilling it.
 - After each answer, show the clarity line: `Clear: M1, M3 · Drilling: M2 (2/4: no edge case) · Questions: 9`
+
+**Clarity review**, once every must-have is clear (skipped if the owner already said "enough"). Spawn **one fresh sub-agent, model fable**, read-only (it writes no file, edits nothing). Give it only the silent draft and the owner's own words: their answers verbatim and any docs they pointed to. Never your reasoning, never a guess passed off as fact. It looks for must-haves a builder or the AI would still have to guess, contradictions, and thin or missing day-one answers. It returns **at most 6 questions**, ranked by rework cost, each one line: `R<n> · <question> · suggested: <answer> · rests on: <line>`.
+
+Give your take on each (agree or pass, and why). Ask the ones you agree with **inside the drill**, one at a time, with the suggested answer as your guess. The clarity line keeps updating. "Enough" still ends it.
 
 ### 6. Sparkle
 
@@ -134,10 +138,10 @@ Put parked details in `<out>/later.md`. Day-one lines go only in `## Day-one que
 
 Then run the **blind test**: start a sub-agent with a fresh context. Give it only the postcard, the core loop and the must list. Ask it to describe the MVP in 10 lines: its screens and what the user does on each. Show the owner the sketch and ask: "How close is this to what's in your head, 1 to 5?" Wait for the number before writing the log. This is the owner's score, never yours.
 
-**Always** append one line to `<out>/north-star-log.jsonl`, even if the blind test was skipped (then `"blind_match":null`). `day_one` counts the day-one lines per must-have, `per_must` the questions asked about each, and `owner_closed` the must-haves closed with "enough" (`[]` if none). Create the file if it doesn't exist. A run with no log line can't be compared:
+**Always** append one line to `<out>/north-star-log.jsonl`, even if the blind test was skipped (then `"blind_match":null`). `day_one` counts the day-one lines per must-have, `per_must` the questions asked about each, and `owner_closed` the must-haves closed with "enough" (`[]` if none), and `review_questions` the clarity review's questions you asked. Create the file if it doesn't exist. A run with no log line can't be compared:
 
 ```json
-{"date":"","idea":"","depth":"","panel":false,"questions":0,"minutes":0,"postcard":"yes|nearly-then-yes|no","postcard_attempts":1,"musts":0,"day_one":{"M1":0},"per_must":{"M1":0},"owner_closed":[],"blind_match":0,"notes":""}
+{"date":"","idea":"","depth":"","panel":false,"questions":0,"minutes":0,"postcard":"yes|nearly-then-yes|no","postcard_attempts":1,"musts":0,"day_one":{"M1":0},"per_must":{"M1":0},"owner_closed":[],"review_questions":0,"blind_match":0,"notes":""}
 ```
 
 End with the scorecard:
