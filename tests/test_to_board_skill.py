@@ -52,6 +52,16 @@ class ToBoardSkill(unittest.TestCase):
                      "data the goal needs", "over-engineering"):
             self.assertIn(look, s)
 
+    def test_spec_review_reads_as_an_attacker(self):
+        s = self.section("Spec review")
+        self.assertIn("model fable", s)
+        self.assertIn("**as an attacker:**", s)
+        for want in ("reach another's data", "without signing in", "guessed id", "leaked link",
+                     "break a must-never or cross users", "missing spec rule or invariant",
+                     "the test that closes it", "No generic hardening advice",
+                     "Attacker findings share the 8 and are marked `abuse`"):
+            self.assertIn(want, s)
+
     def test_spec_review_owner_decides(self):
         s = self.section("Spec review")
         self.assertIn("**your take** on each", s)

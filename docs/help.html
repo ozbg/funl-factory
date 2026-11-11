@@ -216,7 +216,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
         <ol>
           <li>Reads the north star, the mock-up and any existing code, then makes the technical calls: stack, data model, how it's tested.</li>
           <li>Writes the <strong>one-page build spec</strong>.</li>
-          <li>Spec review: a fresh Fable agent checks the spec against the north star, the mock-up and your inputs. The factory gives its take on each finding; you decide what changes.</li>
+          <li>Spec review: a fresh Fable agent checks the spec against the north star, the mock-up and your inputs, then reads it as an attacker: can one client reach another's data, what works without signing in, which path breaks a must-never. The factory gives its take on each finding; you decide what changes.</li>
           <li>Drafts the zone map: which files are risky (red), features (amber) or looks only (green).</li>
           <li>Cuts the work into cards: a foundation card first (the skeleton and one finished example of each pattern), a thin slice for each step of the core loop, and a Demo card last that walks the whole loop.</li>
           <li>Blind review: a fresh agent checks the cards against the north star without seeing the spec, and Haiku reads every card and lists any question it would need answered. One round of fixes.</li>
