@@ -117,6 +117,7 @@ Not its job: visual polish, wording, features for their own sake. Relay every fi
 Run Anthropic's `frontend-design` skill on `<out>/mockup.html` (onboarding checks the plugin is on; if it is missing, say "Enable the frontend-design plugin, start a new session (plugins load at session start), then re-run /mockup" and stop). One pass: sizing, spacing, type scale, buttons, consistent components. Rules:
 - **Presentation only.** Keep every `screen-<name>` id, every button, every flow and every behaviour. No new screens or features. The step 3 file rules still hold (no network, no web fonts); rerun the step 4 checks after.
 - Take **before and after screenshots** of each tab at desktop (1280px) and phone (390px) width, and show them side by side.
+- **Own session? Hand back.** When the polish runs in a session of its own, its brief ends: "When the owner has picked, say: Polish done. Go back to <the /mockup session, linked> for the postcard check." It writes nothing past its picks; the /mockup session runs step 9.
 - The owner picks what stays; log it. The kept CSS tokens (type scale, spacing, colours) at the top of the style block are the design baseline `/to-board` points UI cards at.
 
 ### 9. The postcard check

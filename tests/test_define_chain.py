@@ -39,7 +39,8 @@ class Mockup(unittest.TestCase):
         s = section(MOCKUP, "Design polish")
         for want in ("`frontend-design`", "Keep every `screen-<name>` id", "every button",
                      "every behaviour", "before and after screenshots", "1280px", "390px",
-                     "owner picks what stays", "start a new session (plugins load at session start)"):
+                     "owner picks what stays", "start a new session (plugins load at session start)",
+                     "Polish done. Go back to", "for the postcard check"):
             self.assertIn(want, s)
 
     def test_hand_off_depends_on_board_config(self):
