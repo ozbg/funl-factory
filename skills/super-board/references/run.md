@@ -86,7 +86,7 @@ card; `super-board-wave.js` sends a `qa` card from Ready straight to the Tester.
 
 **Green skips QA.** When the Builder's zone step reports `green` (and no `zone:amber`/`zone:red`
 label), the Builder moves the card Building → Review and the wave runs the Reviewer next, with
-no Tester. A `qa` card still goes to QA. A ticket with a `Zone:` line skips the classify
+no Tester. A `qa` card still goes to QA, and so does an exam card (a `## Exam` section). A ticket with a `Zone:` line skips the classify
 agent: green, amber, red mean low, medium, high complexity.
 
 ```

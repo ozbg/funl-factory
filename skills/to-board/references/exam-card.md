@@ -46,7 +46,7 @@ The card template's sections, with these differences:
 - Title: `🧪 [test] exam: M<n> <feature> on the real model`
 - **Files:** the exam file, its seed file, and the file that holds the exam command and the
   exclusion (for example `package.json`). At most 5.
-- **Zone:** the zone the files give, but never green: QA must run the exam.
+- **Zone:** the zone the files give. Even when green, the wave sends an exam card to QA: QA must run the exam.
 - **Must-have served:** the AI feature's number.
 - **Pattern:** the foundation's test file.
 - **Needs judgement:** `yes — AI exam on the real model`. Build and QA run on Sonnet. Exam cards do

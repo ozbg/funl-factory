@@ -175,7 +175,7 @@ class ExamCard(unittest.TestCase):
                      "**expected answer**", "`facts:`", "`rubric:`", "**Pass mark:**", "**Real model only.**",
                      "refuses to\n  start on the fake or mock model", "**Seeded realistically.**", "**Privacy.**",
                      "only what the app itself would send to that provider", "never runs it",
-                     "**Needs judgement:** `yes — AI exam on the real model`", "never green", "## Exam\n"):
+                     "**Needs judgement:** `yes — AI exam on the real model`", "the wave sends an exam card to QA", "## Exam\n"):
             self.assertIn(want, self.EXAM, want)
 
     def test_qa_lane_runs_exam_and_records_score(self):

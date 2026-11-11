@@ -127,6 +127,14 @@ const amber = '## Context\n- **Zone:** amber\n'
   eq(g.card.lanesRun, 'build:advanced → review:advanced', 'green lanes')
   eq(g.card.tier, 'green', 'summary tier')
   ;/Building → Review, not QA/.test(g.prompts['build:#6']) || fail('build prompt must route green to Review')
+  // 4b — an exam card (## Exam section) never skips QA, even on a green build.
+  const ex = await run({ cards: [card(16, { lane: 'build', body: '## Problem\nx\n\n## Exam\nPass mark: 8/10\n' })] },
+    { 'build:#16': { status: 'advanced', column: 'QA', detail: 'built', tier: 'green', maxRounds: 1 } })
+  ex.prompts['qa:#16'] || fail('an exam card must run the QA lane even when green')
+  ;/Green card: it skips QA/.test(ex.prompts['review:#16'] || '') && fail('exam card review must not say it skipped QA')
+  ;/Exam card: it never skips QA/.test(ex.prompts['build:#16']) || fail('build prompt must route an exam card to QA')
+  ;/Building → Review, not QA/.test(ex.prompts['build:#16']) && fail('build prompt must not route an exam card to Review')
+  eq(ex.card.lanesRun, 'build:advanced → qa:advanced → review:advanced', 'exam card lanes')
   // Amber still goes through QA, and the built card's QA entry passes skills-ready (was exit 64).
   const am = await run({ cards: [card(7, { lane: 'build' })] },
     { 'build:#7': { status: 'advanced', column: 'QA', detail: 'built', tier: 'amber' } })

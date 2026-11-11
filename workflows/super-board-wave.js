@@ -266,7 +266,10 @@ const lanePrompt = (lane, card, { greenEntry = false } = {}) => [
   `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' || lane === 'review' ? BOUNCE_RULES : []),
-  ...(lane === 'build' && !labelsOf(card).includes('qa')
+  ...(lane === 'build' && hasExam(card)
+    ? [`Return tier and maxRounds from your zone step (3c). Exam card: it never skips QA, even when green: move the card Building → QA and return column QA.`]
+    : []),
+  ...(lane === 'build' && !labelsOf(card).includes('qa') && !hasExam(card)
     ? [`Return tier and maxRounds from your zone step (3c). Green tier, and no zone:amber or zone:red label → no QA lane: move the card Building → Review, not QA, and return column Review.`]
     : []),
   ...(greenEntry
@@ -335,6 +338,8 @@ const zoneOfBody = (card) => {
   const m = typeof card.body === 'string' && card.body.match(ZONE_LINE)
   return m ? m[1].toLowerCase() : null
 }
+// An exam card (to-board/references/exam-card.md) never skips QA: QA runs its exam on the real model.
+const hasExam = (card) => typeof card.body === 'string' && /^##[ \t]+Exam[ \t]*$/m.test(card.body)
 const zoneOfLabels = (card) => highest(...labelsOf(card).map((l) => (l.match(/^zone:(green|amber|red)$/) || [])[1]))
 // N in `loop:rebuild-N` when the wave started: rebuilds so far (none = 0).
 const rebuildsOf = (card) => Math.max(0, ...labelsOf(card).map((l) => +((l.match(/^loop:rebuild-(\d+)$/) || [])[1] || 0)))
@@ -534,8 +539,8 @@ const results = await pipeline(
       if (b.status !== 'advanced') return done()
       zone = highest(zone, b.tier)
       // Green skips QA (lanes/qa.md step 4): Build → Review. Only on the
-      // builder's own zone-script tier, never on the ticket's word alone.
-      greenEntry = b.tier === 'green' && zone === 'green'
+      // builder's own zone-script tier, never on the ticket's word alone. Never an exam card.
+      greenEntry = b.tier === 'green' && zone === 'green' && !hasExam(card)
       at = greenEntry ? 'Review' : 'QA'
     }
     // A `qa`-labelled card skips Building: Ready → QA, Tester first
