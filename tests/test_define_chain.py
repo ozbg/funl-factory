@@ -56,7 +56,7 @@ class Chain(unittest.TestCase):
     def test_north_star_hands_to_mockup(self):
         ns = (ROOT / "skills/north-star/SKILL.md").read_text()
         self.assertIn('"North star signed. Next: /mockup"', ns)
-        self.assertLessEqual(len(ns.splitlines()), 150)
+        self.assertLessEqual(len(ns.splitlines()), 160)
 
     def test_onboard_checks_plugin_and_names_dry_run(self):
         ob = (ROOT / "skills/super-board/references/onboard.md").read_text()

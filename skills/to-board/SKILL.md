@@ -57,8 +57,22 @@ Nobody independent has checked spec.md, and the blind review (step 7) never sees
 - data the goal needs that the model can't record (for example, when a client counts as won)
 - over-engineering for a small app for a small business
 - **as an attacker:** holes the spec leaves open. Can one user or client reach another's data? What answers without signing in, or to a guessed id or a leaked link? Which path breaks a must-never anyway? Report only holes that break a must-never or cross users; each finding names the missing spec rule or invariant and the test that closes it. No generic hardening advice
+- **capability pass:** for each must-have, each of its lines under `## Day-one questions` in north-star.md: can this design answer it? `yes` or `no`, and why, naming the spec line that decides it (an invariant, a decision, a missing field). A north star with no such section: it writes one likely question per must-have and marks it `guessed`
+- **rules with no parent:** every invariant or must-never in spec.md that no north-star line asks for. The spec must not invent limits
 
 Output, under 700 words: at most 8 findings ranked by impact, each citing the north-star line, mock-up screen or owner input it rests on, with the smallest fix. Attacker findings share the 8 and are marked `abuse`. Not its job: the cards (step 7), wording or style.
+
+After the findings, outside the 8 and the word count, two blocks the owner always sees:
+
+```
+| Must-have | Day-one question | Can answer? | Why |
+|---|---|---|---|
+| M1 | <question> | no | I7: one model round, so tool results never reach the model |
+
+No north-star parent: I7 (keep or drop?)
+```
+
+One row per day-one question; with no such rules, `No north-star parent: none`. Every `no` and every rule with no parent needs the owner's call, like a finding.
 
 Relay every finding to the owner with **your take** on each (agree, modify or pass, and why). **The owner decides; nothing is applied without them.** Fix spec.md with the accepted ones in one pass, then cut cards. This does not replace the blind review or the Haiku read.
 

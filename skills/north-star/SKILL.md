@@ -57,6 +57,7 @@ Show your pre-sorted list in three columns. Sort with these tests:
 - **Monday test:** if it were missing on Monday morning, would they still use the app? If yes, it is not a must.
 - **North-star test:** does it move the north star? If not, it is nice.
 - **Forced choice:** if the must list is too long for the depth, ask them to keep the top 3 (prototype) or 5 (product).
+- **Day-one test:** under each must, ask "what will you ask or do with this on day one, and what's a good answer?" with your guess, for them to accept or fix. It rides on this round's questions, so it costs no extra one. A must with no day-one line isn't clear yet.
 
 Then ask the one question: "What must it never do?" Offer your guesses (lose data, send something without asking, show it to the wrong person, cost more than X).
 
@@ -101,6 +102,9 @@ Signed: <date> · depth: <prototype|product> · questions: <n> · minutes: <n>
 ## Must have
 1. <must> - why: <ties to the pain>
 
+## Day-one questions
+- M<n>: <what they'll ask or do on day one> → <a good answer>
+
 ## Must never
 - <never>
 
@@ -114,14 +118,14 @@ Signed: <date> · depth: <prototype|product> · questions: <n> · minutes: <n>
 - <assumption> - <why it didn't change the plan>
 ```
 
-Put parked details in `<out>/later.md`.
+Put parked details in `<out>/later.md`. Day-one lines go only in `## Day-one questions`, one per line, never in the postcard; the AI exam and the agent walk read them.
 
 Then run the **blind test**: start a sub-agent with a fresh context. Give it only the postcard, the core loop and the must list. Ask it to describe the MVP in 10 lines: its screens and what the user does on each. Show the owner the sketch and ask: "How close is this to what's in your head, 1 to 5?" Wait for the number before writing the log. This is the owner's score, never yours.
 
-**Always** append one line to `<out>/north-star-log.jsonl`, even if the blind test was skipped (then `"blind_match":null`). Create the file if it doesn't exist. A run with no log line can't be compared:
+**Always** append one line to `<out>/north-star-log.jsonl`, even if the blind test was skipped (then `"blind_match":null`). `day_one` counts the day-one lines per must-have. Create the file if it doesn't exist. A run with no log line can't be compared:
 
 ```json
-{"date":"","idea":"","depth":"","panel":false,"questions":0,"minutes":0,"postcard":"yes|nearly-then-yes|no","postcard_attempts":1,"musts":0,"blind_match":0,"notes":""}
+{"date":"","idea":"","depth":"","panel":false,"questions":0,"minutes":0,"postcard":"yes|nearly-then-yes|no","postcard_attempts":1,"musts":0,"day_one":{"M1":0},"blind_match":0,"notes":""}
 ```
 
 End with the scorecard:
