@@ -56,8 +56,9 @@ Nobody independent has checked spec.md, and the blind review (step 7) never sees
 - states, rules or flows the mock-up shows that spec.md leaves out, or the reverse
 - data the goal needs that the model can't record (for example, when a client counts as won)
 - over-engineering for a small app for a small business
+- **as an attacker:** holes the spec leaves open. Can one user or client reach another's data? What answers without signing in, or to a guessed id or a leaked link? Which path breaks a must-never anyway? Report only holes that break a must-never or cross users; each finding names the missing spec rule or invariant and the test that closes it. No generic hardening advice
 
-Output, under 700 words: at most 8 findings ranked by impact, each citing the north-star line, mock-up screen or owner input it rests on, with the smallest fix. Not its job: the cards (step 7), wording or style.
+Output, under 700 words: at most 8 findings ranked by impact, each citing the north-star line, mock-up screen or owner input it rests on, with the smallest fix. Attacker findings share the 8 and are marked `abuse`. Not its job: the cards (step 7), wording or style.
 
 Relay every finding to the owner with **your take** on each (agree, modify or pass, and why). **The owner decides; nothing is applied without them.** Fix spec.md with the accepted ones in one pass, then cut cards. This does not replace the blind review or the Haiku read.
 
