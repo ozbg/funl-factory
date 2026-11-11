@@ -94,7 +94,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
 </header>
 
 <nav class="bar" aria-label="Sections"><div class="in">
-  <a href="#path">The path</a><a href="#stages">Step by step</a><a href="#files">Where things live</a><a href="#board">The board</a><a href="#zones">Zones</a><a href="#security">Security</a><a href="#standards">Code standards</a><a href="#qa">QA</a><a href="#done">Done</a><a href="#models">Models</a><a href="#numbers">Numbers</a><a href="#sdd">Spec-driven</a><a href="#you">Your calls</a><a href="#skills">Skills</a>
+  <a href="#path">The path</a><a href="#stages">Step by step</a><a href="#files">Where things live</a><a href="#board">The board</a><a href="#zones">Zones</a><a href="#security">Security</a><a href="#standards">Code standards</a><a href="#qa">QA</a><a href="#done">Done</a><a href="#models">Models</a><a href="#numbers">Numbers</a><a href="#sdd">Spec-driven</a><a href="#you">Your calls</a><a href="#after-v1">After v1</a><a href="#lessons">Lessons</a><a href="#skills">Skills</a>
 </div></nav>
 
 <main class="wrap">
@@ -238,8 +238,8 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   <div class="stage">
     <div class="sh"><span class="n">4</span><h3><span class="cmd">/super-board run</span> · the build</h3><span class="tag fac">factory</span></div>
     <dl>
-      <dt>Does</dt><dd>Drains the board in waves. For each card: a builder (Haiku, or Sonnet for red and flagged cards) works in its own copy of the code, writes the tests first, makes the change and opens a draft PR. QA proves every check. An Opus reviewer reads it, and the merge gate re-runs everything against the latest <code>main</code> before merging. Cards that don't pass go back, at most 1–3 times by zone, then wait in Blocked with the reason.</dd>
-      <dt>You</dt><dd>Nothing, unless a digest asks: a 🙋 card (money, auth, a destructive schema change, a live database) or a budget question.</dd>
+      <dt>Does</dt><dd>Drains the board in waves. For each card: a builder (Haiku, or Sonnet for red and flagged cards) works in its own copy of the code, writes the tests first, makes the change and opens a draft PR. QA proves every check. A Sonnet reviewer reads it (Opus on red cards), and the merge gate re-runs everything against the latest <code>main</code> before merging. Cards that don't pass go back, at most 1–3 times by zone, then wait in Blocked with the reason. Waves run 3 cards wide by default, picked so no two cards touch the same files.</dd>
+      <dt>You</dt><dd>Nothing, unless a digest asks: a 🙋 card (money, auth, a destructive schema change, a live database) or a budget question. If a safety check refuses a lane's merge, the foreman runs the merge gate itself, pinned to the exact commit that was reviewed. You aren't asked to click merge on work you'd just approve anyway.</dd>
       <dt>Output</dt><dd>Merged PRs on <code>main</code>, cards in Done, a short digest on each merge, breach or question. <span class="cmd">/super-board status</span> shows where it is any time.</dd>
       <dt>Next</dt><dd>When the Demo card is Done, use the app and check it against the postcard.</dd>
     </dl>
@@ -370,7 +370,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Ready</td><td><span class="cmd">/to-board</span> after your scope review</td><td>Lint checks it. The planner admits it if it has ACs, a must-have and no file clash.</td></tr>
     <tr><td>Building</td><td>A wave picks it up</td><td>Its own worktree. Test first, smallest change, draft PR.</td></tr>
     <tr><td>QA</td><td>Amber and red cards after Build</td><td>Every AC proven by a test; red adds invariant tests and a security pass.</td></tr>
-    <tr><td>Review</td><td>After QA, or straight from Build for green</td><td>Opus reviews, then the merge gate re-proves the branch and merges.</td></tr>
+    <tr><td>Review</td><td>After QA, or straight from Build for green</td><td>Sonnet reviews (Opus on red), then the merge gate re-proves the branch and merges.</td></tr>
     <tr><td>Blocked</td><td>Round cap hit, or a step only you can do (🙋)</td><td>Last comment line says <code>blocked-by:</code> and what's needed.</td></tr>
     <tr><td>Done</td><td>Merged through the gate</td><td>Counts towards its must-have in <code>coverage.md</code>.</td></tr>
   </table></div>
@@ -395,7 +395,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><th>Level</th><th>Done when</th><th>Checked by</th></tr>
     <tr><td>Card</td><td>Every AC ticked, each with a proof that names a file at the PR head, and the gate's own test run is green. Unmet AC → back to Build, or split into a new linked card.</td><td>Merge gate (exit 13 refuses)</td></tr>
     <tr><td>Must-have</td><td>Every card listed for it in <code>coverage.md</code> is Done.</td><td><code>super-board-coverage.py</code></td></tr>
-    <tr><td>Milestone</td><td>Every must-have done, and the Demo card walked the whole core loop against the mock-up.</td><td>Demo card · status line</td></tr>
+    <tr><td>Milestone</td><td>Every must-have done, and the Demo card walked the whole core loop against the mock-up. <span class="tag a">building now</span> Plus: an agent walks every screen of the real app with the real AI, each screen matches the mock-up, and every AI feature passes its exam.</td><td>Demo card · agent walk · report</td></tr>
     <tr><td>App</td><td>You use it and say yes to the postcard.</td><td>You</td></tr>
   </table></div>
 </section>
@@ -428,7 +428,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Validate at the edge</td><td>Inputs are checked where they enter: forms, APIs, files. Part of the amber bar, so QA can cite it.</td><td>QA</td></tr>
     <tr><td>Test first</td><td>Every acceptance check gets a test that fails before the change and passes after.</td><td>Builder (<span class="cmd">/tdd</span>), QA, merge gate</td></tr>
     <tr><td>Smallest safe change</td><td>Only the files the card lists. Copy the pattern the foundation card set; don't invent a new one.</td><td>Review: scope drift</td></tr>
-    <tr><td>Small cards</td><td>About 5 files and 200 lines. A PR over 600 source lines gets a deeper review.</td><td><span class="cmd">/to-board</span>, merge policy</td></tr>
+    <tr><td>Small cards</td><td>About 5 files and 200 lines per card, because small cards bounce less. A PR's size never blocks a merge (the cap is 5000 lines): every bounce costs tokens, and on small business apps a bigger proven PR beats a split.</td><td><span class="cmd">/to-board</span>, merge policy</td></tr>
     <tr><td>No gold plating</td><td>Build what the checks need, nothing more. Extra is flagged as over-engineering (a note, never a bounce).</td><td>Review</td></tr>
     <tr><td>Reuse, not DRY</td><td>Use what already exists (the card's Pattern, an existing helper). Don't build new shared abstractions mid-card, or touch other cards' files to share code. Real repetition gets cleaned up after the milestone by a refactor card from <span class="cmd">/super-collect architecture</span>.</td><td>Review: "already in the codebase?"</td></tr>
     <tr><td>Project conventions</td><td>Whatever the app's <code>AGENTS.md</code> / <code>CLAUDE.md</code> says.</td><td>Builder, review</td></tr>
@@ -463,7 +463,8 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   <div class="tablebox"><table>
     <tr><th>Lane</th><th>Model</th><th>When it changes</th></tr>
     <tr><td>Build, QA</td><td>Haiku</td><td>Sonnet for red cards and cards marked <code>Needs judgement: yes</code>. Nothing else moves up without your OK.</td></tr>
-    <tr><td>Review</td><td>Opus (the session)</td><td>Never. It's the quality gate.</td></tr>
+    <tr><td>Review</td><td>Sonnet</td><td>Opus (the session) on red cards. It's the quality gate.</td></tr>
+    <tr><td>AI exam, agent walk</td><td>Sonnet <span class="tag a">building now</span></td><td>Judging whether an app is useful and looks right needs more than Haiku.</td></tr>
     <tr><td>Classify, pre-flight</td><td>Haiku</td><td>—</td></tr>
   </table></div>
   <p>Many cards marked <code>Needs judgement</code> means the spec isn't finished. Fix the spec, not the model.</p>
@@ -523,7 +524,55 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Merge money, auth and destructive-schema PRs; run anything on a live database</td><td>A 🙋 card in Blocked</td></tr>
     <tr><td>Keep going, raise the budget, or stop</td><td>Budget breach in the digest</td></tr>
     <tr><td>Re-read the north star next morning</td><td>The day after signing</td></tr>
+    <tr><td>Accept or reject a proposal from triage</td><td>The proposals digest, after v1</td></tr>
   </table></div>
+</section>
+
+<section id="after-v1">
+  <h2>After v1: how changes flow <span class="tag a">building now</span></h2>
+  <p class="sub">Once the first version ships, every change takes one of three tracks. The size of what it touches picks the track, not its label. Agents do the legwork; you decide direction.</p>
+  <div class="tablebox"><table>
+    <tr><th>Track</th><th>What it is</th><th>What it goes through</th><th>You</th></tr>
+    <tr><td>Bug</td><td>The app differs from the spec or the design</td><td>Reproduce it, ticket it with a test that fails now, then build, QA and review</td><td>Nothing: the spec already decided what's right</td></tr>
+    <tr><td>Tweak</td><td>A look, copy or behaviour change on one screen, with no contract or data change</td><td>Ticket with before and after, then lanes. Proof is a screenshot next to the baseline.</td><td>Only if it changes how the product behaves</td></tr>
+    <tr><td>Body of work</td><td>Touches a rule (<code>I1</code>…), the data model, or more than one screen</td><td>Grill it with day-one questions, then the exam, the brief, Fable review, your signature, the spec, cards, a run, an agent walk and the report</td><td>Sign the brief</td></tr>
+  </table></div>
+  <p><strong>Feedback in one click.</strong> Every app the factory builds gets a small feedback icon. Click it and type: it captures the screen, the page, the state and recent logs, and you can mark up a screenshot if you want. The item is saved inside the app, with nothing sent anywhere. A factory command removes contact details, merges duplicates and files it to Backlog.</p>
+  <p><strong>Triage, not autopilot.</strong> An agent reads each item and decides:</p>
+  <ul>
+    <li><strong>Fix it</strong> when the item breaks a spec line, rule or mock-up screen it can point to, touches one screen, changes no data model and isn't red zone.</li>
+    <li><strong>Propose it to you</strong> otherwise, or whenever it's unsure. Proposals come in one digest, with a recommendation each.</li>
+    <li>You reject in one click, and the reason is kept.</li>
+  </ul>
+  <p><strong>Design truth after v1.</strong> The mock-up is frozen. Screenshots of the real app become the baseline that tweaks are checked against.</p>
+</section>
+
+<section id="lessons">
+  <h2>What the first app taught us</h2>
+  <p class="sub">funl M1 (Nov 2026): 28 of 28 cards merged, 92% first pass, 3% rework, 1.08 rounds per merge, $58 of $140. Every target met. Then the first real use found the AI agent near-useless and the screens far from the mock-up. A delivery success and a product miss: the factory built exactly what the cards said, and the cards weren't the product. Every miss becomes a default, so it can't happen twice.</p>
+
+  <p class="groupcap">Already added</p>
+  <div class="tablebox"><table>
+    <tr><th>Change</th><th>What it fixed</th></tr>
+    <tr><td>Cards go to lanes as files, and lane commands are single steps (#96)</td><td>A card mentioning a secrets file tripped the guard and halted a wave; chained commands asked you to approve constantly</td></tr>
+    <tr><td>Overlap counts only a card's Files list (#97)</td><td>"Pattern" and "Mock-up" references were treated as clashes, which serialised cards that could run together</td></tr>
+    <tr><td>Review on Sonnet, Opus on red</td><td>The same quality at a fraction of the cost on everyday cards</td></tr>
+    <tr><td>Merge size never blocks (cap 5000)</td><td>Splitting proven work just to stay small cost tokens and rounds</td></tr>
+    <tr><td>The foreman merges when a check refuses the lane</td><td>Merges waited for you to click a button you'd always click</td></tr>
+  </table></div>
+
+  <p class="groupcap">Building now <span class="tag a">remodel</span></p>
+  <div class="tablebox"><table>
+    <tr><th>Change</th><th>The miss it prevents</th></tr>
+    <tr><td>Spec review adds a capability pass: "can this design answer what the owner asks on day one?" It also flags any rule the north star never asked for (#107)</td><td>The spec invented rule I7 (one model round, results never reach the model), which crippled the agent. A page-only brain got signed.</td></tr>
+    <tr><td>UI cards carry their mock-up section's markup and classes, plus a "matches the mock-up" check. Mock-up features left out are listed (#104)</td><td>Screens were rebuilt instead of copied, and features were dropped silently</td></tr>
+    <tr><td>Every AI feature gets an exam of 10 day-one questions, run on the real model (#106)</td><td>Everything passed on the fake AI; the real agent said "I do not know" to the ABN</td></tr>
+    <tr><td>QA puts a screenshot of the app beside the mock-up for every UI card (#105)</td><td>Screenshots were taken but never compared with anything</td></tr>
+    <tr><td>At milestone end an agent walks the real app, and the report gains mock-up match, exam score and walk pass rate as targets (#108)</td><td>"Done" meant tests passed; the report measured only conformance to the cards</td></tr>
+    <tr><td>The three-track protocol (#102) and the feedback icon with triage (#103)</td><td>No path for changes after v1</td></tr>
+    <tr><td>Run fixes: close an issue left open after merge (#98), refresh stale worktrees (#99), demo cards run their own app (#100), count hand merges (#101), and more</td><td>Idle waves, false blocks, and a report that undercounted</td></tr>
+  </table></div>
+  <p>The lesson in one line: cards tuned so a cheap model never needs judgement push the judgement work (prompt design, context, visual fidelity) somewhere nobody checks. So the factory now checks it.</p>
 </section>
 
 <section id="skills">
