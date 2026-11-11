@@ -201,9 +201,15 @@ Repeat until a done condition, a halt or a stop:
    drop the planner's Ready cards from this wave; in-flight cards still run.
    If `cards` is empty and
    Building/QA/Review counts are 0 → done. If empty but cards sit in Blocked
-   only → report and stop. **Goal reached:** when the goal milestone has no open
-   issues, stop, report `🎯 <title> reached`, and ask the owner for the next goal
-   (the goal check above). Off-goal cards never keep a run going. This is unfinished work, not a completed-run calibration trigger.
+   only → report and stop. **Agent walk:** once the Demo card is Done and nothing on the goal is
+   left to run, launch the walk before reporting the goal: one Agent task on Sonnet that follows
+   [`walk.md`](walk.md), once per run, when `super-board-coverage.py status --json --milestone <goal>`
+   shows its `walk` as `not run` or `failed`. It files each failure to Backlog and records the
+   result with `super-board-scorecard.py walk`. A failed walk is one `needs-you` item on the Demo
+   card (walk.md → "After the walk"), then stop. **Goal reached:** when the goal milestone has no
+   open issues and coverage status says `milestone_done` (the walk passed, or the owner accepted
+   its findings), stop, fill the retro ([`retro.md`](retro.md)), report `🎯 <title> reached`, and
+   ask the owner for the next goal (the goal check above). Off-goal cards never keep a run going. This is unfinished work, not a completed-run calibration trigger.
 3. **Claim** — for each card, `gh issue edit <n> --add-assignee <bot_identity>`,
    then VERIFY: re-read assignees (`gh issue view <n> --json assignees`) and
    proceed only if the list is exactly `[<bot_identity>]`. Adding an assignee

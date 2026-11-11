@@ -119,6 +119,10 @@ Same sections. Differences:
 - ACs: one per core-loop step, each `— test: <the e2e file>`, each checked against its mock-up screen.
 - `## Blocked by`: every other card, one bullet each.
 
+When the Demo card is Done, the orchestrator runs the agent walk on the real app
+(`super-board/references/walk.md`). The milestone closes only when the walk passes or the owner
+accepts its findings.
+
 ## Needs judgement
 
 Only when a card can't be made mechanical by deciding in spec.md or by splitting:

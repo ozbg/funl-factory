@@ -167,6 +167,12 @@ The loop exits cleanly when:
 - Only Blocked/Done cards remain (Backlog is not part of a run); OR
 - A halt gate fires.
 
+The milestone is a separate question. It closes only when every card and the Demo card are Done
+and the agent walk ([`walk.md`](walk.md)) has run and passed, or the owner has accepted its
+findings. When the Demo card is Done, the orchestrator runs the walk before it reports the goal
+reached (`run-workflow.md` → wave loop step 2). `super-board status` and `report` show the
+milestone as not done until then.
+
 ## Run manifest
 
 ```

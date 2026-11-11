@@ -167,7 +167,7 @@ Every finding, adopting a `github` issue and a duplicate's "Seen again" comment 
 
 ```bash
 .claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --type bug|feature|refactor|fix \
-  --source sentry|posthog|github|prs|architecture|custom --title "<one line>" --body-file <md> \
+  --source sentry|posthog|github|prs|architecture|custom|walk --title "<one line>" --body-file <md> \
   --fingerprint "<key>" [--priority p] [--area a] [--label needs-triage] [--label ux] [--yes]
 .claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
 ```
@@ -181,7 +181,9 @@ Every finding, adopting a `github` issue and a duplicate's "Seen again" comment 
   links and counts — never secrets or user PII. The filer refuses a body that misses a section.
 - **Fingerprint per source** (the filer rejects a mismatch): sentry `err|sentry|<id>`, posthog
   `posthog|<signal>|<key>` (fetchers emit it) or `gap|<workflow>`, github `github|<n>`, prs
-  `prs|<boundary>|<cause>`, architecture `arch|<module>|<problem>`, custom `custom|<name>|<key>`.
+  `prs|<boundary>|<cause>`, architecture `arch|<module>|<problem>`, custom `custom|<name>|<key>`,
+  walk `walk|<screen-name or M<n>>|<key>` (the agent walk's findings, filed by the walk agent:
+  `.claude/skills/super-board/references/walk.md`).
 - **Dedupe** uses complete guarded paginated issue history, exact-fingerprint, repo-wide, any label: an open hit gets a "Seen again" comment; a
   closed-only hit is a **recurrence**, filed again naming the closed issue.
 - **Column** is the board's holding column (`Backlog`, else `Todo`/`To do`/`Triage`/`Inbox`); none

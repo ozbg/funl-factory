@@ -8,6 +8,9 @@ health  — four acting metrics; a breach steps ramp.stage down one and pauses o
           Never halts. Prints {breaches, action, ...} and appends a health event row.
 demo    — record that the owner accepted a demo (an event row).
 exam    — record one AI exam score on the real model (an event row; the latest per card counts).
+screen  — record one QA screen match, passed or failed (an event row; the latest per card counts).
+walk    — record the milestone-end agent walk (screens and day-one questions passed), or
+          --accepted when the owner accepts its findings. Needs a screenshot per screen.
 digest  — short plain-text owner digest; prints only on a merge, breach or ask
           (every wave when the config's `digest` is "every-wave").
 
@@ -17,6 +20,10 @@ digest  — short plain-text owner digest; prints only on a merge, breach or ask
   super-board-scorecard.py health --config <cfg> [--wave <label>] [--goal-done N --goal-total N]
   super-board-scorecard.py demo --accepted
   super-board-scorecard.py exam --card N --score 9 --total 10 --pass-mark 8 --model <model id> [--milestone M1]
+  super-board-scorecard.py screen --card N --screen screen-<name> --passed|--failed [--milestone M1]
+  super-board-scorecard.py walk --screens N --passed N --questions N --answered N \
+      --shots docs/super-board/runs/<date>-walk/ [--findings <file>] [--model <id>] [--milestone M1]
+  super-board-scorecard.py walk --accepted --note "<why>" [--milestone M1]
   super-board-scorecard.py digest --config <cfg> --plan <plan.json> [--wave <label>]
   super-board-scorecard.py report --config <cfg> [--repo-path <app>] [--log] [--compare] [--json]
                                   [--board-json <file>]
@@ -420,6 +427,55 @@ def exam(a):
     print(json.dumps({"recorded": "exam", "card": a.card, "passed": a.score >= a.pass_mark}))
 
 
+def screen(a):
+    if a.passed == a.failed:
+        print("screen: pass exactly one of --passed or --failed", file=sys.stderr)
+        return 64
+    if not re.match(r"^screen-[A-Za-z0-9_-]+$", a.screen or ""):
+        print("screen: --screen must be screen-<name>, got {!r}".format(a.screen), file=sys.stderr)
+        return 64
+    row = {"event": "screen", "card": a.card, "screen": a.screen, "passed": bool(a.passed), "at": now_iso()}
+    if a.milestone:
+        row["milestone"] = a.milestone
+    append(Path(a.scorecard), [row])
+    print(json.dumps({"recorded": "screen", "card": a.card, "passed": bool(a.passed)}))
+
+
+def walk(a):
+    if a.accepted:
+        if not (a.note or "").strip():
+            print("walk: --accepted needs --note saying why the owner accepts the findings", file=sys.stderr)
+            return 64
+        row = {"event": "walk-accept", "at": now_iso(), "note": a.note}
+        if a.milestone:
+            row["milestone"] = a.milestone
+        append(Path(a.scorecard), [row])
+        print(json.dumps({"recorded": "walk-accept"}))
+        return 0
+    n = {k: getattr(a, k) for k in ("screens", "passed", "questions", "answered")}
+    if any(v is None for v in n.values()):
+        print("walk: needs --screens, --passed, --questions and --answered", file=sys.stderr)
+        return 64
+    if n["screens"] < 1 or not (0 <= n["passed"] <= n["screens"]) or not (0 <= n["answered"] <= n["questions"]):
+        print("walk: want screens >= 1, 0 <= passed <= screens, 0 <= answered <= questions", file=sys.stderr)
+        return 64
+    shots = Path(a.shots) if a.shots else None
+    pngs = sorted(shots.glob("*.png")) if shots and shots.is_dir() else []
+    if len(pngs) < n["screens"]:
+        print("walk: {} has {} screenshots for {} screens; save one per screen first".format(
+            a.shots, len(pngs), n["screens"]), file=sys.stderr)
+        return 64
+    ok = n["passed"] == n["screens"] and n["answered"] == n["questions"]
+    if not ok and not (a.findings and Path(a.findings).is_file()):
+        print("walk: a failed screen or question needs --findings <file> listing each one", file=sys.stderr)
+        return 64
+    row = dict(n, event="walk", at=now_iso(), shots=str(a.shots), findings=a.findings, model=a.model, ok=ok)
+    if a.milestone:
+        row["milestone"] = a.milestone
+    append(Path(a.scorecard), [row])
+    print(json.dumps({"recorded": "walk", "passed": ok}))
+
+
 def digest(a):
     cfg = _read_cfg(a.config)
     plan = json.loads(Path(a.plan).read_text()) if a.plan else {}
@@ -460,7 +516,8 @@ def digest(a):
 # ── report (factory #63) ────────────────────────────────────────────────────
 LOG_PATH = "docs/super-board/factory-log.jsonl"
 DEFAULT_TARGETS = {"days_per_app": 2, "first_pass_pct": 70, "rework_pct": 10,
-                   "rounds_per_merge": 1.5, "demo_first_try": True, "exam_pass": True}
+                   "rounds_per_merge": 1.5, "demo_first_try": True, "exam_pass": True,
+                   "screens_match": 100, "walk_pass": 100}
 NA = "n/a"
 
 
@@ -488,7 +545,7 @@ def _num(v, suffix=""):
     return NA if v is None else "{}{}".format(v, suffix)
 
 
-def _coverage(repo, rows, board_json):
+def _coverage(repo, rows, board_json, milestone=None, scorecard=None):
     """Coverage summary dict from super-board-coverage.py, or None when it can't run."""
     script = Path(__file__).resolve().with_name("super-board-coverage.py")
     if not script.exists():
@@ -503,8 +560,12 @@ def _coverage(repo, rows, board_json):
             json.dump([{"number": n, "status": "Done"} for n in sorted(done)], tmp)
             tmp.close()
             board_json = tmp.name
-        r = subprocess.run([sys.executable, str(script), "status", "--repo-path", str(repo),
-                            "--board-json", str(board_json), "--json"], capture_output=True, text=True)
+        cmd = [sys.executable, str(script), "status", "--repo-path", str(repo), "--board-json", str(board_json), "--json"]
+        if milestone:
+            cmd += ["--milestone", milestone]
+        if scorecard:
+            cmd += ["--scorecard", str(scorecard)]
+        r = subprocess.run(cmd, capture_output=True, text=True)
         return json.loads(r.stdout) if r.returncode == 0 and r.stdout.strip() else None
     except (OSError, ValueError):
         return None
@@ -513,22 +574,39 @@ def _coverage(repo, rows, board_json):
             Path(tmp.name).unlink(missing_ok=True)
 
 
-def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=None, today=None):
+def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=None, today=None, scorecard=None):
     goal = cfg.get("goal") or {}
     milestone = goal.get("milestone")
     budget = goal.get("budget_usd")
     targets = dict(DEFAULT_TARGETS)
     targets.update(cfg.get("targets") or {})
-    exams = {}
+    exams, screens = {}, {}
+    walk_row, walk_accepted = None, False
     for r in rows:
-        if r.get("event") == "exam" and r.get("card") is not None and (
-                not milestone or r.get("milestone") in (None, milestone)):
+        if milestone and r.get("milestone") not in (None, milestone):
+            continue
+        ev = r.get("event")
+        if ev == "exam" and r.get("card") is not None:
             exams[r["card"]] = r  # the latest run per card counts
+        elif ev == "screen" and r.get("card") is not None:
+            screens[r["card"]] = bool(r.get("passed"))  # the latest match per card counts
+        elif ev == "walk":
+            walk_row, walk_accepted = r, False  # the latest walk counts
+        elif ev == "walk-accept" and walk_row is not None:
+            walk_accepted = True
     exams = [{"card": c, "score": r.get("score"), "total": r.get("total"), "pass_mark": r.get("pass_mark"),
               "model": r.get("model"), "passed": (r.get("score") or 0) >= (r.get("pass_mark") or 0)}
              for c, r in sorted(exams.items())]
     rows = [r for r in rows if "event" not in r and r.get("card") is not None
             and (not milestone or r.get("milestone") in (None, milestone))]
+    sm = {"passed": sum(screens.values()), "total": len(screens),
+          "pct": round(100 * sum(screens.values()) / len(screens)) if screens else None}
+    walk = None
+    if walk_row:
+        asked = walk_row.get("screens", 0) + walk_row.get("questions", 0)
+        good = walk_row.get("passed", 0) + walk_row.get("answered", 0)
+        walk = {k: walk_row.get(k) for k in ("screens", "passed", "questions", "answered", "findings", "shots")}
+        walk.update(pct=round(100 * good / asked) if asked else None, accepted=walk_accepted)
     by_card = {}
     for r in rows:
         by_card.setdefault(r["card"], []).append(r)
@@ -590,7 +668,7 @@ def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=
     spent = round(sum(r.get("usd") or 0 for r in rows), 2) if rows else None
 
     # Done: coverage and demo
-    cov = _coverage(repo, rows, board_json)
+    cov = _coverage(repo, rows, board_json, milestone, scorecard)
     demo_done = cov.get("demo_done") if cov else None
     demo_first = None
     if cov is not None:
@@ -607,13 +685,16 @@ def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=
         met[key] = None if val is None else bool(ok(val, targets[key]))
     met["demo_first_try"] = None if demo_first is None else (demo_first or not targets["demo_first_try"])
     met["exam_pass"] = None if not exams else (all(e["passed"] for e in exams) or not targets["exam_pass"])
+    met["screens_match"] = None if sm["pct"] is None else sm["pct"] >= targets["screens_match"]
+    met["walk_pass"] = None if not walk or walk["pct"] is None else walk["pct"] >= targets["walk_pass"]
     return {"milestone": milestone, "targets": targets, "targets_met": met, "define": define,
             "build": {"days": days, "merged": done, "total": total, "first_pass_pct": fp, "rework_pct": rw,
                       "rounds_per_merge": rpm, "k_tokens_per_card": tok, "min_per_card": mins,
                       "model_rules": rules or None, "causes": causes},
             "cost": {"usd": spent, "budget_usd": budget},
             "done": {"coverage": cov, "demo_passed": demo_done, "demo_first_try": demo_first},
-            "exams": exams,
+            "exams": exams, "screens_match": sm, "walk": walk,
+            "mockup_cuts": cov.get("mockup_cuts") if cov else None,
             "postcard": postcard, "_checks": checks}
 
 
@@ -633,7 +714,11 @@ def render_report(app, rep):
     cov = dn["coverage"]
     if cov:
         per = " · ".join("must-have {} {}/{}".format(m["must_have"], m["done"], m["total"]) for m in cov["must_haves"])
-        out.append("Done: {} · demo {}".format(per or NA, "passed" if dn["demo_passed"] else "not passed"))
+        out.append("Done: {} · demo {} · milestone {}".format(
+            per or NA, "passed" if dn["demo_passed"] else "not passed",
+            "done" if cov.get("milestone_done") else "not done: " + (
+                cov.get("walk_detail") if dn["demo_passed"] and cov.get("cards_done") == cov.get("cards_total")
+                else "cards still open")))
     else:
         out.append("Done: {} · demo {}".format(NA, NA))
     ex = rep["exams"]
@@ -645,6 +730,16 @@ def render_report(app, rep):
     out.append("{} demo first try: {} vs {}".format(mark("demo_first_try"), yn(dn["demo_first_try"]), yn(t["demo_first_try"])))
     out.append("{} exams at pass mark: {} vs {}".format(mark("exam_pass"), "{}/{}".format(
         sum(1 for e in ex if e["passed"]), len(ex)) if ex else NA, "all" if t["exam_pass"] else "any"))
+    sm, w = rep["screens_match"], rep["walk"]
+    out.append("{} screens match: {} vs ≥ {}%".format(mark("screens_match"), "{}/{} ({}%)".format(
+        sm["passed"], sm["total"], sm["pct"]) if sm["total"] else NA, t["screens_match"]))
+    wtxt = NA
+    if w:
+        wtxt = "{}% · screens {}/{} · questions {}/{}{}".format(
+            _num(w["pct"]), w["passed"], w["screens"], w["answered"], w["questions"],
+            " · findings accepted" if w["accepted"] else "")
+    out.append("{} walk pass: {} vs ≥ {}%".format(mark("walk_pass"), wtxt, t["walk_pass"]))
+    out.append("ℹ mock-up cuts: {} (no target)".format(_num(rep["mockup_cuts"])))
     out.append("Next:")
     nxt = _next_steps(rep)
     out.extend("  " + x for x in nxt)
@@ -667,6 +762,12 @@ def _next_steps(rep):
         steps.append("run the demo card earlier and check it against the postcard")
     if met["exam_pass"] is False:
         steps.append("fix the spec, not the prompt: a failed exam means thin context or a rule that cripples the AI")
+    if met["walk_pass"] is False:
+        steps.append("work the walk's findings: each is a Backlog card; the milestone isn't done until they pass or you accept them")
+    elif rep.get("walk") is None and rep["done"]["demo_passed"]:
+        steps.append("run the agent walk: the demo is Done, and the milestone isn't done until the walk passes")
+    if met["screens_match"] is False:
+        steps.append("match the mock-up: give each screen card its mock-up block, and fail QA on every unlisted difference")
     if met["days_per_app"] is False:
         steps.append("cut the must-haves or split the milestone: the app ran over its days")
     if c["usd"] is not None and c["budget_usd"] and c["usd"] > c["budget_usd"]:
@@ -680,7 +781,9 @@ def _log_line(app, rep, today):
             "total": b["total"], "first_pass_pct": b["first_pass_pct"], "rework_pct": b["rework_pct"],
             "rounds_per_merge": b["rounds_per_merge"], "usd": c["usd"], "budget_usd": c["budget_usd"],
             "demo_passed": rep["done"]["demo_passed"], "postcard": rep["postcard"], "targets_met": rep["targets_met"],
-            "exams": [{k: e[k] for k in ("card", "score", "total", "pass_mark")} for e in rep["exams"]] or None}
+            "exams": [{k: e[k] for k in ("card", "score", "total", "pass_mark")} for e in rep["exams"]] or None,
+            "screens_match_pct": rep["screens_match"]["pct"],
+            "walk_pass_pct": rep["walk"]["pct"] if rep["walk"] else None, "mockup_cuts": rep["mockup_cuts"]}
 
 
 def compare(repo):
@@ -722,7 +825,7 @@ def report(a):
         rows = load_all(sc)
     except ValueError:
         rows = []
-    rep = compute_report(cfg, rows, repo, a.goal_done, a.goal_total, a.board_json)
+    rep = compute_report(cfg, rows, repo, a.goal_done, a.goal_total, a.board_json, scorecard=sc)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     if a.log:
         line = _log_line(repo.name, rep, today)
@@ -783,9 +886,28 @@ def main():
     e.add_argument("--model", required=True, help="the real model id the exam ran on")
     e.add_argument("--milestone")
     e.add_argument("--scorecard", default=DEFAULT_SC)
+    sc = sub.add_parser("screen")
+    sc.add_argument("--card", type=int, required=True)
+    sc.add_argument("--screen", required=True, help="the mock-up anchor, screen-<name>")
+    sc.add_argument("--passed", action="store_true")
+    sc.add_argument("--failed", action="store_true")
+    sc.add_argument("--milestone")
+    sc.add_argument("--scorecard", default=DEFAULT_SC)
+    w = sub.add_parser("walk")
+    w.add_argument("--screens", type=int, help="screens walked")
+    w.add_argument("--passed", type=int, help="screens that passed")
+    w.add_argument("--questions", type=int, help="day-one questions asked")
+    w.add_argument("--answered", type=int, help="day-one questions answered well")
+    w.add_argument("--shots", help="the run folder holding one screenshot per screen")
+    w.add_argument("--findings", help="the walk's findings file; required when anything failed")
+    w.add_argument("--model", help="the model the walk ran on")
+    w.add_argument("--accepted", action="store_true", help="the owner accepts the latest walk's findings")
+    w.add_argument("--note")
+    w.add_argument("--milestone")
+    w.add_argument("--scorecard", default=DEFAULT_SC)
     a = p.parse_args()
     return {"record": record, "summary": summary, "health": health, "demo": demo, "digest": digest, "report": report,
-            "exam": exam}[a.cmd](a)
+            "exam": exam, "screen": screen, "walk": walk}[a.cmd](a)
 
 
 if __name__ == "__main__":
