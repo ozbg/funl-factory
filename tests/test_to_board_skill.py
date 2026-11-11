@@ -165,11 +165,11 @@ class ToBoardSkill(unittest.TestCase):
 class NorthStarDayOne(unittest.TestCase):
     NS = (ROOT / "skills" / "north-star" / "SKILL.md").read_text()
 
-    def test_grill_asks_day_one_per_must_without_extra_questions(self):
+    def test_grill_asks_day_one_per_must_as_part_of_the_bar(self):
         self.assertIn("- **Day-one test:** under each must", self.NS)
         self.assertIn("what will you ask or do with this on day one, and what's a good answer?", self.NS)
-        self.assertIn("costs no extra one", self.NS)
-        self.assertIn("**12 questions or fewer**", self.NS)
+        self.assertIn("It is item 3 of the clarity bar (step 5).", self.NS)
+        self.assertNotIn("costs no extra one", self.NS)
 
     def test_day_one_section_format_and_home(self):
         self.assertIn("## Day-one questions\n- M<n>: <what they'll ask or do on day one> → <a good answer>", self.NS)
@@ -179,6 +179,103 @@ class NorthStarDayOne(unittest.TestCase):
     def test_log_counts_day_one_per_must(self):
         self.assertIn('"day_one":{"M1":0}', self.NS)
         self.assertIn("`day_one` counts the day-one lines per must-have", self.NS)
+
+
+class NorthStarClarityBar(unittest.TestCase):
+    NS = (ROOT / "skills" / "north-star" / "SKILL.md").read_text()
+
+    def drill(self):
+        m = re.search(r"^### 5\. Drill to the clarity bar\n(.*?)(?=^### )", self.NS, re.M | re.S)
+        self.assertIsNotNone(m)
+        return m.group(1)
+
+    def test_no_hard_question_cap(self):
+        for cap in ("12 questions or fewer", "n/12", "12 or fewer", "12 is a ceiling"):
+            self.assertNotIn(cap, self.NS)
+        self.assertIn("About 12 questions is typical, not a cap", self.NS)
+        self.assertIn("| Questions | about 12, not a cap | |", self.NS)
+
+    def test_drill_step_sits_after_must_list_and_before_sparkle(self):
+        names = [n for _, n in re.findall(r"^### (\d+)\. (.+)$", self.NS, re.M)]
+        i = names.index("Drill to the clarity bar")
+        self.assertEqual(names[i - 1], "Round 3: must, nice, never")
+        self.assertEqual(names[i + 1], "Sparkle")
+
+    def test_bar_has_four_items(self):
+        d = self.drill()
+        for item in ("(1) **who** uses it and what triggers it", "(2) what a **good result** looks like",
+                     "(3) its **day-one** question, with an expected answer",
+                     "(4) the one **edge case** that would change the design"):
+            self.assertIn(item, d)
+
+    def test_drill_judgement(self):
+        d = self.drill()
+        for want in ("Score each must-have 0 to 4 against the bar", "one question at a time",
+                     "**Weakest first.**", "**A clear must-have gets one confirming question**",
+                     "then stop drilling it", "with your guess, worded so \"yes\" accepts it",
+                     "`Clear: M1, M3 · Drilling: M2 (2/4: no edge case) · Questions: 9`"):
+            self.assertIn(want, d)
+
+    def test_enough_ends_it_and_records_assumed(self):
+        self.assertIn('- **"Enough" always ends it.**', self.NS)
+        self.assertIn("`M<n>: assumed <missing items> (owner closed)`", self.NS)
+        self.assertIn("- M<n>: assumed <missing items> (owner closed)\n```", self.NS)
+
+    def test_log_records_questions_per_must_and_owner_closed(self):
+        self.assertIn('"per_must":{"M1":0},"owner_closed":[]', self.NS)
+        self.assertIn("`per_must` the questions asked about each", self.NS)
+        self.assertIn("`owner_closed` the must-haves closed with \"enough\"", self.NS)
+
+
+class DefineReview(unittest.TestCase):
+    def sub(self):
+        m = re.search(r"^#### Define review\n(.*?)(?=^#{2,4} )", TEXT, re.M | re.S)
+        self.assertIsNotNone(m)
+        return m.group(1)
+
+    def test_sits_in_step_3_after_the_spec_review_before_cards(self):
+        spec = TEXT.index("### 3. Spec review")
+        self.assertLess(spec, TEXT.index("#### Define review"))
+        self.assertLess(TEXT.index("#### Define review"), TEXT.index("### 4. "))
+        self.assertIn("**in the same message as the spec review**", self.sub())
+
+    def test_inputs_model_and_read_only(self):
+        s = self.sub()
+        for want in ("model fable", "read-only", "writes no file", "never the spec review's findings"):
+            self.assertIn(want, s)
+        for f in ("north-star.md", "mockup.html", "mockup-log.md", "spec.md"):
+            self.assertIn(f"docs/shape/{f}", s)
+        self.assertNotIn("later.md", s)
+
+    def test_hunts_only_for_the_five_gaps(self):
+        s = self.sub()
+        for look in ("**vague must-haves:**", "the three documents disagree",
+                     "mock-up screens or behaviour the spec doesn't support",
+                     "spec rules that box the product in", "anything a builder or the AI would have to guess"):
+            self.assertIn(look, s)
+
+    def test_output_is_bounded_drill_down_questions(self):
+        s = self.sub()
+        self.assertIn("**at most 10 drill-down questions**", s)
+        self.assertIn("`D<n> · <question> · suggested: <answer> · rests on:", s)
+        self.assertIn("separate from the spec review's 8 findings", s)
+
+    def test_vague_must_have_goes_back_to_north_star_before_cards(self):
+        s = self.sub()
+        self.assertIn("`M<n>: back to /north-star`", s)
+        self.assertIn("**cut no cards** until the owner either re-grills", s)
+        self.assertIn("the Define review's questions (step 3)", TEXT)
+        self.assertIn("the spec review, the Define review and the blind review", TEXT)
+
+    def test_help_describes_both_steps(self):
+        html = (ROOT / "docs/help.html").read_text()
+        self.assertNotIn("at most 12 questions", html)
+        self.assertIn("drills each must-have to a <strong>clarity bar</strong>", html)
+        self.assertIn("about 12 questions is typical, not a cap", html)
+        self.assertIn('Say "enough" any time', html)
+        self.assertIn("<li>Define review, alongside the spec review:", html)
+        self.assertIn("up to 10 drill-down questions, each with a suggested answer", html)
+        self.assertIn("no cards are cut until you do", html)
 
 
 if __name__ == "__main__":
