@@ -168,4 +168,29 @@ printf 'nope' > "$T/bad.json"
 set +e; $PY cards --repo-path "$T/cuts" --issues-json "$T/bad.json" 2>/dev/null; rc=$?; set -e
 [ "$rc" = 64 ] || fail "bad issues json should exit 64, got $rc"
 
+# briefs: the body-of-work gate (references/iteration.md, lint criterion 25)
+B="$T/briefs"; mkdir -p "$B/docs/shape/briefs"
+printf '# Brief: super brain\n\nSigned: 2026-11-12 · owner\n\n## What\nx\n' > "$B/docs/shape/briefs/2026-11-12-brain.md"
+printf '# Brief: draft\n\nSigned: no\n' > "$B/docs/shape/briefs/2026-11-13-draft.md"
+printf '# Brief: nosign\n\n## What\nx\n' > "$B/docs/shape/briefs/2026-11-14-nosign.md"
+BJ() { python3 -c 'import json,sys; print(json.dumps([{"number":int(n),"title":"t","labels":l.split(",") if l else [],"body":b} for n,l,b in (a.split("=",2) for a in sys.argv[1:])]))' "$@" > "$T/b.json"; }
+briefs() { $PY briefs --repo-path "$B" --issues-json "$T/b.json"; }
+CTX=$'## Context\n- **Brief:** docs/shape/briefs/2026-11-12-brain.md\n\n## Fix\nx'
+BJ "21=body-of-work=$CTX" "22==## Context\n- **Where:** x" "23=bug=no brief needed"
+out=$(briefs) || fail "a signed brief, and cards that are not a body of work, pass: $out"
+BJ "24=body-of-work=## Context\n- **Where:** x"
+if out=$(briefs); then fail "body-of-work label with no Brief line should fail"; fi
+echo "$out" | grep -qF '#24: body of work with no `Brief:' || fail "no-brief message: $out"
+BJ "25==${CTX//brain/ghost}"
+if out=$(briefs); then fail "a Brief line naming a missing file should fail"; fi
+echo "$out" | grep -q 'not found' || fail "missing brief message: $out"
+BJ "26=body-of-work=${CTX//2026-11-12-brain/2026-11-13-draft}" "27=body-of-work=${CTX//2026-11-12-brain/2026-11-14-nosign}"
+if out=$(briefs); then fail "an unsigned brief should fail"; fi
+echo "$out" | grep -q '#26: brief .* is not signed' && echo "$out" | grep -q '#27: brief .* is not signed' || fail "unsigned message: $out"
+BJ "28=proposal,tweak=## Context\n- **Where:** x"
+if out=$(briefs); then fail "a proposal in an active column should fail"; fi
+echo "$out" | grep -q 'still a `proposal`' || fail "proposal message: $out"
+BJ "29=body-of-work=${CTX//docs\/shape\/briefs\/2026-11-12-brain.md/..\/..\/etc\/x.md}"
+if out=$(briefs); then fail "a brief outside the repo should fail"; fi
+
 echo "PASS: test-coverage"

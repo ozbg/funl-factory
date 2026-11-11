@@ -1,7 +1,8 @@
 # /super-collect
 
-Finds problems in one project, checks each one, and writes one findings doc, then files each
-verified finding straight into the super-board Backlog in the ticket format. See [routing](../../docs/super-board/routing.md).
+Finds problems in one project, checks each one, triages each into a track (bug, tweak, body of
+work), writes one findings doc, then files each in the ticket format: a fix to Ready (capped per
+run), everything else straight into the super-board Backlog as a proposal for the owner. See [routing](../../docs/super-board/routing.md).
 
 ## What It Does
 

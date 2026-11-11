@@ -17,8 +17,10 @@ Confirm the active config matches the intended repo/board, then test a dry run.
 > In the configured project repository, use the existing super-collect skill with
 > --yes --direct and only this project's configured sources. Confirm the active config's
 > repo and board before writes. Verify candidates and deduplicate before filing.
-> File verified new findings or recurrences into Backlog or its holding-column
-> alias, never Ready; preserve cards already on the board. Do not build, merge,
+> Triage each verified finding, then file new findings or recurrences: a fix to
+> Ready only within the run's fix cap, everything else into Backlog or its
+> holding-column alias as a proposal; preserve cards already on the board. Never
+> accept or reject a proposal: that is the owner's call. Do not build, merge,
 > migrate, deploy or run calibration as part of intake. Keep unchanged results
 > quiet. Notify only for verified new findings, meaningful new evidence or
 > recurrences, failures, or required user action. Report unavailable/partial

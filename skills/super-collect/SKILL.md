@@ -1,19 +1,23 @@
 ---
 name: super-collect
-description: Find problems in one project, verify each, write one findings doc and file every verified finding straight into the super-board Backlog in the ticket format. Source plug-ins - sentry (app errors), posthog (exceptions, rage/dead clicks, failure events, web vitals, tracking gaps), github (issues not on the board), prs (recurring problems in merged PRs and their review comments), architecture (refactor findings), plus any custom source added in onboard (an MCP server, HTTP API, CLI command or app). Each candidate is checked by one fresh verifier first. Dry-run by default. Use when the user says "super-collect", "/super-collect", "/super-collect sentry", "collect tickets", "triage errors onto the board", "what keeps breaking", or "find refactors".
+description: Find problems in one project, verify each, triage each into a track (bug, tweak, body of work), write one findings doc and file it in the ticket format - a fix to Ready (capped per run), everything else to Backlog as a proposal for the owner. Source plug-ins - sentry (app errors), posthog (exceptions, rage/dead clicks, failure events, web vitals, tracking gaps), github (issues not on the board), prs (recurring problems in merged PRs and their review comments), architecture (refactor findings), plus any custom source added in onboard (an MCP server, HTTP API, CLI command or app). Each candidate is checked by one fresh verifier first. Dry-run by default. Use when the user says "super-collect", "/super-collect", "/super-collect sentry", "collect tickets", "triage errors onto the board", "what keeps breaking", or "find refactors".
 ---
 
-# super-collect — find problems, file them into Backlog
+# super-collect — find problems, triage them, file them
 
 One job: find problems and turn them into tickets. The flow:
 
 1. Collect candidates from the sources.
 2. One fresh verifier checks each candidate.
-3. Write ONE findings doc that groups what survived: `docs/super-board/findings/collect-<YYYY-MM-DD>.md`.
-4. File every verified finding straight into **Backlog** in the ticket format
-   (`.claude/skills/super-board/references/ticket-format.md`), then `/super-board lint` and `run`.
+3. Triage gives each one a track (bug, tweak, body of work) and a decision: fix or propose
+   ([iteration.md](../super-board/references/iteration.md)).
+4. Write ONE findings doc that groups what survived: `docs/super-board/findings/collect-<YYYY-MM-DD>.md`.
+5. File each one in the ticket format (`.claude/skills/super-board/references/ticket-format.md`):
+   a fix to **Ready**, capped per run; everything else straight into **Backlog** as a proposal.
+   Then the proposals digest for the owner, `/super-board lint` and `run`.
 
-super-collect never edits app code and never moves a card to `Ready`. Per project only: it reads
+super-collect never edits app code. It puts a card in `Ready` only as a triage fix, within the
+cap, or when the owner accepts a bug or tweak proposal. Per project only: it reads
 the active project's super-board config and files onto that project's board. The whole rule in
 plain words: [routing](../../docs/super-board/routing.md).
 
@@ -32,7 +36,7 @@ Default is **dry-run**: show the findings doc and the route, write nothing, go o
 
 For periodic intake, use [scheduled-intake.md](references/scheduled-intake.md):
 let the owner's scheduler invoke this existing skill, retain source verification
-and holding-column-only filing, and notify only on meaningful changes or failures.
+and triage's capped fix-or-propose filing, and notify only on meaningful changes or failures.
 No job, cadence or scheduler is created by this skill.
 
 ## Setup
@@ -60,6 +64,7 @@ Scripts live in `.claude/skills/super-collect/scripts/`; call them by that liter
 | `github` | Read open candidates with `gh issue list --state open --json number,title,body,labels,url --limit 300` (a full 300 is capped coverage, not a complete repo inventory), minus issues on the board and `source:*` labels | real work → **adopt** (`--adopt <n>`), never copied |
 | `prs` | `python3 .claude/skills/super-collect/scripts/collect_prs.py list --since <w>` — one GraphQL search `is:pr is:merged merged:>=DATE`, paginated, with comments, reviews and review threads (human and bot), super-review reports flagged (`<!-- super-review:report -->`) | one recurring root cause → `fix` / `refactor` / `feature`, fp `prs|<boundary>|<cause>` |
 | `architecture` | read-only finder sub-agent (below) | one finding → `refactor`, fp `arch|<module>|<problem>` |
+| feedback (#103) | the in-app feedback items, read from the app's own data folder and redacted on the factory side | one item → a candidate like any other; triage picks its track |
 | custom (`collect.custom[]`) | `python3 .claude/skills/super-collect/scripts/collect_custom.py list --since <w>` — http and cli sources run in the script; an `mcp` source comes back `status: agent`: call that server's read/list tool yourself (read-only), then pipe its JSON into `collect_custom.py normalize --name <n>` | one candidate → `bug` (errors, incidents) or `feature` (requests), `--source custom`, fp `custom|<name>|<key>` (the script emits it) |
 
 ### custom sources
@@ -148,10 +153,46 @@ evidence: [links], note}`. `duplicate` names the card; the filer then comments o
 not a drop**: `needs-triage` files the card with `--label needs-triage`. Report every drop with its
 evidence.
 
+## Triage — a track, then fix or propose
+
+Every source feeds the same step: triage reads only the verified findings, so a new source (the
+feedback icon's items, #103) joins by emitting candidates. One fresh triage sub-agent per run
+reads `docs/shape/spec.md`, `docs/shape/north-star.md`, `docs/agents/zones.yaml` and the baseline
+screens, then adds to each `file` / `needs-triage` finding:
+
+| Field | Value |
+|---|---|
+| `track` | `bug` (differs from the spec, a rule or the baseline) · `tweak` (one screen's look, copy or behaviour) · `body` (a rule, the data model, more than one screen, or new) |
+| `decision` | `fix` or `propose`; unsure is `propose` |
+| `breaks` | the spec line, rule (`I3`) or baseline screen it breaks; empty if none |
+| `screens` | the screens it touches, by name |
+| `touches` | any of `rule`, `data-model`, `contract` |
+| `zone` | the zone of the files it would change |
+| `recommendation` | one line for the owner: accept or reject, and why (every proposal) |
+
+Then the rules run in code, not judgement:
+
+```bash
+python3 .claude/skills/super-collect/scripts/collect_handoff.py triage --findings <verified.json> --config <cfg>
+```
+
+It prints the findings back with the final `track`, `decision`, `column` and `why`. What it
+touches picks the track, so a "bug" that changes the data model comes back `body`. A fix needs
+all of: verdict `file`, track bug or tweak, a `breaks` citation, one screen at most, nothing
+touched, zone green or amber. Fixes past `collect.triage.max_fix_cards` (default 5) come back as
+proposals recommending the fix. Save the output; it is the input to the findings doc and the filer.
+
+Each card body adds, per decision:
+- **fix, bug:** `- **Breaks:** <citation>` and `- **Failing test:** <path>` in Context, the test the builder makes pass.
+- **fix, tweak:** `- **Breaks:** <citation>` in Context and a `## Before and after` section (the baseline screen, then the change).
+- **propose:** a `## Recommendation` section: one line, accept or reject, and why.
+
+The filer refuses a body that misses its line or section.
+
 ## Findings doc
 
-After Verify, write the verifier's results as one JSON array (`title`, `type`, `source`,
-`group`, `fingerprint`, `verdict`, `evidence`, `note`). `group` is the shared root cause or
+After Triage, use its output: one JSON array (`title`, `type`, `source`,
+`group`, `fingerprint`, `verdict`, `evidence`, `note`, plus the triage fields). `group` is the shared root cause or
 area; findings with the same cause share one group.
 
 `python3 .claude/skills/super-collect/scripts/collect_handoff.py doc --findings <verified.json> --since <w>` prints the doc (dry
@@ -168,9 +209,14 @@ Every finding, adopting a `github` issue and a duplicate's "Seen again" comment 
 ```bash
 .claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --type bug|feature|refactor|fix \
   --source sentry|posthog|github|prs|architecture|custom|walk --title "<one line>" --body-file <md> \
-  --fingerprint "<key>" [--priority p] [--area a] [--label needs-triage] [--label ux] [--yes]
+  --fingerprint "<key>" [--priority p] [--area a] [--label needs-triage] [--label ux] \
+  --track bug|tweak|body --decision fix|propose [--yes]
 .claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
 ```
+
+Pass each finding's triaged `track` and `decision`. A fix lands in `Ready` and is labelled with its
+track (`bug` or `tweak`). A proposal lands in Backlog, labelled with its track (`bug`, `tweak` or
+`body-of-work`) and `proposal`.
 
 - `bug`, `feature`, `fix` → `super-qa-file-bug.sh` (`fix` files as `tech-debt`); `refactor` →
   `super-review-file-refactor.sh`. `--title` is the bare problem: the filers add the
@@ -186,14 +232,42 @@ Every finding, adopting a `github` issue and a duplicate's "Seen again" comment 
   `.claude/skills/super-board/references/walk.md`).
 - **Dedupe** uses complete guarded paginated issue history, exact-fingerprint, repo-wide, any label: an open hit gets a "Seen again" comment; a
   closed-only hit is a **recurrence**, filed again naming the closed issue.
-- **Column** is the board's holding column (`Backlog`, else `Todo`/`To do`/`Triage`/`Inbox`); none
-  → refused (exit 65).
+- **Column** is `Ready` for a fix (none → refused, exit 65). Everything else goes to the board's holding
+  column (`Backlog`, else `Todo`/`To do`/`Triage`/`Inbox`); none → refused (exit 65).
+- **Rejected** items are never filed again: a closed issue whose body carries the rejection
+  marker comes back `rejected|#N`, and nothing is written.
 - The same-host repository lock serializes collector calls; digest receipts skip identical repeat comments. See [state and recovery](references/scheduled-intake.md).
 - Labels: `source:collect`, `collect:<source>`, every `--label`, plus the filer's own.
 
 Dry-run: run each verified item without `--yes`, show one table (`would-file` /
-`duplicate` / `recurrence` / `would-adopt`, plus the verifier's drops), wait for confirm, rerun
+`duplicate` / `recurrence` / `rejected` / `would-adopt`, plus the verifier's drops), wait for confirm, rerun
 with `--yes`.
+
+## Proposals digest
+
+After filing, list every open proposal, not just this run's, for the owner. Read them with
+`gh issue list --label proposal --state open --json number,title,body,labels,url --limit 100`,
+save the JSON to a file, then:
+
+```bash
+python3 .claude/skills/super-collect/scripts/collect_handoff.py digest --issues-json <file>
+```
+
+It prints one table: number, track, title and the recommendation. Show it at the end of the
+report. The owner answers each with `accept #N` or `reject #N <reason>`; run the answer through
+the filer:
+
+```bash
+.claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --accept <n> [--yes]
+.claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --reject <n> --reason "<why>" [--yes]
+```
+
+- **accept:** removes `proposal`. A bug or tweak moves to Ready. A body of work stays in Backlog
+  and starts the path in [iteration.md](../super-board/references/iteration.md), step a.
+- **reject:** comments the reason, marks the body, labels `rejected` and closes the issue as not
+  planned. The reason stays on the issue, and the marker stops collect filing it again.
+
+Never accept or reject for the owner.
 
 ## Report
 
@@ -201,12 +275,15 @@ with `--yes`.
 ## super-collect: <filed n | dry-run n> · since 2026-09-18 (14d)
 Coverage   sentry: read 42 | posthog: read 9 (silent: rageclick) | github: read 7 | prs: 23 PRs, 6 reports | architecture: 4 | linear: read 12
 Findings   docs/super-board/findings/collect-2026-10-02.md  (7 findings, 3 groups)
-Filed      #431–#438 (8) into Backlog
+Fixed      #431–#433 (3, cap 5) into Ready
+Proposed   #434–#438 (5) into Backlog
 Duplicate  #301 ← Sentry 4502 (comment added)
 Dropped    Sentry 4490 drop-fixed — resolved in web@1.4.0, not seen since (PR #377)
 Report     docs/super-board/runs/collect-funnel-2026-10-02.md
-Next       /super-board lint  — nothing here is in Ready
+Next       /super-board lint, then answer the proposals below
 ```
+
+Then the proposals digest.
 
 Each filed line reads `Filed #412 bug Checkout 500 on empty cart (err|sentry|4411)`, with `Recurrence` / `Gaps` lines as needed.
 
@@ -217,5 +294,6 @@ Each filed line reads `Filed #412 bug Checkout 500 on empty cart (err|sentry|441
 - Dropping an unclear candidate. File it `needs-triage`.
 - Copying a user's issue into a new one. Adopt it.
 - Treating a reviewer's `fixed` as proof. Recurrence is decided by the next report.
-- Editing app code, adding instrumentation, or moving anything to `Ready`. Collect plans and files; lint and run do the rest.
+- Editing app code, adding instrumentation, or moving anything to `Ready` that isn't a capped triage fix or an accepted proposal. Collect plans and files; lint and run do the rest.
+- Fixing a body of work because it arrived labelled as a bug. What it touches picks the track.
 - Writing one findings doc per finding. One findings doc per run.

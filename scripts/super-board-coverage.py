@@ -5,6 +5,7 @@
   super-board-coverage.py status --repo-path <app> --board-json <file|-> [--milestone M1] [--json]
                                  [--scorecard <file>]
   super-board-coverage.py cards  --repo-path <app> --issues-json <file|->
+  super-board-coverage.py briefs --repo-path <app> --issues-json <file|->
 
 coverage.md (written by /to-board):
 
@@ -32,6 +33,12 @@ is a list of {number, title, body}. Exit 1 when a screen card lacks the
 `## Mock-up` block, its anchor, the markup excerpt, the class list, the
 `Cut from mock-up:` line or the match AC; when the anchor is not in mockup.html;
 or when coverage.md's cut list leaves out a card that cuts something.
+briefs: the body-of-work gate (references/iteration.md). Issues JSON may carry
+`labels` (names or {name}). A card labelled `body-of-work`, or with a `Brief:`
+line in Context, fails (exit 1) when the line is missing, the brief file is not
+in the repo, or it has no `Signed:` line with a real value (`no`, empty or a
+`<placeholder>` is unsigned). A card still labelled `proposal` fails too: it is
+waiting on the owner and belongs in Backlog.
 status: prints done/total per must-have and one milestone line. Silent (no
 output, exit 0) when coverage.md is missing. Read-only; stdlib only.
 The milestone is done only when every card and the Demo card are Done AND the
@@ -390,6 +397,74 @@ def cmd_cards(args) -> int:
     return 0
 
 
+BODY_LABEL = "body-of-work"
+SIGNED_RE = re.compile(r"^\s*Signed:[ \t]*(.*?)\s*$", re.IGNORECASE | re.M)
+
+
+def label_names(card: dict) -> set[str]:
+    out = set()
+    for lab in card.get("labels") or []:
+        name = lab.get("name") if isinstance(lab, dict) else lab
+        if isinstance(name, str):
+            out.add(name.strip().lower())
+    return out
+
+
+def signed(text: str) -> bool:
+    m = SIGNED_RE.search(text or "")
+    if not m:
+        return False
+    value = m.group(1).strip().strip("`*_")
+    return bool(value) and value.lower() not in ("no", "not yet", "none") and not value.startswith("<")
+
+
+def brief_problems(card: dict, root: Path) -> list[str]:
+    """Body-of-work gate problems on one card; [] when fine or not a body of work."""
+    body = card.get("body") or ""
+    labels = label_names(card)
+    out: list[str] = []
+    if "proposal" in labels:
+        out.append("still a `proposal`: it waits on the owner's accept, so it belongs in Backlog")
+    line = card_line(section(body, "Context") or body, "Brief")
+    if BODY_LABEL not in labels and line is None:
+        return out
+    m = re.search(r"(?<![\w/.-])((?:\./)?[\w./-]+\.md)\b", (line or "").replace("`", " "))
+    if m is None:
+        return out + ["body of work with no `Brief: docs/shape/briefs/<date>-<slug>.md` line in Context"]
+    rel = m.group(1)
+    path = (root / rel).resolve()
+    try:
+        path.relative_to(root.resolve())
+    except ValueError:
+        return out + [f"brief {rel} is outside the repo"]
+    text = read(path)
+    if text is None:
+        return out + [f"brief {rel} not found"]
+    if not signed(text):
+        out.append(f"brief {rel} is not signed (no `Signed: <date> · <owner>` line)")
+    return out
+
+
+def cmd_briefs(args) -> int:
+    root = Path(args.repo_path)
+    try:
+        issues = load_issues(args.issues_json)
+    except (OSError, ValueError) as e:
+        print(f"cannot read issues json: {e}", file=sys.stderr)
+        return 64
+    bad = 0
+    for card in issues:
+        probs = brief_problems(card, root)
+        for p in probs:
+            print(f"error: #{card.get('number')}: {p}")
+        bad += bool(probs)
+    if bad:
+        print(f"{bad} card(s) fail the body-of-work gate")
+        return 1
+    print("briefs ok")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -407,6 +482,10 @@ def main(argv=None) -> int:
     c.add_argument("--repo-path", default=".")
     c.add_argument("--issues-json", required=True)
     c.set_defaults(fn=cmd_cards)
+    d = sub.add_parser("briefs")
+    d.add_argument("--repo-path", default=".")
+    d.add_argument("--issues-json", required=True)
+    d.set_defaults(fn=cmd_briefs)
     args = p.parse_args(argv)
     return args.fn(args)
 

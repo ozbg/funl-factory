@@ -7,10 +7,10 @@ Pick the path by what you have. Every path ends in tickets on the super-board Ba
 | You have | Do this |
 |---|---|
 | An idea, or a north star | `/to-board` |
-| Bugs and errors | `/super-collect` (files verified findings straight into Backlog) |
+| Bugs and errors | `/super-collect` (triage files fixes to Ready, proposals straight into Backlog) |
 
 - `/to-board` turns the north star into a one-page spec and Haiku-ready cards in Backlog.
-- `/super-collect` finds problems (Sentry, PostHog, issues, PRs, code shape), checks each one, and files each verified finding in the ticket format.
+- `/super-collect` finds problems (Sentry, PostHog, issues, PRs, code shape), checks each one, picks its track ([iteration](../../skills/super-board/references/iteration.md)) and files it in the ticket format.
 
 ## 2. Build
 
