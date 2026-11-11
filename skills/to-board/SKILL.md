@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 You are the head engineer at a small software house. The owner signed a north star: the destination. Your job is the **route**: the tech, the data, the order of work, and cards so plain that a cheap model (Haiku) can build each one without guessing.
 
-Technical calls are yours. The owner is asked about **scope only**, once, when they see the card list, plus the spec review's findings and the Define review's questions (step 3). Never ask about seams, files, stack, granularity or dependencies. Do not interview: work from what is written down.
+Technical calls are yours. The owner is asked about **scope only**, once, when they see the card list, plus the spec review's findings (step 3). Never ask about seams, files, stack, granularity or dependencies. Do not interview: work from what is written down.
 
 Win condition: every card is **mechanical**, every must-have has a card, and the Demo card walks the whole core loop.
 
@@ -17,7 +17,7 @@ Win condition: every card is **mechanical**, every must-have has a card, and the
 `/to-board [--config <cfg.json>] [--dry-run]`
 
 - `--config`: the board config. Default: the one file in `.claude/super-board/configs/`.
-- `--dry-run`: write spec.md and the draft zones.yaml, run the spec review, the Define review and the blind review, print the table; file nothing. Works with no board config: skip the milestone and filing and say "dry run: no config, nothing filed".
+- `--dry-run`: write spec.md and the draft zones.yaml, run the spec review and the blind review, print the table; file nothing. Works with no board config: skip the milestone and filing and say "dry run: no config, nothing filed".
 
 ## Inputs
 
@@ -61,6 +61,8 @@ Nobody independent has checked spec.md, and the blind review (step 7) never sees
 - **as an attacker:** holes the spec leaves open. Can one user or client reach another's data? What answers without signing in, or to a guessed id or a leaked link? Which path breaks a must-never anyway? Report only holes that break a must-never or cross users; each finding names the missing spec rule or invariant and the test that closes it. No generic hardening advice
 - **capability pass:** for each must-have, each of its lines under `## Day-one questions` in north-star.md: can this design answer it? `yes` or `no`, and why, naming the spec line that decides it (an invariant, a decision, a missing field). A north star with no such section: it writes one likely question per must-have and marks it `guessed`
 - **rules with no parent:** every invariant or must-never in spec.md that no north-star line asks for. The spec must not invent limits
+- mock-up screens or behaviour the spec doesn't support
+- anything a builder or the AI would have to guess. A must-have too vague to build from is a finding like any other
 
 Output, under 700 words: at most 8 findings ranked by impact, each citing the north-star line, mock-up screen or owner input it rests on, with the smallest fix. Attacker findings share the 8 and are marked `abuse`. Not its job: the cards (step 7), wording or style.
 
@@ -76,20 +78,7 @@ No north-star parent: I7 (keep or drop?)
 
 One row per day-one question; with no such rules, `No north-star parent: none`. Every `no` and every rule with no parent needs the owner's call, like a finding.
 
-Relay every finding to the owner with **your take** on each (agree, modify or pass, and why). **The owner decides; nothing is applied without them.** Fix spec.md with the accepted ones in one pass, then cut cards. This does not replace the blind review or the Haiku read.
-
-#### Define review
-
-The spec review checks the spec; this one checks that the three Define documents agree and leave nothing to guess. Spawn it **in the same message as the spec review**, so the two run in parallel: **one fresh sub-agent, model fable**, read-only (it writes no file, edits nothing). Give it only `docs/shape/north-star.md`, `docs/shape/mockup.html`, `docs/shape/mockup-log.md` (each mock-up file if present) and `docs/shape/spec.md`. Never your drafting reasoning, never the spec review's findings. It hunts only for:
-- **vague must-haves:** each scored against the clarity bar in `/north-star` (who and trigger, good result, day-one question with answer, the edge case that changes the design)
-- places where the three documents disagree
-- mock-up screens or behaviour the spec doesn't support
-- spec rules that box the product in
-- anything a builder or the AI would have to guess
-
-Output: **at most 10 drill-down questions** for the owner, ranked by how much rework a wrong guess costs. Each is one line: `D<n> · <question> · suggested: <answer> · rests on: <the north-star line, mock-up screen or spec line>`. A must-have too vague to build from is marked `M<n>: back to /north-star` with the bar items it lacks. These questions are separate from the spec review's 8 findings and never count toward them.
-
-Show both outputs to the owner together, with **your take** on each question. Fold the answers into spec.md (and into that must-have's lines in `north-star.md` when an answer settles one) in the same pass as the spec fixes. Any `back to /north-star` line stops here: **cut no cards** until the owner either re-grills that must-have with `/north-star` (then run `/to-board` again) or answers its questions here.
+Relay every finding to the owner with **your take** on each (agree, modify or pass, and why). **The owner decides; nothing is applied without them.** A finding that needs the owner's business call is relayed as usual and also noted as a north-star miss, for the retro. Fix spec.md with the accepted ones in one pass, then cut cards. This does not replace the blind review or the Haiku read.
 
 ### 4. Draft `docs/agents/zones.yaml`
 

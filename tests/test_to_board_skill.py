@@ -254,55 +254,77 @@ class NorthStarClarityBar(unittest.TestCase):
         self.assertIn("`owner_closed` the must-haves closed with \"enough\"", self.NS)
 
 
-class DefineReview(unittest.TestCase):
-    def sub(self):
-        m = re.search(r"^#### Define review\n(.*?)(?=^#{2,4} )", TEXT, re.M | re.S)
-        self.assertIsNotNone(m)
-        return m.group(1)
+class ClarityReviewInNorthStar(unittest.TestCase):
+    NS = (ROOT / "skills" / "north-star" / "SKILL.md").read_text()
 
-    def test_sits_in_step_3_after_the_spec_review_before_cards(self):
-        spec = TEXT.index("### 3. Spec review")
-        self.assertLess(spec, TEXT.index("#### Define review"))
-        self.assertLess(TEXT.index("#### Define review"), TEXT.index("### 4. "))
-        self.assertIn("**in the same message as the spec review**", self.sub())
+    def drill(self):
+        return re.search(r"^### 5\. Drill to the clarity bar\n(.*?)(?=^### )", self.NS, re.M | re.S).group(1)
+
+    def test_review_ends_the_drill_before_sparkle_and_postcard(self):
+        d = self.drill()
+        self.assertIn("**Clarity review**", d)
+        self.assertLess(self.NS.index("**Clarity review**"), self.NS.index("### 6. Sparkle"))
+        self.assertLess(self.NS.index("**Clarity review**"), self.NS.index("### 7. Read back the postcard"))
 
     def test_inputs_model_and_read_only(self):
-        s = self.sub()
-        for want in ("model fable", "read-only", "writes no file", "never the spec review's findings"):
-            self.assertIn(want, s)
-        for f in ("north-star.md", "mockup.html", "mockup-log.md", "spec.md"):
-            self.assertIn(f"docs/shape/{f}", s)
-        self.assertNotIn("later.md", s)
+        d = self.drill()
+        for want in ("model fable", "read-only", "writes no file", "the silent draft and the owner's own words",
+                     "their answers verbatim and any docs they pointed to", "Never your reasoning"):
+            self.assertIn(want, d)
 
-    def test_hunts_only_for_the_five_gaps(self):
-        s = self.sub()
-        for look in ("**vague must-haves:**", "the three documents disagree",
-                     "mock-up screens or behaviour the spec doesn't support",
-                     "spec rules that box the product in", "anything a builder or the AI would have to guess"):
-            self.assertIn(look, s)
+    def test_bounded_ranked_questions_asked_in_the_drill(self):
+        d = self.drill()
+        self.assertIn("**at most 6 questions**, ranked by rework cost", d)
+        self.assertIn("`R<n> · <question> · suggested: <answer> · rests on: <line>`", d)
+        for look in ("must-haves a builder or the AI would still have to guess", "contradictions",
+                     "thin or missing day-one answers"):
+            self.assertIn(look, d)
+        self.assertIn("**inside the drill**, one at a time, with the suggested answer", d)
+        self.assertIn('The clarity line keeps updating. "Enough" still ends it.', d)
 
-    def test_output_is_bounded_drill_down_questions(self):
-        s = self.sub()
-        self.assertIn("**at most 10 drill-down questions**", s)
-        self.assertIn("`D<n> · <question> · suggested: <answer> · rests on:", s)
-        self.assertIn("separate from the spec review's 8 findings", s)
+    def test_runs_once_even_after_enough(self):
+        d = self.drill()
+        self.assertIn('**Clarity review**, once, when the drill ends: every must-have clear, or "enough" said.', d)
+        self.assertNotIn("skipped if the owner already said", d)
+        self.assertIn("show the ones you agree with as one numbered list, each with its suggested answer", d)
+        self.assertIn('answers any of them in one reply, or says "enough" again', d)
+        self.assertIn("Each one left unanswered goes under `## Assumed (not asked)`.", d)
 
-    def test_vague_must_have_goes_back_to_north_star_before_cards(self):
-        s = self.sub()
-        self.assertIn("`M<n>: back to /north-star`", s)
-        self.assertIn("**cut no cards** until the owner either re-grills", s)
-        self.assertIn("the Define review's questions (step 3)", TEXT)
-        self.assertIn("the spec review, the Define review and the blind review", TEXT)
+    def test_looks_ahead_to_business_rules_within_the_six(self):
+        d = self.drill()
+        self.assertIn("It also looks ahead to the spec: any business rule the build will need that the draft leaves open", d)
+        for rule in ("when a client counts as won", "who may see what", "what data must never leave the machine",
+                     "money, deletion, sending on the owner's behalf", "These share the 6."):
+            self.assertIn(rule, d)
 
-    def test_help_describes_both_steps(self):
+    def test_log_counts_review_questions(self):
+        self.assertIn('"review_questions":0', self.NS)
+        self.assertIn("`review_questions` the clarity review's questions you asked", self.NS)
+
+
+class SpecReviewCoversDefineGaps(unittest.TestCase):
+    def test_no_separate_define_review(self):
+        self.assertNotIn("Define review", TEXT)
+        self.assertNotIn("back to /north-star", TEXT)
+        self.assertIn("plus the spec review's findings (step 3).", TEXT)
+        self.assertIn("run the spec review and the blind review,", TEXT)
+
+    def test_spec_review_has_the_two_added_lines(self):
+        s = re.search(r"^### 3\. Spec review\n(.*?)(?=^### )", TEXT, re.M | re.S).group(1)
+        self.assertIn("- mock-up screens or behaviour the spec doesn't support\n", s)
+        self.assertIn("- anything a builder or the AI would have to guess. A must-have too vague to build from is a finding like any other", s)
+        self.assertEqual(s.count("model fable"), 1)
+        self.assertIn("A finding that needs the owner's business call is relayed as usual and also noted as a north-star miss, for the retro.", s)
+
+    def test_help_describes_the_move(self):
         html = (ROOT / "docs/help.html").read_text()
+        self.assertNotIn("Define review", html)
         self.assertNotIn("at most 12 questions", html)
         self.assertIn("drills each must-have to a <strong>clarity bar</strong>", html)
         self.assertIn("about 12 questions is typical, not a cap", html)
         self.assertIn('Say "enough" any time', html)
-        self.assertIn("<li>Define review, alongside the spec review:", html)
-        self.assertIn("up to 10 drill-down questions, each with a suggested answer", html)
-        self.assertIn("no cards are cut until you do", html)
+        self.assertIn("hands back up to 6 questions a builder or the AI would otherwise guess", html)
+        self.assertIn("mock-up screens the spec doesn't support and anything a builder or the AI would have to guess", html)
 
 
 if __name__ == "__main__":
