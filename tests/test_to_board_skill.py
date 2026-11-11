@@ -70,6 +70,16 @@ class ToBoardSkill(unittest.TestCase):
         # The blind reviewer still never sees spec.md.
         self.assertIn("Never `spec.md`", self.section("Blind review"))
 
+    def test_spec_review_capability_pass_and_rules_with_no_parent(self):
+        s = self.section("Spec review")
+        for want in ("**capability pass:**", "`## Day-one questions`", "can this design answer it?",
+                     "`yes` or `no`, and why", "marks it `guessed`",
+                     "**rules with no parent:**", "every invariant or must-never in spec.md",
+                     "| Must-have | Day-one question | Can answer? | Why |",
+                     "No north-star parent:", "(keep or drop?)",
+                     "outside the 8 and the word count", "needs the owner's call"):
+            self.assertIn(want, s)
+
     def test_mockup_log_is_an_input(self):
         self.assertIn("| `docs/shape/mockup-log.md` | if present (from `/mockup`) |", TEXT)
 
@@ -127,6 +137,25 @@ class ToBoardSkill(unittest.TestCase):
         self.assertIn("update\n   `docs/shape/spec.md` in the same PR", build)
         review = (root / "skills/super-board/references/lanes/review.md").read_text()
         self.assertIn("`bar: spec.md matches the code`", review)
+
+
+class NorthStarDayOne(unittest.TestCase):
+    NS = (ROOT / "skills" / "north-star" / "SKILL.md").read_text()
+
+    def test_grill_asks_day_one_per_must_without_extra_questions(self):
+        self.assertIn("- **Day-one test:** under each must", self.NS)
+        self.assertIn("what will you ask or do with this on day one, and what's a good answer?", self.NS)
+        self.assertIn("costs no extra one", self.NS)
+        self.assertIn("**12 questions or fewer**", self.NS)
+
+    def test_day_one_section_format_and_home(self):
+        self.assertIn("## Day-one questions\n- M<n>: <what they'll ask or do on day one> → <a good answer>", self.NS)
+        self.assertLess(self.NS.index("## Must have\n"), self.NS.index("## Day-one questions"))
+        self.assertIn("never in the postcard", self.NS)
+
+    def test_log_counts_day_one_per_must(self):
+        self.assertIn('"day_one":{"M1":0}', self.NS)
+        self.assertIn("`day_one` counts the day-one lines per must-have", self.NS)
 
 
 if __name__ == "__main__":
