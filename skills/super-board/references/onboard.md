@@ -177,6 +177,12 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    git or gh → halt: "Without <tool> the board can't <why>. Your answers are saved — run
    │    the command, then re-run onboard."
    ├─ Re-check (`check --text`) after every install; move on only when it says all green.
+   ├─ Design plugin (Claude host only; `/mockup` step 8 runs it): the `frontend-design` skill
+   │    must be visible to this session, i.e. `enabledPlugins` has a `frontend-design@…` key set
+   │    to true in `~/.claude/settings.json` or `.claude/settings.json`. Not on → no question, one line:
+   │      Needs your machine: frontend-design plugin is off; /mockup's design polish needs it.
+   │      → /plugin install frontend-design@claude-plugins-official, then restart Claude Code.
+   │    It never blocks onboard; a missing plugin stops only /mockup step 8.
    ├─ Workflow runtime: syntax-check the installed workflow (same command run-workflow.md uses):
    │      { echo '(async function(){'; sed 's/^export const meta/const meta/' \
    │        .claude/workflows/super-board-wave.js; echo '})'; } | node --check --input-type=module
@@ -394,6 +400,9 @@ DONE — run `python3 $SB/super-board-verification-ready.py --config <saved conf
         📋 Board: github.com/users/<owner>/projects/<n> (<title>)
         🧹 Next: /super-board lint — checks every ticket has clear success criteria.
         🤖 Then: /super-board run.
+      A new app mid-Define (`docs/shape/north-star.md` exists, `docs/shape/coverage.md` does
+      not) gets the next Define step instead of the two lines above:
+        🧭 Next: /to-board --dry-run — spec and card table, nothing filed.
 ```
 
 ---

@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 You are a senior product designer at a small software house. The owner has signed a north star. Your job is to let them **feel the core loop** before anyone writes a spec: a throwaway, clickable page with fake data. Not the app. Not code anyone keeps.
 
-Win condition: the owner clicks through, picks a version, and says **yes** to the postcard, in **one hour or less** and **at most 2 rounds of tweaks**.
+Win condition: the owner clicks through, picks a version, and says **yes** to the postcard, in **one hour or less** and **at most 2 rounds of tweaks**, after an outside review and a design polish.
 
 ## Arguments
 
@@ -19,7 +19,7 @@ Win condition: the owner clicks through, picks a version, and says **yes** to th
 
 ## Rules
 
-- **Read only** `<out>/north-star.md` and what the owner points at (a screenshot, a spreadsheet, a screen they use today). Nothing else in the repo.
+- **Read only** `<out>/north-star.md`, `<out>/later.md`, `<out>/mockup-log.md` and what the owner points at (a screenshot, a spreadsheet, a screen they use today). Nothing else in the repo.
 - **Throwaway.** No real data, no real code, no other app screens, no install. Mark the page "MOCK-UP, not the app" in its header.
 - **Business is theirs, tech is yours.** Talk about what they see and do. Never ask about frameworks, hosting or data.
 - **Don't ask what you can assume.** Make the call, mark it on the page or in `later.md`. At most 3 questions in the whole run, and only to pick a version or fix the postcard.
@@ -86,7 +86,7 @@ Before the owner sees it, open the file in a browser if you can, or reread it. C
 
 ### 5. Hand it over
 
-Tell the owner the path, and how to use it: "Open `docs/shape/mockup.html`. Click the tabs. Switch versions at the bottom. Pick the one that feels right." Then ask them to:
+Start `<out>/mockup-log.md` now (see step 6). Tell the owner the path, and how to use it: "Open `docs/shape/mockup.html`. Click the tabs. Switch versions at the bottom. Pick the one that feels right." Then ask them to:
 1. Click through each version once.
 2. Say which version they pick, and anything to steal from the others.
 
@@ -94,19 +94,38 @@ Tell the owner the path, and how to use it: "Open `docs/shape/mockup.html`. Clic
 
 Make the picked version the default: it loads first, and the file remembers it as `DEFAULT_VERSION` at the top of the script. The other versions may stay behind the switch.
 
+**Feedback log.** Keep `<out>/mockup-log.md` as you go, one line each, in order: `- owner (round <n>): <their words, verbatim>` for every owner input (the pick included) and `- builder: <what you pushed back on or parked, and why>`. The outside review (step 7) and `/to-board`'s spec review read it, so never tidy or summarise it.
+
 For each tweak the owner asks for, sort it:
 - **Small tweak or detail** (wording, a field, a colour, an edge case): park it in `<out>/later.md` unless it takes under 2 minutes and helps the feel. Say what you parked.
-- **Changes the loop or a must-have** (a new step, a removed step, something it must or must never do): this is a north star change, not a tweak. Go to step 7, "no" branch.
+- **Changes the loop or a must-have** (a new step, a removed step, something it must or must never do): this is a north star change, not a tweak. Go to step 9, "no" branch.
 
-Apply the tweaks, then go to step 7. A second round of tweaks is the last. After it, ask for yes or no only.
+Apply the tweaks. A second round of tweaks is the last. When the owner says the mock-up feels right, go to step 7.
 
-### 7. The postcard check
+### 7. Outside review
+
+Nobody outside the shaping chat has looked yet; owner and builder can talk themselves into choices. Spawn **one fresh sub-agent, model fable**, read-only (it writes no file, edits nothing). It starts cold on purpose: give it only the goal (the postcard), `<out>/north-star.md`, `<out>/later.md`, `<out>/mockup-log.md` and `<out>/mockup.html`. Never your own reasoning. Prompt it for, in under 700 words:
+- `verdict:` one line, does this mock-up deliver the postcard
+- at most 8 core issues or omissions, ranked by impact, each with why (citing a north-star line or an owner input from the log) and the smallest fix
+- a cut/park list (cruft that serves no must-have)
+- at most 3 things that must stay
+
+Not its job: visual polish, wording, features for their own sake. Relay every finding to the owner with **your take** on each (agree, modify or pass, and why). Where one contradicts an explicit owner input in the log, say so. **The owner decides; nothing is applied without them.** Apply the accepted fixes in one pass and log them. A finding that changes a must-have, the never-list or the core loop goes through the north-star amendment (step 9, "no" branch). The review is not a tweak round.
+
+### 8. Design polish
+
+Run Anthropic's `frontend-design` skill on `<out>/mockup.html` (onboarding checks the plugin is on; if it is missing, say "Enable the frontend-design plugin, then re-run /mockup" and stop). One pass: sizing, spacing, type scale, buttons, consistent components. Rules:
+- **Presentation only.** Keep every `screen-<name>` id, every button, every flow and every behaviour. No new screens or features. The step 3 file rules still hold (no network, no web fonts); rerun the step 4 checks after.
+- Take **before and after screenshots** of each tab at desktop (1280px) and phone (390px) width, and show them side by side.
+- The owner picks what stays; log it. The kept CSS tokens (type scale, spacing, colours) at the top of the style block are the design baseline `/to-board` points UI cards at.
+
+### 9. The postcard check
 
 Read the postcard back and ask exactly:
 
 **"Is that the postcard? Yes, nearly or no?"**
 
-- **yes:** add one line under the north-star header in `<out>/north-star.md`, directly below the `Signed:` line: `Mock-up: <date> · picked: <version> · postcard: yes`. Then say: "Mock-up signed. Next: /to-board."
+- **yes:** add one line under the north-star header in `<out>/north-star.md`, directly below the `Signed:` line: `Mock-up: <date> · picked: <version> · postcard: yes`. Then hand off (below).
 - **nearly:** fix what they point at, within the round limit, and ask again. Counts as one tweak round.
 - **no:** ask once: "What's wrong?" If the answer changes a must-have, the never-list or the core loop, say: "That changes the north star. Go back to `/north-star` to re-sign it, then run `/mockup` again." If it is only look and feel, make the change as a tweak round and ask again.
 
@@ -114,4 +133,6 @@ If the second round still gets "no", stop. Say what is unclear and send them to 
 
 ## Not this skill's job
 
-Real data, real code, other app screens, installing, specs, tickets, and building inside an existing app. Hand-off line: "Mock-up signed. Next: /to-board."
+Real data, real code, other app screens, installing, specs, tickets, and building inside an existing app.
+
+**Hand-off line.** No board config in `.claude/super-board/configs/` → "Mock-up signed. Next: /super-board onboard". A config exists → "Mock-up signed. Next: /to-board --dry-run".
