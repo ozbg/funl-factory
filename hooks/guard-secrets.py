@@ -49,7 +49,26 @@ def subject(payload):
     return ""
 
 
+def scan(path):
+    """`--scan <file>`: lint and /to-board check a card body before a run (#88). Prints each
+    line a lane command carrying this text would be denied for; exit 1 if any, else 0.
+    Reads only the given file, which must not itself be a secrets file."""
+    if SECRET_RE.search(path):
+        print("refusing to scan a secrets file", file=sys.stderr)
+        return 2
+    hits = 0
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for n, line in enumerate(f, 1):
+            m = SECRET_RE.search(line)
+            if m:
+                hits += 1
+                print(f"{n}: names {m.group(0).strip()!r} (the secrets guard would block a command carrying this line)")
+    return 1 if hits else 0
+
+
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "--scan":
+        sys.exit(scan(sys.argv[2]))
     try:
         payload = json.loads(sys.stdin.read() or "{}")
         text = subject(payload)

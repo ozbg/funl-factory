@@ -55,6 +55,19 @@ expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-chec
 expect allow guard-secrets.py "$(bash_cmd ".claude/bin/super-board-env-check.sh SENTRY_AUTH_TOKEN")" "env-check direct call"
 expect allow guard-secrets.py "$(bash_cmd "  sh /abs/path/.claude/bin/super-board-env-check.sh	--file=${D}.local K ")" "env-check sh, tab, abs path"
 
+# #88: card text inside a command trips the guard, so lanes pass cards by file. The
+# by-file call is allowed; --scan finds a body that would trip it before a run.
+CARDS_JSON='[{"number":7,"body":"Fix: load the keys from '"$D"'"}]'
+expect deny  guard-secrets.py "$(bash_cmd "python3 .claude/bin/super-board-skills-ready.py --root . --host claude --cards - --hydrate <<'CARDS'${NL}${CARDS_JSON}${NL}CARDS")" "#88: card body inline in a heredoc"
+expect allow guard-secrets.py "$(bash_cmd "python3 .claude/bin/super-board-skills-ready.py --root . --host claude --cards /tmp/scratch/cards-7.json --hydrate")" "#88: cards by file path"
+SCAN_DIR=$(mktemp -d)
+printf 'Problem\nFix: load the keys from %s\n' "$D" > "$SCAN_DIR/bad.md"
+printf 'Problem\nFix: load the keys from the env file\n' > "$SCAN_DIR/good.md"
+OUT=$(python3 "$H/guard-secrets.py" --scan "$SCAN_DIR/bad.md") && fail "--scan should exit 1 on a body naming the dotenv file"
+printf '%s' "$OUT" | grep -q '^2: names' || fail "--scan should name the line, got: $OUT"
+python3 "$H/guard-secrets.py" --scan "$SCAN_DIR/good.md" >/dev/null || fail "--scan should pass a body that names it in words"
+rm -rf "$SCAN_DIR"; PASS=$((PASS + 3))
+
 # ---- guard-key-literals -----------------------------------------------------
 ANT="sk-""ant-$(printf 'a%.0s' $(seq 1 30))"
 AWS="AKIA""ABCDEFGHIJKLMNOP"

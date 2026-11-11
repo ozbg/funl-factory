@@ -27,6 +27,10 @@ edits mode prompts the owner on every call (#94).
   a fresh shell, so a variable or a sourced function is gone by the next call anyway. The
   exit code is in the tool result; read it there. A value you need later (a sha, a path),
   read it with its own call and paste the literal into the next one.
+- **Card text never goes inside a command** (no heredoc, no `--cards -`, no `echo '<json>' |`).
+  The secrets guard scans the whole command, so a body that only names the env file halts the
+  wave (#88). Write the JSON or body to a file with the Write tool and pass the path
+  (`--cards <file>`, `--body-file <file>`).
 
 - `gh`, `.claude/bin/…` and board commands run as one plain command: no `cd … &&` in front,
   no shell loop, no `;` or `&&` chain. Name the repo with `-R <owner>/<repo>` (or

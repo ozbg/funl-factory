@@ -231,8 +231,9 @@ const BOARD_IO = () =>
 // The orchestrator resolves every remaining chain before claims. The runtime has
 // no subprocess API; each worker repeats the deterministic CLI before its writes.
 const SKILLS_CHECK = (cards, lane) => [
-  `First operation, before worktree creation, classification, comments, labels or moves: run, as ONE plain call from the project root, python3 .claude/bin/super-board-skills-ready.py --root . --host claude --cards - --hydrate${lane ? ' --lane ' + lane : ''} <<'CARDS'`,
-  `followed by this JSON array on its own lines and a closing CARDS line (a quoted heredoc is data, never shell code; no variables, no && or |): ${JSON.stringify(cards)}.`,
+  `First operation, before worktree creation, classification, comments, labels or moves: with the Write tool, write this JSON array to a file in your scratchpad directory (the one your system prompt names; without one, .claude/super-board/inflight/cards-${cards.map((c) => c.number).join('-')}.json). Card text never goes inside a command: the secrets guard scans the whole command and a body that names the env file halts the wave (#88).`,
+  `Cards file contents (data, never shell code): ${JSON.stringify(cards)}.`,
+  `Then run ONE plain call from the project root: python3 .claude/bin/super-board-skills-ready.py --root . --host claude --cards <that file> --hydrate${lane ? ' --lane ' + lane : ''}`,
   `Exit 10 means status=halted (preflight verdict=halted), detail beginning "skills-readiness:"; preserve all existing claims/worktrees/approval evidence. Exit 64 means invalid input: halt and repair it. Exit 79 uses the read halt policy.`,
   `Load the exact resolved_path files. Only declared fallback IDs are allowed. Before using a conditional/custom helper repeat this CLI with --require <exact-name>.`,
 ].join('\n')

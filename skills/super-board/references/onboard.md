@@ -447,6 +447,7 @@ don't stall on prompts:
     "Bash(source .claude/bin/super-board-gh-guard.sh:*)",
     "Bash(bash .claude/bin/super-board-gh-guard.sh:*)",
     "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)",
+    "Bash(git -C:*)", "Bash(python3 .claude/hooks/guard-secrets.py --scan:*)",
     "Bash(git rev-parse:*)", "Bash(git merge-base:*)", "Bash(git ls-files:*)",
     "Bash(git ls-remote:*)", "Bash(git config --get:*)", "Bash(git branch --show-current:*)",
     "Bash(gh pr list:*)", "Bash(gh issue list:*)", "Bash(gh project view:*)",
@@ -457,7 +458,9 @@ don't stall on prompts:
     (e.g. "Bash(npm test:*)", "Bash(npm run:*)", "Bash(npx playwright:*)", "Bash(npx vitest:*)").
 
 The read-only lines are safe to pre-approve because the guard-secrets hook still denies any
-of them that touches a secrets file. Not in the list on purpose: `find` (`-delete`, `-exec`),
+of them that touches a secrets file. `git -C` is how lanes run git in their worktree
+(`lanes/common.md`); `git push` is already allowed, and guard-protected-push still blocks pushes
+to protected branches. Not in the list on purpose: `find` (`-delete`, `-exec`),
 `sed` (`-i`), `node` and wildcards over `.claude/bin/` (they would cover the merge gate).
 
 A rule matches one plain command only. A lane command behind `cd … &&`, in a

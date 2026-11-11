@@ -128,6 +128,19 @@ check("bash .claude/bin/super-board-gh-guard.sh check 200" in wave,
 
 common = (ROOT / "skills/super-board/references/lanes/common.md").read_text()
 check("**One literal call per Bash call.**" in common, "lanes/common.md must give the one-call rule")
+
+# Card text never travels inside a command: the secrets guard scans the whole command (#88).
+for bad in ("--cards -", "<<'CARDS'", "<<CARDS"):
+    check(bad not in wave, f"workflows/super-board-wave.js passes cards inline ({bad}); write a file and pass --cards <file>")
+check("--cards <that file>" in wave and "Write tool" in wave,
+      "the skills check must write the cards to a file and pass its path")
+check("**Card text never goes inside a command**" in common, "lanes/common.md must say card text never goes inside a command")
+lint = (ROOT / "skills/super-board/references/lint.md").read_text()
+check("| 23 | Body names a file the secrets guard blocks" in lint and "guard-secrets.py --scan" in lint,
+      "lint must flag a card body the secrets guard would block")
+check("guard-secrets.py --scan" in (ROOT / "skills/to-board/SKILL.md").read_text(),
+      "/to-board must scan card bodies before filing")
+check("Bash(git -C:*)" in base_rules, "base allowlist misses Bash(git -C:*), how lanes run git")
 check("resolveReviewThread" in common and "gh api -X PATCH" in common,
       "lanes/common.md must give the one route to resolve threads and edit comments")
 

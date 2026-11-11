@@ -88,7 +88,7 @@ PHASE 7 — Final summary + session-reset nudge
 
 ---
 
-## Lint criteria — 22-criterion table
+## Lint criteria — 23-criterion table
 
 An issue is flagged if any of these apply. An issue can fail multiple criteria; all firing criteria are surfaced in Phase 4.
 
@@ -116,6 +116,7 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 20 | Ready card with no milestone, or not on the config's `goal.milestone` (factory #40) | A refactor in Ready with no milestone | Ask the owner which goal it serves; with none, move it to Backlog |
 | 21 | No `Must-have served:` line, or it names a number not under `## Must have` in `docs/shape/north-star.md` (bug and qa cards exempt); or 0 AC checkboxes | Planner `refused` reason | Ask which must-have it serves; with none, move it to Backlog |
 | 22 | Card lines missing (ticket-format.md): `Scenario:`, `Zone:` (green/amber/red), `Files:`, `Fit for purpose:`, `Out of scope:` | No `Files:` line, so the card runs alone | Draft each one line under Context |
+| 23 | Body names a file the secrets guard blocks (factory #88): `python3 .claude/hooks/guard-secrets.py --scan <body file>` exits 1 | Fix line "load SUPABASE keys from the env file", spelled as its file name | Reword to name it in words ("the env file") or by key name; a lane carrying the text in a command would halt |
 
 Criterion 19 is conditional. Read the current flow, owners/callers and applicable specs/ADRs
 before flagging it. Labels alone do not trigger it. Ordinary bugs, mechanical refactors and
@@ -285,7 +286,7 @@ Before declaring lint complete, the worker MUST verify all three:
 
 - [ ] `docs/super-board/pre-flight.md` exists and lists every credential / tool / env signal encountered while scanning issues + PROJECT.md.
 - [ ] Every issue in active-pipeline columns (Ready, Building, QA, Review) either:
-  - has a populated `## Acceptance Criteria` section that passes all 22 criteria (conditional #19 only when triggered), OR
+  - has a populated `## Acceptance Criteria` section that passes all 23 criteria (conditional #19 only when triggered), OR
   - was dropped on purpose (closed as not planned, Done, `🤷 dropped` comment), OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
 - [ ] `super-board-coverage.py lint` exits 0 (or warns that coverage.md is missing).
