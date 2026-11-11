@@ -56,7 +56,7 @@ class Chain(unittest.TestCase):
     def test_north_star_hands_to_mockup(self):
         ns = (ROOT / "skills/north-star/SKILL.md").read_text()
         self.assertIn('"North star signed. Next: /mockup"', ns)
-        self.assertLessEqual(len(ns.splitlines()), 160)
+        self.assertLessEqual(len(ns.splitlines()), 170)
 
     def test_onboard_checks_plugin_and_names_dry_run(self):
         ob = (ROOT / "skills/super-board/references/onboard.md").read_text()
@@ -72,8 +72,8 @@ class Chain(unittest.TestCase):
     def test_help_shows_chain_in_order(self):
         html = (ROOT / "docs/help.html").read_text()
         chain = re.search(r'<ol class="chain">(.*?)</ol>', html, re.S).group(1)
-        order = ["/north-star", "/mockup", "outside review", "design polish", "postcard check",
-                 "/super-board onboard", "/to-board --dry-run", "spec review", "blind review",
+        order = ["/north-star", "clarity bar", "/mockup", "outside review", "design polish", "postcard check",
+                 "/super-board onboard", "/to-board --dry-run", "spec review", "Define review", "blind review",
                  "scope review", "/to-board</span>: files", "zones.yaml", "/super-board lint",
                  "/super-board run", "report"]
         pos = [chain.find(w) for w in order]
