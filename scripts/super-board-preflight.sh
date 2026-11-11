@@ -33,7 +33,7 @@
 # Usage:
 #   super-board-preflight.sh --repo <owner/name> --issues <N[,M…]>
 #                            [--inflight <cards.json>]   # [{number,title,status}] board cards
-#                            [--files a/b.ts,c/d.ts]     # paths the card will touch (else: parsed from body)
+#                            [--files a/b.ts,c/d.ts]     # paths the card will touch (else: its **Files:** line; Pattern/Mock-up never count)
 #                            [--threshold 0.6]           # title Jaccard for a duplicate
 #
 # Stdout, one object keyed by issue number:
@@ -94,6 +94,18 @@ jq -n --argjson targets "$TARGETS" --argjson merged "$MERGED" --argjson open "$O
   def closed_refs: [ (.body // "") | scan("(?i)\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[ :]+#([0-9]+)")[0] | tonumber ] | unique;
   def fps: [ (.body // "") | scan("(?m)^[ \t]*fingerprint:[ \t]*([^\n]*[^ \t\n])")[0] ];
   def paths: [ (.body // "") | scan("[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+\\.[A-Za-z0-9]+") ] | unique;
+  # Files a card changes: its `**Files:**` list only (#95). `Pattern:` and `Mock-up:` paths
+  # are read-only references and never count. A card with no Files line falls back to the
+  # paths in its body, minus those reference lines.
+  def card_files:
+    ((.body // "") / "\n") as $l
+    | [ $l[] | select(test("^[ \t]*(?:[-*][ \t]+)?(?:\\*\\*)?Files:(?:\\*\\*)?")) ] as $fl
+    | if ($fl | length) > 0 then
+        [ $fl[] | sub("^[ \t]*(?:[-*][ \t]+)?(?:\\*\\*)?Files:(?:\\*\\*)?"; "") | split(",")[]
+          | gsub("[`\\s]"; "") | select(length > 0) ] | unique
+      else
+        { body: ([ $l[] | select(test("^[ \t]*(?:[-*][ \t]+)?(?:\\*\\*)?(?:Pattern|Mock-up):") | not) ] | join("\n")) } | paths
+      end;
   # The AC section: lines after the LAST "## Acceptance Criteria" heading, up to the next "## ".
   def has_acs: ((.body // "") / "\n") as $l
     | [ $l | to_entries[] | select(.value | test("^##[ \t]+Acceptance Criteria")) | .key ] as $h
@@ -104,7 +116,7 @@ jq -n --argjson targets "$TARGETS" --argjson merged "$MERGED" --argjson open "$O
 
   [ $targets[] | . as $i | $i.number as $n
     | ($i | fps) as $myfp
-    | (if $files == "" then ($i | paths) else ($files / ",") end) as $mine
+    | (if $files == "" then ($i | card_files) else ($files / ",") end) as $mine
     # Own branch = this card coming back (rebuild, rebase); never its own duplicate.
     | [ $open[] | select((.headRefName // "") | startswith("issue-\($n)-") | not) ] as $others
 
