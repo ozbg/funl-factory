@@ -282,6 +282,14 @@ class ClarityReviewInNorthStar(unittest.TestCase):
         self.assertIn("**inside the drill**, one at a time, with the suggested answer", d)
         self.assertIn('The clarity line keeps updating. "Enough" still ends it.', d)
 
+    def test_runs_once_even_after_enough(self):
+        d = self.drill()
+        self.assertIn('**Clarity review**, once, when the drill ends: every must-have clear, or "enough" said.', d)
+        self.assertNotIn("skipped if the owner already said", d)
+        self.assertIn("show the ones you agree with as one numbered list, each with its suggested answer", d)
+        self.assertIn('answers any of them in one reply, or says "enough" again', d)
+        self.assertIn("Each one left unanswered goes under `## Assumed (not asked)`.", d)
+
     def test_looks_ahead_to_business_rules_within_the_six(self):
         d = self.drill()
         self.assertIn("It also looks ahead to the spec: any business rule the build will need that the draft leaves open", d)
