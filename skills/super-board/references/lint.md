@@ -64,6 +64,11 @@ PHASE 3b — Coverage check (factory #58)
      lines, do not print the Phase 7 success banner, and send the owner to `/to-board`.
      A missing `docs/shape/coverage.md` prints a warning and exits 0 — an old app is not failed.
 
+PHASE 3c — Mock-up blocks (factory #104)
+  └─ Write the active-pipeline issues from Phase 2 as JSON `[{number, title, body}]` to a temp
+     file, then run `python3 .claude/bin/super-board-coverage.py cards --repo-path . --issues-json <file>`.
+     Each `error: #N:` line is criterion 24 on that card. Exit 1 is a lint failure, like 3b.
+
 PHASE 4 — Deep-dive flagged issues (skill-routed, PM voice, one at a time)
 
 PHASE 5 — Per-issue summary
@@ -88,7 +93,7 @@ PHASE 7 — Final summary + session-reset nudge
 
 ---
 
-## Lint criteria — 23-criterion table
+## Lint criteria — 24-criterion table
 
 An issue is flagged if any of these apply. An issue can fail multiple criteria; all firing criteria are surfaced in Phase 4.
 
@@ -117,6 +122,7 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 21 | No `Must-have served:` line, or it names a number not under `## Must have` in `docs/shape/north-star.md` (bug and qa cards exempt); or 0 AC checkboxes | Planner `refused` reason | Ask which must-have it serves; with none, move it to Backlog |
 | 22 | Card lines missing (ticket-format.md): `Scenario:`, `Zone:` (green/amber/red), `Files:`, `Fit for purpose:`, `Out of scope:` | No `Files:` line, so the card runs alone | Draft each one line under Context |
 | 23 | Body names a file the secrets guard blocks (factory #88): `python3 .claude/hooks/guard-secrets.py --scan <body file>` exits 1 | Fix line "load SUPABASE keys from the env file", spelled as its file name | Reword to name it in words ("the env file") or by key name; a lane carrying the text in a command would halt |
+| 24 | Screen card (a `Mock-up:` line in Context; the Demo card is exempt) without its `## Mock-up` block: the anchor, a markup excerpt (an `html` block), a `Classes:` list, a `Cut from mock-up:` line (`none` if nothing), and the AC ``screen matches mock-up `#screen-<name>` (screenshot side by side)``. A card that cuts features must also be in coverage.md's `Cut from mock-up:` list. Checked by `super-board-coverage.py cards` (Phase 3c) | Card says "styled per the mock-up" and drops the source filter without saying so | Fill the block from that `<section>` of `docs/shape/mockup.html` ([card-template.md](../../to-board/references/card-template.md#the-mock-up-block)); list each cut and add it to coverage.md |
 
 Criterion 19 is conditional. Read the current flow, owners/callers and applicable specs/ADRs
 before flagging it. Labels alone do not trigger it. Ordinary bugs, mechanical refactors and
@@ -286,10 +292,11 @@ Before declaring lint complete, the worker MUST verify all three:
 
 - [ ] `docs/super-board/pre-flight.md` exists and lists every credential / tool / env signal encountered while scanning issues + PROJECT.md.
 - [ ] Every issue in active-pipeline columns (Ready, Building, QA, Review) either:
-  - has a populated `## Acceptance Criteria` section that passes all 23 criteria (conditional #19 only when triggered), OR
+  - has a populated `## Acceptance Criteria` section that passes all 24 criteria (conditional #19 only when triggered), OR
   - was dropped on purpose (closed as not planned, Done, `🤷 dropped` comment), OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
 - [ ] `super-board-coverage.py lint` exits 0 (or warns that coverage.md is missing).
+- [ ] `super-board-coverage.py cards` exits 0: every screen card has its mock-up block.
 - [ ] No issue is left in an in-between state (flagged but not resolved, partially edited, or awaiting user input that never came).
 
 If any check fails, do **not** print the Phase 7 success banner. Re-enter the loop on the unresolved issues, or halt with a clear "N issues still need attention" message so the user can re-run `super-board lint`.

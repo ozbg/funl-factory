@@ -94,6 +94,7 @@ Every card, without exception:
 - **Files:** the exact files it creates or changes. No folders, no "etc".
 - **Pattern:** the file to copy (from the foundation or an earlier card). The foundation card has none; it makes them. The card is Blocked by the card that makes its Pattern file.
 - **Mock-up:** `docs/shape/mockup.html#screen-<name>` on every card with a screen. The anchor must exist. No mock-up → no line, and Fit for purpose says what the screen shows.
+- **Mock-up block:** every screen card, except the Demo card, gets a `## Mock-up` block filled from that section of `mockup.html`: anchor, markup excerpt, class list, `Cut from mock-up:` and the AC ``screen matches mock-up `#screen-<name>` (screenshot side by side)``. The builder rebuilds the markup and classes, never the mock-up's JS. List every mock-up feature on that screen the card leaves out, and where it went; `none` if nothing.
 - **Test first:** each AC ends with `— test: <path>`. The builder writes that test, sees it fail, then builds.
 - **Fix:** what to change, the contract it reads or writes (by its spec.md name), and the command to run.
 - **Zone:** from the draft map: `python3 .claude/bin/super-board-zone.py --zones docs/agents/zones.yaml --files <Files>`, take `tier`. A red card adds one AC per invariant it touches: `- [ ] I<n> holds: <rule> — test: <path>`.
@@ -110,6 +111,7 @@ Every card, without exception:
 - no two cards list the same file unless one is Blocked by the other
 - the blocking graph has no cycle; the Demo card is blocked by all
 - every Mock-up anchor exists in `mockup.html`
+- every feature of each mock-up screen is built by a card or named in a `Cut from mock-up:` line
 - nothing from `later.md` or the north star's `## Nice later` has a card
 - no card body trips the secrets guard: `python3 .claude/hooks/guard-secrets.py --scan <body file>` exits 0 for each; else name the file in words ("the env file") or by key name (factory #88)
 
@@ -123,7 +125,7 @@ Two independent checks, then one fix round. Full prompts and rules: [references/
 
 ### 8. One review, for scope
 
-Show the owner one table, in build order. Above it, one line: `Verdict: builds the postcard: yes · Haiku read: 14/14 clear` (or `gaps` and the real count). Below it, each open finding and each flagged scope change, one line each.
+Show the owner one table, in build order. Above it, one line: `Verdict: builds the postcard: yes · Haiku read: 14/14 clear` (or `gaps` and the real count). Below it, each open finding and each flagged scope change, one line each, then every mock-up feature cut to `later.md` or nowhere, one line each: `Cut from mock-up: <screen>: <feature>`.
 
 ```
 | # | Card | Must-have | Zone | Blocked by |
@@ -145,7 +147,7 @@ Then file in build order, so each `## Blocked by` can name real numbers. Command
 
 ### 10. Write `docs/shape/coverage.md`
 
-Commit and push it the same way once the card numbers are in. Exactly this shape (lint parses it). One row per must-have, slice cards only. The foundation card does not count as coverage.
+Commit and push it the same way once the card numbers are in. Exactly this shape (lint parses it). One row per must-have, slice cards only. The foundation card does not count as coverage. `Cut from mock-up:` has one bullet per card whose `Cut from mock-up:` line is not `none`: `#N · <screen>: <its cuts>`, copied from the card; `- none` when no card cuts anything. No mock-up: leave the list out.
 
 ```
 | Must-have | Cards |
@@ -154,6 +156,9 @@ Commit and push it the same way once the card numbers are in. Exactly this shape
 | 2 | #14 |
 
 Demo: #20
+
+Cut from mock-up:
+- #13 · screen-pipeline: source filter, notes search (#14) · archived restore (later.md)
 ```
 
 ### 11. Hand off

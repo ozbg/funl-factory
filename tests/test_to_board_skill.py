@@ -138,6 +138,29 @@ class ToBoardSkill(unittest.TestCase):
         review = (root / "skills/super-board/references/lanes/review.md").read_text()
         self.assertIn("`bar: spec.md matches the code`", review)
 
+    def test_screen_cards_carry_the_mock_up_block(self):
+        card = (ROOT / "skills/to-board/references/card-template.md").read_text()
+        for want in ("## Mock-up\n- **Anchor:** docs/shape/mockup.html#screen-<name>",
+                     "- **Classes:**", "- **Cut from mock-up:**", "```html",
+                     "screen matches mock-up `#screen-<name>` (screenshot side by side)",
+                     "never the\nmock-up's JavaScript", "## The mock-up block",
+                     "write out the HTML it renders, not the JS"):
+            self.assertIn(want, card)
+        cut = self.section("Cut the cards")
+        self.assertIn("**Mock-up block:**", cut)
+        self.assertIn("never the mock-up's JS", cut)
+        self.assertIn("`Cut from mock-up:`", cut)
+        self.assertIn("`Cut from mock-up:`", self.section("Check before showing"))
+        self.assertIn("Cut from mock-up: <screen>: <feature>", self.section("One review, for scope"))
+
+    def test_coverage_lists_the_cuts(self):
+        cov = self.section("Write `docs/shape/coverage.md`")
+        self.assertIn("Cut from mock-up:\n- #13 · screen-pipeline:", cov)
+        self.assertIn("`- none`", cov)
+        lint = (ROOT / "skills/super-board/references/lint.md").read_text()
+        self.assertIn("super-board-coverage.py cards", lint)
+        self.assertIn("| 24 | Screen card", lint)
+
 
 class NorthStarDayOne(unittest.TestCase):
     NS = (ROOT / "skills" / "north-star" / "SKILL.md").read_text()
