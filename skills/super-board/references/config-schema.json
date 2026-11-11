@@ -430,8 +430,8 @@
   // live in .env — SENTRY_AUTH_TOKEN, POSTHOG_PERSONAL_API_KEY — never here.
   "collect": {
     // Sources `/super-collect` runs with no argument. Any of:
-    // "sentry", "posthog", "github", "prs", "architecture", plus the `name` of
-    // any entry in `custom` below.
+    // "sentry", "posthog", "github", "prs", "architecture", "feedback", plus the
+    // `name` of any entry in `custom` below.
     "sources": ["sentry", "posthog", "github", "prs", "architecture", "linear"],
     // Default window in days when no --since is given. Default 14.
     "window_days": 14,
@@ -477,6 +477,11 @@
     "architecture": {
       // Cap on refactor findings filed per run. Default 5.
       "max_findings": 5
+    },
+    // The in-app feedback icon's folder (skills/to-board/references/feedback-card.md),
+    // relative to the repo root. Read by collect_feedback.py. Default "data/feedback".
+    "feedback": {
+      "dir": "data/feedback"
     },
     // Triage (references/iteration.md): fix cards filed to Ready per run. Past the
     // cap, a fix goes to Backlog as a proposal recommending it. Default 5.

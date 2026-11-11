@@ -94,6 +94,7 @@ Use [references/card-template.md](references/card-template.md). Cut in this orde
 2. **Slice cards**: one per step of the core loop, then one per must-have not yet covered. Each is a thin vertical slice: data, logic, screen and test for one thing the user does. Demoable alone.
 3. **Demo card**, last: walks the whole core loop end to end against the mock-up screens. Blocked by every other card.
 
+- **Feedback card**, right after the foundation, in every app: one amber card that builds the in-app feedback icon in the app's own stack (capture, local save, no outbound call, the `feedback/1` item). Spec, ACs and title: [references/feedback-card.md](references/feedback-card.md). It serves no must-have, so it adds no coverage row.
 - **Exam cards**, before the Demo card: one per AI feature (a must-have served by an AI call), 10 or more day-one questions run on the real model against a pass mark. Format and rules: [references/exam-card.md](references/exam-card.md).
 
 Every card, without exception:
@@ -113,6 +114,7 @@ Every card, without exception:
 ### 6. Check before showing
 
 - every must-have number has at least one slice card
+- the feedback card is there, Blocked by the foundation (a rescope adds it only if the app has none)
 - every card has 2 to 5 ACs, each with a test hint
 - no two cards list the same file unless one is Blocked by the other
 - the blocking graph has no cycle; the Demo card is blocked by all

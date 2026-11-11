@@ -203,7 +203,7 @@ class IterationProtocol(unittest.TestCase):
         text = SKILL.read_text()
         for needle in ("## Triage", "collect_handoff.py triage", "## Proposals digest",
                        "collect_handoff.py digest", "--accept <n>", "--reject <n> --reason",
-                       "--track bug|tweak|body --decision fix|propose", "feedback (#103)",
+                       "--track bug|tweak|body --decision fix|propose", "| `feedback` | `python3 .claude/skills/super-collect/scripts/collect_feedback.py list`",
                        "Never accept or reject for the owner", "iteration.md"):
             self.assertIn(needle, text)
         self.assertNotIn("never moves a card to `Ready`", text)

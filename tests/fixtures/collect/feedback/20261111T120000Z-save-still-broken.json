@@ -1,0 +1,21 @@
+{
+  "schema": "feedback/1",
+  "id": "20261111T120000Z-save-still-broken",
+  "created_at": "2026-11-11T12:00:00Z",
+  "text": "save does nothing on my note",
+  "route": "/clients/77",
+  "element": "[data-testid=save-note]",
+  "app": {
+    "commit": "abc1234"
+  },
+  "state": {
+    "client_id": 77,
+    "notes": 1
+  },
+  "logs": {
+    "client": [],
+    "server": []
+  },
+  "screenshot": null,
+  "marked_up": false
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "feedback/1",
+  "id": "20261112T090000Z-export-again",
+  "created_at": "2026-11-12T09:00:00Z",
+  "text": "the export button is greyed out again",
+  "route": "/reports",
+  "element": "[data-testid=export]",
+  "app": {
+    "version": "1.4.1"
+  }
+}

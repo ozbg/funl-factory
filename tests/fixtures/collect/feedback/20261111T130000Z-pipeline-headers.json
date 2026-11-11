@@ -1,0 +1,16 @@
+{
+  "schema": "feedback/1",
+  "id": "20261111T130000Z-pipeline-headers",
+  "created_at": "2026-11-11T13:00:00Z",
+  "text": "Stage headers are much bigger than the mock-up",
+  "route": "/pipeline",
+  "screen": "screen-pipeline",
+  "app": {
+    "version": "1.4.0"
+  },
+  "state": {
+    "stages": 5,
+    "deals": 18
+  },
+  "screenshot": "20261111T130000Z-pipeline-headers.png"
+}

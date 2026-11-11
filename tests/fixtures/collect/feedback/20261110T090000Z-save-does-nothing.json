@@ -1,0 +1,30 @@
+{
+  "schema": "feedback/1",
+  "id": "20261110T090000Z-save-does-nothing",
+  "created_at": "2026-11-10T09:00:00Z",
+  "text": "Save does nothing on the Harbour Freight note. Call me on 0412 345 678 or jo@example.com",
+  "route": "/clients/42?tab=notes&q=harbour",
+  "screen": "screen-client",
+  "element": "[data-testid=save-note]",
+  "app": {
+    "version": "1.4.0",
+    "commit": "abc1234"
+  },
+  "state": {
+    "client_id": 42,
+    "client_name": "Harbour Freight",
+    "notes": 3,
+    "filter": "open"
+  },
+  "logs": {
+    "client": [
+      "warn POST /api/notes 500 at 2026-11-10 09:00:01",
+      "debug auth Bearer eyJhbGciOiJIUzI1NiJ9.abc.def"
+    ],
+    "server": [
+      "error notes.save: null client for Harbour Freight"
+    ]
+  },
+  "screenshot": "20261110T090000Z-save-does-nothing.png",
+  "marked_up": true
+}

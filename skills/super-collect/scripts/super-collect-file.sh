@@ -15,7 +15,8 @@
 #      every run: sentry `err|sentry|<issue-id>`, posthog `posthog|<signal>|<key>`
 #      (tracking gaps: `gap|<workflow>`),
 #      github `github|<issue#>`, prs `prs|<boundary>|<cause>`,
-#      architecture `arch|<module>|<problem>`, walk `walk|<screen-name or M<n>>|<key>`.
+#      architecture `arch|<module>|<problem>`, walk `walk|<screen-name or M<n>>|<key>`,
+#      feedback `feedback|<route>|<element>|<text hash>`.
 #   5. triage (super-board references/iteration.md): `--track bug|tweak|body` labels the
 #      track; `--decision fix` files to Ready and needs a `Breaks:` line plus a
 #      `Failing test:` line (bug) or a `## Before and after` section (tweak);
@@ -29,7 +30,7 @@
 #
 # Usage:
 #   super-collect-file.sh --config <cfg.json> --type bug|feature|refactor|fix \
-#     --source sentry|posthog|github|prs|architecture|custom|walk --title "<one line>" --body-file <md> \
+#     --source sentry|posthog|github|prs|architecture|custom|walk|feedback --title "<one line>" --body-file <md> \
 #     --fingerprint "<stable key>" [--priority high|medium|low] [--area <a>] \
 #     [--label <l>]... [--track bug|tweak|body --decision fix|propose] [--yes]
 #   super-collect-file.sh --config <cfg.json> --adopt <issue#> --type bug|feature|refactor [--yes]
@@ -99,7 +100,8 @@ elif [ -z "$ADOPT" ]; then
     prs) FP_PREFIX="prs|" ;; architecture) FP_PREFIX="arch|" ;;
     custom) FP_PREFIX="custom|" ;;   # onboard's "➕ Add another source": custom|<name>|<key>
     walk) FP_PREFIX="walk|" ;;       # the milestone-end agent walk: walk|<screen-or-M<n>>|<key>
-    *) die "--source must be sentry|posthog|github|prs|architecture|custom|walk (got: ${SOURCE:-<unset>})" 64 ;;
+    feedback) FP_PREFIX="feedback|" ;;  # the in-app feedback icon: feedback|<route>|<element>|<text>
+    *) die "--source must be sentry|posthog|github|prs|architecture|custom|walk|feedback (got: ${SOURCE:-<unset>})" 64 ;;
   esac
   [ -n "$TITLE" ] || die "--title is required" 64
   [ -n "$FP" ]    || die "--fingerprint is required (dedupe key)" 64
