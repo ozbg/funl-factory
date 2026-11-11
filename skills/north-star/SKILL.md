@@ -147,4 +147,4 @@ Each returns its single best question with a recommended answer. You pick the be
 
 ## Not this skill's job
 
-The route: screens, fields, data model, tech choices, plans and tickets. Those are later Define levels. Hand off with "North star signed. Next: the mud map and prototype."
+The route: screens, fields, data model, tech choices, plans and tickets. Those are later Define levels. Hand off with "North star signed. Next: /mockup".

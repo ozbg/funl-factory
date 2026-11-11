@@ -76,6 +76,7 @@ td:first-child{white-space:nowrap}
 .stage dt{font:600 12px/1.9 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .stage dd{margin:0;min-width:0;max-width:78ch}
 .stage ol{margin:0;padding-left:20px}
+.chain{margin:0 0 12px;padding-left:22px}.chain li{margin:4px 0}
 .stage li{margin:2px 0}
 @media (max-width:560px){.stage dl{grid-template-columns:1fr;gap:2px}.stage dd{margin-bottom:8px}}
 .callout{border-left:3px solid var(--you);background:var(--you-soft);padding:12px 14px;border-radius:0 6px 6px 0;margin:8px 0 16px;max-width:76ch}
@@ -101,7 +102,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
 <section id="path">
   <h2>The path</h2>
   <p class="sub">Five steps. You sign three things; the factory does the rest and asks only when it must.</p>
-  <div class="diagram" role="img" aria-label="Path: north-star, mockup, to-board, run, report. You sign the postcard, the mock-up, and the scope and zone map.">
+  <div class="diagram" role="img" aria-label="Path: north-star, mockup (with outside review and design polish), to-board (with spec review), run, report. You sign the postcard, the mock-up, and the scope and zone map.">
   <svg viewBox="0 0 980 230" xmlns="http://www.w3.org/2000/svg">
     <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
     <g font-size="13">
@@ -117,14 +118,14 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
         <rect x="210" y="40" width="170" height="92" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
         <text x="295" y="66" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">/mockup</text>
         <text x="295" y="88" text-anchor="middle" fill="var(--fg)">clickable core loop,</text>
-        <text x="295" y="106" text-anchor="middle" fill="var(--fg)">2–3 versions</text>
+        <text x="295" y="106" text-anchor="middle" fill="var(--fg)">review, polish</text>
         <text x="295" y="124" text-anchor="middle" fill="var(--muted)" font-size="12">~1 hour</text>
       </g>
       <g>
         <rect x="410" y="40" width="170" height="92" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
         <text x="495" y="66" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">/to-board</text>
-        <text x="495" y="88" text-anchor="middle" fill="var(--fg)">spec, zones, cards,</text>
-        <text x="495" y="106" text-anchor="middle" fill="var(--fg)">blind review</text>
+        <text x="495" y="88" text-anchor="middle" fill="var(--fg)">spec + review, zones,</text>
+        <text x="495" y="106" text-anchor="middle" fill="var(--fg)">cards + blind review</text>
         <text x="495" y="124" text-anchor="middle" fill="var(--muted)" font-size="12">~30 min</text>
       </g>
       <g>
@@ -171,6 +172,15 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     </g>
   </svg>
   </div>
+  <p><strong>The chain, in order.</strong> Each step ends by naming the next one.</p>
+  <ol class="chain">
+    <li><span class="cmd">/north-star</span>: you sign the postcard.</li>
+    <li><span class="cmd">/mockup</span>: tweak rounds → outside review (a fresh Fable agent) → design polish (<code>frontend-design</code>) → postcard check → north-star amendment if a must-have changed.</li>
+    <li><span class="cmd">/super-board onboard</span>: sets up the board. Skipped if the app already has a board.</li>
+    <li><span class="cmd">/to-board --dry-run</span>: spec → spec review (a fresh Fable agent) → cards → blind review and Haiku read → your scope review. Nothing filed.</li>
+    <li><span class="cmd">/to-board</span>: files the cards to Ready.</li>
+    <li>You sign <code>zones.yaml</code> → <span class="cmd">/super-board lint</span> → <span class="cmd">/super-board run</span> → report.</li>
+  </ol>
   <p>Run Define (<span class="cmd">/north-star</span>, <span class="cmd">/mockup</span>, <span class="cmd">/to-board</span>) in the app's folder, or in an empty folder to test an idea. <span class="cmd">/to-board --dry-run</span> writes the spec and shows the cards without touching a board.</p>
 </section>
 
@@ -192,9 +202,10 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <div class="sh"><span class="n">2</span><h3><span class="cmd">/mockup</span> · the feel</h3><span class="tag you">you click</span></div>
     <dl>
       <dt>Does</dt><dd>Builds 2–3 <strong>radically different mock-ups</strong> of the core loop, all in one web page with fake but realistic data: one tab per step of the loop, a switch at the bottom to flip between versions, buttons that really do something. The sparkle is shown working, and every must-never visibly doesn't happen.</dd>
-      <dt>You</dt><dd>Click through each version, pick one, ask for at most two rounds of tweaks, then answer "Is that the postcard?" If a must-have turns out wrong, it sends you back to <span class="cmd">/north-star</span>.</dd>
-      <dt>Output</dt><dd><strong>A clickable mock-up</strong>: <code>docs/shape/mockup.html</code>, one file that opens with a double-click in any browser, your pick showing first. Each screen has a fixed name (<code>#screen-capture</code>) that the build cards link to, so builders copy the look. It adds a <code>Mock-up: … · postcard: yes</code> line to <code>north-star.md</code>; small tweaks go to <code>later.md</code>.</dd>
-      <dt>Next</dt><dd>Run <span class="cmd">/to-board</span> in the same folder. It reads the north star and the mock-up itself.</dd>
+      <dt>Then</dt><dd>Once you say it feels right: a <strong>fresh Fable agent</strong> that never saw the chat reviews it against the north star and your own words (kept in <code>docs/shape/mockup-log.md</code>) and returns at most 8 ranked issues. The factory gives its take on each; you decide. Then a <strong>design polish</strong> with <code>frontend-design</code> fixes sizing, spacing and type, keeping every screen and button; you see before and after at desktop and phone width and keep what you like.</dd>
+      <dt>You</dt><dd>Click through each version, pick one, ask for at most two rounds of tweaks, say which review findings to take and which polish to keep, then answer "Is that the postcard?" If a must-have turns out wrong, it sends you back to <span class="cmd">/north-star</span>.</dd>
+      <dt>Output</dt><dd><strong>A clickable mock-up</strong>: <code>docs/shape/mockup.html</code>, one file that opens with a double-click in any browser, your pick showing first. Each screen has a fixed name (<code>#screen-capture</code>) that the build cards link to, so builders copy the look. It adds a <code>Mock-up: … · postcard: yes</code> line to <code>north-star.md</code>; small tweaks go to <code>later.md</code>; your inputs and the factory's pushbacks go to <code>mockup-log.md</code>.</dd>
+      <dt>Next</dt><dd>No board yet: <span class="cmd">/super-board onboard</span>, which then names <span class="cmd">/to-board --dry-run</span>. A board already: <span class="cmd">/to-board --dry-run</span> in the same folder. It reads the north star and the mock-up itself.</dd>
     </dl>
   </div>
 
@@ -205,6 +216,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
         <ol>
           <li>Reads the north star, the mock-up and any existing code, then makes the technical calls: stack, data model, how it's tested.</li>
           <li>Writes the <strong>one-page build spec</strong>.</li>
+          <li>Spec review: a fresh Fable agent checks the spec against the north star, the mock-up and your inputs. The factory gives its take on each finding; you decide what changes.</li>
           <li>Drafts the zone map: which files are risky (red), features (amber) or looks only (green).</li>
           <li>Cuts the work into cards: a foundation card first (the skeleton and one finished example of each pattern), a thin slice for each step of the core loop, and a Demo card last that walks the whole loop.</li>
           <li>Blind review: a fresh agent checks the cards against the north star without seeing the spec, and Haiku reads every card and lists any question it would need answered. One round of fixes.</li>

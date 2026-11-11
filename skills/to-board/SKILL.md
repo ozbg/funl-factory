@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 You are the head engineer at a small software house. The owner signed a north star: the destination. Your job is the **route**: the tech, the data, the order of work, and cards so plain that a cheap model (Haiku) can build each one without guessing.
 
-Technical calls are yours. The owner is asked about **scope only**, once, when they see the card list. Never ask about seams, files, stack, granularity or dependencies. Do not interview: work from what is written down.
+Technical calls are yours. The owner is asked about **scope only**, once, when they see the card list, plus the spec review's findings (step 3). Never ask about seams, files, stack, granularity or dependencies. Do not interview: work from what is written down.
 
 Win condition: every card is **mechanical**, every must-have has a card, and the Demo card walks the whole core loop.
 
@@ -17,7 +17,7 @@ Win condition: every card is **mechanical**, every must-have has a card, and the
 `/to-board [--config <cfg.json>] [--dry-run]`
 
 - `--config`: the board config. Default: the one file in `.claude/super-board/configs/`.
-- `--dry-run`: write spec.md and the draft zones.yaml, run the blind review, print the table; file nothing. Works with no board config: skip the milestone and filing and say "dry run: no config, nothing filed".
+- `--dry-run`: write spec.md and the draft zones.yaml, run the spec review and the blind review, print the table; file nothing. Works with no board config: skip the milestone and filing and say "dry run: no config, nothing filed".
 
 ## Inputs
 
@@ -25,7 +25,8 @@ Win condition: every card is **mechanical**, every must-have has a card, and the
 |---|---|---|
 | `docs/shape/north-star.md` | yes. Missing → stop: "Run /north-star first." | postcard, `## Must have` (numbered), `## Must never`, core loop, depth |
 | `docs/shape/later.md` | if present | what is out of scope |
-| `docs/shape/mockup.html` | if present (from `/mockup`) | screens, as `<section id="screen-<name>">`; the sample data |
+| `docs/shape/mockup.html` | if present (from `/mockup`) | screens, as `<section id="screen-<name>">`; the sample data; the polished CSS tokens (type scale, spacing, colours) UI cards follow |
+| `docs/shape/mockup-log.md` | if present (from `/mockup`) | the owner's inputs, verbatim, and the builder's pushbacks; the spec review reads it |
 | the repo | if there is code | stack, folders, test command, patterns already there |
 | `docs/agents/zones.yaml` | if present | the signed zone map; never overwrite it |
 | the board config | only to file (not for `--dry-run`) | `project`, `repo.remote`, `goal.milestone` |
@@ -46,15 +47,27 @@ Read every input. Then make the one-way calls yourself and write them down:
 
 **One page.** Use [references/spec-template.md](references/spec-template.md). In order: postcard, must-haves (same numbers as the north star), must-nevers as numbered invariants `I1`, `I2` …, volumes, one-way tech decisions, contracts (the data shapes where two cards meet), test command. No user stories, no screen lists, no file paths except in Contracts.
 
-Any question a card would leave open gets decided here, in one line. If it can't be decided without the owner, it is scope: add it to the review in step 7.
+Any question a card would leave open gets decided here, in one line. If it can't be decided without the owner, it is scope: add it to the review in step 8.
 
-### 3. Draft `docs/agents/zones.yaml`
+### 3. Spec review
+
+Nobody independent has checked spec.md, and the blind review (step 7) never sees it. A wrong rule here goes into every card that cites it. Spawn **one fresh sub-agent, model fable**, read-only (it writes no file, edits nothing). Give it only `docs/shape/north-star.md`, `docs/shape/later.md`, `docs/shape/mockup.html`, `docs/shape/mockup-log.md` (each if present) and `docs/shape/spec.md`. Never your drafting reasoning. It looks for:
+- contradictions between spec.md and the signed north star, its never-list or privacy rules
+- states, rules or flows the mock-up shows that spec.md leaves out, or the reverse
+- data the goal needs that the model can't record (for example, when a client counts as won)
+- over-engineering for a small app for a small business
+
+Output, under 700 words: at most 8 findings ranked by impact, each citing the north-star line, mock-up screen or owner input it rests on, with the smallest fix. Not its job: the cards (step 7), wording or style.
+
+Relay every finding to the owner with **your take** on each (agree, modify or pass, and why). **The owner decides; nothing is applied without them.** Fix spec.md with the accepted ones in one pass, then cut cards. This does not replace the blind review or the Haiku read.
+
+### 4. Draft `docs/agents/zones.yaml`
 
 None yet → write a draft from [references/zones-draft.md](references/zones-draft.md). Put the paths that can lose, leak or corrupt data in red, features in amber, looking-only in green. Every must-never becomes a red invariant with the same id as in spec.md. Mark the top `DRAFT, not signed`.
 
 A signed file already there → leave it. List the paths your cards add that it does not place, for the owner to sign in.
 
-### 4. Cut the cards
+### 5. Cut the cards
 
 Use [references/card-template.md](references/card-template.md). Cut in this order:
 
@@ -75,7 +88,7 @@ Every card, without exception:
 
 **Mechanical test:** read each card as the builder. If it says "decide", "choose", "if needed", "as appropriate", "etc" or "whether", or names a file it doesn't list, it fails. Fix it by deciding in spec.md, or split it. Only when neither works, add `**Needs judgement:** yes — <why>`. That should be rare; more than one card in ten means the spec is unfinished.
 
-### 5. Check before showing
+### 6. Check before showing
 
 - every must-have number has at least one slice card
 - every card has 2 to 5 ACs, each with a test hint
@@ -84,15 +97,15 @@ Every card, without exception:
 - every Mock-up anchor exists in `mockup.html`
 - nothing from `later.md` or the north star's `## Nice later` has a card
 
-### 6. Blind review
+### 7. Blind review
 
 Two independent checks, then one fix round. Full prompts and rules: [references/blind-review.md](references/blind-review.md).
 
 1. **Blind reviewer:** one fresh sub-agent. Inputs only `north-star.md`, the mock-up screen index (if a mock-up exists) and the card list (title, Must-have served, Zone, ACs, Fix). Never `spec.md`, never your drafting reasoning. It returns `missing`, `unguarded`, `extra` and `verdict: builds the postcard: yes | gaps`.
 2. **Haiku read-through:** one sub-agent per card, in parallel, model haiku. Each gets only that card, the current contents of the files it lists (if they exist) and spec.md's Contracts. Prompt: "List every question you would need answered before building this card. If none, answer exactly: none." Any answer other than `none` fails the card.
-3. **One fix round:** fix every finding (decide in spec.md, split, add or cut a card). Cutting or adding scope is not decided silently: it goes to step 7 as a flagged line. Re-run the Haiku read only on changed or new cards. Findings still open are shown, not looped.
+3. **One fix round:** fix every finding (decide in spec.md, split, add or cut a card). Cutting or adding scope is not decided silently: it goes to step 8 as a flagged line. Re-run the Haiku read only on changed or new cards. Findings still open are shown, not looped.
 
-### 7. One review, for scope
+### 8. One review, for scope
 
 Show the owner one table, in build order. Above it, one line: `Verdict: builds the postcard: yes · Haiku read: 14/14 clear` (or `gaps` and the real count). Below it, each open finding and each flagged scope change, one line each.
 
@@ -108,13 +121,13 @@ Then ask at most two things in one message:
 
 Apply the answer. Moving a feature in or out is the owner's; how it is cut is yours. Do not ask again unless they added something new. `--dry-run` stops here; with no config it asks no milestone question.
 
-### 8. Commit, then file to Ready
+### 9. Commit, then file to Ready
 
 First commit `docs/shape/` and the draft `docs/agents/zones.yaml` in one commit (`📝 [docs] shape: spec, zones and cards for <app>`) and push the current branch without force. Builders branch from the base branch, so they see only what is committed there; if the current branch is not `config.base_branch`, say so. `--dry-run` commits nothing.
 
-Then file in build order, so each `## Blocked by` can name real numbers. Commands: [references/filing.md](references/filing.md). Each card goes to the **Ready** column (the owner approved the scope in step 7), on the milestone, with **no label** (`bug` and `qa` change routing; slice cards are neither). `--dry-run` files nothing.
+Then file in build order, so each `## Blocked by` can name real numbers. Commands: [references/filing.md](references/filing.md). Each card goes to the **Ready** column (the owner approved the scope in step 8), on the milestone, with **no label** (`bug` and `qa` change routing; slice cards are neither). `--dry-run` files nothing.
 
-### 9. Write `docs/shape/coverage.md`
+### 10. Write `docs/shape/coverage.md`
 
 Commit and push it the same way once the card numbers are in. Exactly this shape (lint parses it). One row per must-have, slice cards only. The foundation card does not count as coverage.
 
@@ -127,7 +140,7 @@ Commit and push it the same way once the card numbers are in. Exactly this shape
 Demo: #20
 ```
 
-### 10. Hand off
+### 11. Hand off
 
 Report: the spec path, the card numbers, the zone map path and the Needs-judgement count. Then:
 

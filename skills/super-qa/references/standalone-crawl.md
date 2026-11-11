@@ -7,18 +7,17 @@
 Before iter 1, resolve a test login. **Never ask the user; discover or create.** Order:
 
 1. **Cached creds** at `.claude/settings.local.json` `.e2e.user` / `.e2e.pass` — use them as-is.
-2. **Env-file fallback** — read in order: `.env.production.local`, `.env.local`, `.env`. Pull `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`. If both present, auto-create `e2e-test@<owner-domain>` (owner from `git config user.email` domain, fallback `erictech.ca`) via:
-   ```bash
-   curl -sS -X POST "$SUPABASE_URL/auth/v1/admin/users" \
-     -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-     -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-     -H "Content-Type: application/json" \
-     -d "{\"email\":\"$E2E_USER\",\"password\":\"$E2E_PASS\",\"email_confirm\":true,\"user_metadata\":{\"role\":\"e2e-test\",\"created_by\":\"super-qa-bootstrap\"}}"
+2. **Admin-key fallback** — never open, read, grep, cat or source any secrets file (dotenv, credentials). Ask for key names only: `bash .claude/bin/super-board-env-check.sh SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY` (one word per key: present, empty or missing; never a value). If both are present, the project's test runner creates the user, so the values stay in its process and never reach the agent's shell or the transcript: add an e2e setup step (for example a Playwright `globalSetup` file) that loads its env the way the app's own test config already does, then auto-creates `e2e-test@<owner-domain>` (owner from `git config user.email` domain, fallback `erictech.ca`) with:
    ```
-   Generate a 24-char random password (`openssl rand -base64 24 | tr -d '/+=' | cut -c1-24`). Save to `.claude/settings.local.json` `.e2e` so the next run skips bootstrap. Verify by logging in (`POST /auth/v1/token?grant_type=password` returns access_token).
-3. **Unauth-only fallback** — if neither cached creds nor env-file admin key exist, log "no admin key — restricting to public routes" and proceed with `/login`, `/signup`, `/forgot-password` only. Do NOT halt.
+   POST $SUPABASE_URL/auth/v1/admin/users
+   headers: apikey and Authorization: Bearer <service role key>, Content-Type: application/json
+   body: {"email": <E2E_USER>, "password": <E2E_PASS>, "email_confirm": true,
+          "user_metadata": {"role": "e2e-test", "created_by": "super-qa-bootstrap"}}
+   ```
+   Run it through the runner (`npx playwright test --project=setup`). The setup prints only the test user's email and `created` or `exists`, never a key. Generate a 24-char random password (`openssl rand -base64 24 | tr -d '/+=' | cut -c1-24`) and pass it to the setup as `E2E_PASS`. Save the test user to `.claude/settings.local.json` `.e2e` so the next run skips bootstrap. Verify by logging in (`POST /auth/v1/token?grant_type=password` returns access_token).
+3. **Unauth-only fallback** — if there are no cached creds and env-check does not report both keys present, log "no admin key — restricting to public routes" and proceed with `/login`, `/signup`, `/forgot-password` only. Do NOT halt.
 
-The bootstrap is **non-interactive**. If the curl returns an existing-user error (`User already registered`), reset the password via the same admin endpoint and continue. Save creds either way.
+The bootstrap is **non-interactive**. If the setup gets an existing-user error (`User already registered`), it resets the password via the same admin endpoint and continues. Save creds either way.
 
 ## QA loop state board — GitHub Project as the state store
 
