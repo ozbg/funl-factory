@@ -267,7 +267,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
       <dt>Does</dt><dd>Drains the board in waves. For each card: a builder (Haiku, or Sonnet for red and flagged cards) works in its own copy of the code, writes the tests first, makes the change and opens a draft PR. QA proves every check, and for a screen it puts a screenshot of the app beside the mock-up and lists every difference; an unaccepted difference sends the card back. A Sonnet reviewer reads it (Opus on red cards), and the merge gate re-runs everything against the latest <code>main</code> before merging. Cards that don't pass go back, at most 1–3 times by zone, then wait in Blocked with the reason. Waves run 3 cards wide by default, picked so no two cards touch the same files.</dd>
       <dt>You</dt><dd>Nothing, unless a digest asks: a 🙋 card (money, auth, a destructive schema change, a live database) or a budget question. If a safety check refuses a lane's merge, the foreman runs the merge gate itself, pinned to the exact commit that was reviewed. You aren't asked to click merge on work you'd just approve anyway.</dd>
       <dt>Output</dt><dd>Merged PRs on <code>main</code>, cards in Done, a short digest on each merge, breach or question. <span class="cmd">/super-board status</span> shows where it is any time.</dd>
-      <dt>Then</dt><dd><strong>The agent walk.</strong> When the Demo card is Done, a Sonnet agent uses the real app as you would: every screen, with the real AI settings. It works from a written checklist and the day-one questions, compares each screen with the mock-up, and runs every AI exam. Whatever fails is filed as feedback, so it goes through step 6. The milestone isn't done until the walk passes.</dd>
+      <dt>Then</dt><dd><strong>The agent walk.</strong> When the Demo card is Done, a Sonnet agent uses the real app as you would: every screen, with the real AI settings. It works from a written checklist and the day-one questions, takes a screenshot of each screen and compares it with the mock-up, and runs every AI exam. The screenshots and findings go in <code>docs/super-board/runs/&lt;date&gt;-walk/</code>. Whatever fails is filed as feedback, so it goes through step 6, and you get one question: build the fixes now, or accept them for later. The milestone isn't done until the walk passes or you accept its findings.</dd>
       <dt>Next</dt><dd><span class="cmd">/super-board report</span>, then use the app yourself and check it against the postcard.</dd>
     </dl>
   </div>
@@ -275,7 +275,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   <div class="stage">
     <div class="sh"><span class="n">5</span><h3><span class="cmd">/super-board report</span> · the score</h3><span class="tag you">you read</span></div>
     <dl>
-      <dt>Does</dt><dd>Puts the whole app on one page: how long Define took, days to build, cost against budget, how many cards passed first time, rework, rounds, whether the demo passed, and the postcard. It also scores the product, not just the build: how many screens match the mock-up, the AI exam scores, and the agent walk's pass rate. Each against a target, with up to three things to change next time.</dd>
+      <dt>Does</dt><dd>Puts the whole app on one page: how long Define took, days to build, cost against budget, how many cards passed first time, rework, rounds, whether the demo passed, and the postcard. It also scores the product, not just the build: how many screens match the mock-up, the AI exam scores, the agent walk's pass rate, and how many mock-up features were cut. Each against a target, with up to three things to change next time.</dd>
       <dt>Output</dt><dd>Printed in the chat. With <code>--log</code>, one line in <code>docs/super-board/factory-log.jsonl</code>; <code>--compare</code> lists every app side by side. The retro beside the run log covers product quality as well as process.</dd>
       <dt>Next</dt><dd>The app is in use. Every change from here goes through step 6.</dd>
     </dl>
@@ -484,7 +484,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><th>Level</th><th>Done when</th><th>Checked by</th></tr>
     <tr><td>Card</td><td>Every AC ticked, each with a proof that names a file at the PR head, and the gate's own test run is green. Unmet AC → back to Build, or split into a new linked card.</td><td>Merge gate (exit 13 refuses)</td></tr>
     <tr><td>Must-have</td><td>Every card listed for it in <code>coverage.md</code> is Done.</td><td><code>super-board-coverage.py</code></td></tr>
-    <tr><td>Milestone</td><td>Every must-have done, and the Demo card walked the whole core loop, and the agent walk passed: every screen of the real app matches the mock-up, and every AI feature passed its exam on the real model.</td><td>Demo card · agent walk · report</td></tr>
+    <tr><td>Milestone</td><td>Every must-have done, and the Demo card walked the whole core loop, and the agent walk passed: every screen of the real app matches the mock-up and does its job, every day-one question gets a good answer, and every AI feature passed its exam on the real model. Or you accepted the walk's findings.</td><td>Demo card · agent walk · report</td></tr>
     <tr><td>App</td><td>You use it and say yes to the postcard.</td><td>You</td></tr>
   </table></div>
 </section>
@@ -580,7 +580,8 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Demo passes first try</td><td>yes</td><td>Coverage gap or a contract mismatch between cards</td></tr>
     <tr><td>Screens match the mock-up</td><td>all</td><td>A card lacked its mock-up section, or QA missed a difference</td></tr>
     <tr><td>AI exams pass</td><td>each card's pass mark</td><td>The design can't answer day-one questions: thin context, or a rule that cripples it. Fix the spec, not the prompt.</td></tr>
-    <tr><td>Agent walk passes</td><td>every screen</td><td>Something works in tests but not for a user; its findings become cards</td></tr>
+    <tr><td>Mock-up cuts</td><td>shown, no target</td><td>Nothing: each cut is a choice you saw at <span class="cmd">/to-board</span></td></tr>
+    <tr><td>Agent walk passes</td><td>every screen and day-one question</td><td>Something works in tests but not for a user; its findings become cards</td></tr>
     <tr><td>Budget</td><td><code>goal.budget_usd</code></td><td>The factory asks: keep going, raise it, or stop</td></tr>
   </table></div>
 </section>
@@ -616,6 +617,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Sign <code>zones.yaml</code></td><td>Before the first run, and when an area is promoted</td></tr>
     <tr><td>Merge money, auth and destructive-schema PRs; run anything on a live database</td><td>A 🙋 card in Blocked</td></tr>
     <tr><td>Keep going, raise the budget, or stop</td><td>Budget breach in the digest</td></tr>
+    <tr><td>Build the agent walk's findings now, or accept them for later</td><td>A failed walk, on the Demo card</td></tr>
     <tr><td>Re-read the north star next morning</td><td>The day after signing</td></tr>
     <tr><td>Accept or reject a proposal from triage</td><td>The proposals digest, after the first build</td></tr>
     <tr><td>Sign the brief for a body of work</td><td>Before its cards are cut</td></tr>

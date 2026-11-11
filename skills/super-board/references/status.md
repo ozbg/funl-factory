@@ -198,8 +198,10 @@ mode:   auto-merge                 truth gate: non-trivial (≥70)
 7. `▎Recent`
 8. `▎Health`
 9. `▎Milestone` — only when `docs/shape/coverage.md` exists; silent otherwise. One line from
-   `super-board-coverage.py status`, e.g. `M1: 9/12 cards done · demo #20 not run`, or
-   `M1 done: all cards and demo #20 Done`. Done = every listed card and the Demo card in Done.
+   `super-board-coverage.py status`, e.g. `M1: 9/12 cards done · demo #20 not run`,
+   `M1: 12/12 cards done · demo #20 Done · walk not run`, or
+   `M1 done: all cards, demo #20 Done · agent walk passed`. Done = every listed card and the Demo
+   card in Done, and the agent walk passed or its findings accepted (`walk.md`).
 
 **Empty-state strings (locked):**
 

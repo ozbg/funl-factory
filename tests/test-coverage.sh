@@ -52,8 +52,28 @@ echo "$B1" | $PY status --repo-path "$T/full" --board-json - --json | python3 -c
 
 # status: all done
 B2='[{"number":12,"status":"Done"},{"number":13,"status":"Done"},{"number":14,"status":"Done"},{"number":20,"status":"Done"}]'
+# cards and demo Done, no agent walk yet: not done (factory #108)
 out=$(echo "$B2" | $PY status --repo-path "$T/full" --board-json -)
-echo "$out" | grep -qF 'M1 done: all cards and demo #20 Done' || fail "done line: $out"
+echo "$out" | grep -qF 'M1: 3/3 cards done · demo #20 Done · walk not run' || fail "walk pending line: $out"
+SC="$T/full/docs/super-board/runs/scorecard.jsonl"; mkdir -p "$(dirname "$SC")"
+echo '{"event":"walk","milestone":"M1","screens":4,"passed":3,"questions":5,"answered":5,"ok":false}' > "$SC"
+out=$(echo "$B2" | $PY status --repo-path "$T/full" --board-json -)
+echo "$out" | grep -qF 'M1: 3/3 cards done · demo #20 Done · walk failed: screens 3/4 · questions 5/5' || fail "walk failed line: $out"
+echo '{"event":"walk-accept","milestone":"M1","note":"later"}' >> "$SC"
+out=$(echo "$B2" | $PY status --repo-path "$T/full" --board-json -)
+echo "$out" | grep -qF 'M1 done: all cards, demo #20 Done · walk findings accepted' || fail "accepted line: $out"
+# a walk that passes, with an exam under its pass mark, still fails; a walk for another milestone doesn't count
+echo '{"event":"walk","milestone":"M1","screens":4,"passed":4,"questions":5,"answered":5,"ok":true}' >> "$SC"
+echo '{"event":"exam","milestone":"M1","card":18,"score":6,"total":10,"pass_mark":8}' >> "$SC"
+out=$(echo "$B2" | $PY status --repo-path "$T/full" --board-json -)
+echo "$out" | grep -qF 'walk failed: screens 4/4 · questions 5/5 · exam #18 6/10' || fail "exam gate: $out"
+echo '{"event":"exam","milestone":"M1","card":18,"score":9,"total":10,"pass_mark":8}' >> "$SC"
+out=$(echo "$B2" | $PY status --repo-path "$T/full" --board-json -)
+echo "$out" | grep -qF 'M1 done: all cards, demo #20 Done · agent walk passed' || fail "done line: $out"
+out=$(echo "$B2" | $PY status --repo-path "$T/full" --board-json - --milestone M2)
+echo "$out" | grep -qF 'M2: 3/3 cards done · demo #20 Done · walk not run' || fail "other milestone: $out"
+echo "$B2" | $PY status --repo-path "$T/full" --board-json - --json | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["milestone_done"] and d["walk"]=="passed" and d["mockup_cuts"] is None, d' || fail "walk json"
+rm "$SC"
 # cards done but demo not: not done
 B3='[{"number":12,"status":"Done"},{"number":13,"status":"Done"},{"number":14,"status":"Done"},{"number":20,"status":"QA"}]'
 out=$(echo "$B3" | $PY status --repo-path "$T/full" --board-json -)
@@ -71,6 +91,8 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 c = m.parse_coverage(open(sys.argv[1] + "/docs/shape/coverage.md").read())
 assert c["cut_cards"] == [12, 13], c["cut_cards"]
 assert len(c["cuts"]) == 2, c["cuts"]
+assert m.count_cuts(c["cuts"]) == 3, m.count_cuts(c["cuts"])
+assert m.count_cuts(["none"]) == 0 and m.count_cuts(None) is None
 PY
 # mock-up present, no cut list: warning only (old apps are not failed)
 app nocuts "$FULL"

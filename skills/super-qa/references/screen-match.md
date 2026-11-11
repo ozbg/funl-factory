@@ -101,3 +101,10 @@ No difference at all → one row reading `none`. A pass with no list is not a pa
 
 The match AC's proof line is the app shot: `docs/shape/baseline/screen-<name>.png`. It is a
 file at the head, so the merge gate accepts it.
+
+## Record the verdict
+
+On a board card, record it for `super-board report` (its `screens match` target):
+`python3 .claude/bin/super-board-scorecard.py screen --card <N> --screen screen-<name> --passed`,
+or `--failed`. The latest verdict per card counts. The agent walk reuses this page's capture and
+difference list at milestone end (`super-board/references/walk.md`).

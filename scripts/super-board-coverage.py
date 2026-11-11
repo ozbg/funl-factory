@@ -3,6 +3,7 @@
 
   super-board-coverage.py lint   --repo-path <app>
   super-board-coverage.py status --repo-path <app> --board-json <file|-> [--milestone M1] [--json]
+                                 [--scorecard <file>]
   super-board-coverage.py cards  --repo-path <app> --issues-json <file|->
 
 coverage.md (written by /to-board):
@@ -33,6 +34,11 @@ is a list of {number, title, body}. Exit 1 when a screen card lacks the
 or when coverage.md's cut list leaves out a card that cuts something.
 status: prints done/total per must-have and one milestone line. Silent (no
 output, exit 0) when coverage.md is missing. Read-only; stdlib only.
+The milestone is done only when every card and the Demo card are Done AND the
+agent walk passed (its latest `walk` row in the scorecard, default
+docs/super-board/runs/scorecard.jsonl, with every exam at its pass mark) or the
+owner accepted its findings (a later `walk-accept` row). `mockup_cuts` counts
+the features in the `Cut from mock-up:` list (None with no list).
 
 Exit codes: 0 ok · 1 lint failure · 64 bad usage / unreadable board JSON
 """
@@ -132,6 +138,59 @@ def parse_coverage(text: str) -> dict:
     return {"rows": rows, "demo": demo, "cuts": cuts, "cut_cards": cut_cards}
 
 
+def count_cuts(cuts: list[str] | None) -> int | None:
+    """Features cut: the items after each bullet's `<screen>:`, split on `,` and `·`."""
+    if cuts is None:
+        return None
+    n = 0
+    for item in cuts:
+        rest = item.split(":", 1)[1] if ":" in item else ""
+        n += sum(1 for x in re.split(r"[,·]", rest) if x.strip() and not is_none(x))
+    return n
+
+
+SCORECARD = Path("docs/super-board/runs/scorecard.jsonl")
+
+
+def walk_state(rows: list[dict], milestone: str | None) -> dict:
+    """{state: not run | passed | failed | accepted, detail} from scorecard event rows."""
+    walk, accepted, exams = None, False, {}
+    for r in rows:
+        if milestone and r.get("milestone") not in (None, milestone):
+            continue
+        ev = r.get("event")
+        if ev == "walk":
+            walk, accepted = r, False
+        elif ev == "walk-accept" and walk is not None:
+            accepted = True
+        elif ev == "exam" and r.get("card") is not None:
+            exams[r["card"]] = r
+    if walk is None:
+        return {"state": "not run", "detail": "walk not run"}
+    failed_exams = [f"exam #{c} {r.get('score')}/{r.get('total')}" for c, r in sorted(exams.items())
+                    if (r.get("score") or 0) < (r.get("pass_mark") or 0)]
+    if walk.get("ok") and not failed_exams:
+        return {"state": "passed", "detail": "agent walk passed"}
+    bits = [f"screens {walk.get('passed')}/{walk.get('screens')}",
+            f"questions {walk.get('answered')}/{walk.get('questions')}"] + failed_exams
+    if accepted:
+        return {"state": "accepted", "detail": "walk findings accepted (" + " · ".join(bits) + ")"}
+    return {"state": "failed", "detail": "walk failed: " + " · ".join(bits)}
+
+
+def read_rows(path: Path) -> list[dict]:
+    out = []
+    try:
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            try:
+                out.append(json.loads(raw))
+            except ValueError:
+                continue
+    except OSError:
+        pass
+    return out
+
+
 def parse_must_haves(text: str) -> list[int]:
     """Numbers of the numbered items under `## Must have`."""
     out: list[int] = []
@@ -163,7 +222,8 @@ def lint_problems(cov: dict, musts: list[int]) -> tuple[list[str], list[str]]:
     return errors, warnings
 
 
-def summarize(cov: dict, musts: list[int], done: set[int], milestone: str = "M1") -> dict:
+def summarize(cov: dict, musts: list[int], done: set[int], milestone: str = "M1",
+              walk: dict | None = None) -> dict:
     nums = sorted(set(musts) | set(cov["rows"]))
     per = []
     all_cards: list[int] = []
@@ -175,16 +235,21 @@ def summarize(cov: dict, musts: list[int], done: set[int], milestone: str = "M1"
     demo = cov["demo"]
     demo_done = demo is not None and demo in done
     cards_done = sum(1 for c in all_cards if c in done)
-    complete = bool(all_cards) and cards_done == len(all_cards) and demo_done
+    walk = walk or {"state": "not run", "detail": "walk not run"}
+    built = bool(all_cards) and cards_done == len(all_cards) and demo_done
+    complete = built and walk["state"] in ("passed", "accepted")
     if complete:
-        line = f"{milestone} done: all cards and demo #{demo} Done"
+        line = f"{milestone} done: all cards, demo #{demo} Done · {walk['detail']}"
+    elif built:
+        line = f"{milestone}: {cards_done}/{len(all_cards)} cards done · demo #{demo} Done · {walk['detail']}"
     else:
         dtxt = f"demo #{demo} " if demo is not None else "no demo "
         state = "done" if demo_done else "not run"
         line = f"{milestone}: {cards_done}/{len(all_cards)} cards done · {dtxt}{state}"
     return {"milestone": milestone, "must_haves": per, "cards_done": cards_done,
             "cards_total": len(all_cards), "demo": demo, "demo_done": demo_done,
-            "milestone_done": complete, "line": line}
+            "milestone_done": complete, "walk": walk["state"], "walk_detail": walk["detail"],
+            "mockup_cuts": count_cuts(cov.get("cuts")), "line": line}
 
 
 def read(path: Path) -> str | None:
@@ -234,7 +299,9 @@ def cmd_status(args) -> int:
         print(f"cannot read board json: {e}", file=sys.stderr)
         return 64
     musts = parse_must_haves(read(root / NORTH_STAR) or "")
-    s = summarize(parse_coverage(ctext), musts, done, args.milestone)
+    sc = Path(args.scorecard) if args.scorecard else root / SCORECARD
+    walk = walk_state(read_rows(sc), args.milestone)
+    s = summarize(parse_coverage(ctext), musts, done, args.milestone, walk)
     if args.json:
         print(json.dumps(s))
         return 0
@@ -334,6 +401,7 @@ def main(argv=None) -> int:
     b.add_argument("--board-json", required=True)
     b.add_argument("--milestone", default="M1")
     b.add_argument("--json", action="store_true")
+    b.add_argument("--scorecard", help=f"default <repo>/{SCORECARD}; the agent walk is read from it")
     b.set_defaults(fn=cmd_status)
     c = sub.add_parser("cards")
     c.add_argument("--repo-path", default=".")

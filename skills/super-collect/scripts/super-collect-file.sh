@@ -15,11 +15,11 @@
 #      every run: sentry `err|sentry|<issue-id>`, posthog `posthog|<signal>|<key>`
 #      (tracking gaps: `gap|<workflow>`),
 #      github `github|<issue#>`, prs `prs|<boundary>|<cause>`,
-#      architecture `arch|<module>|<problem>`.
+#      architecture `arch|<module>|<problem>`, walk `walk|<screen-name or M<n>>|<key>`.
 #
 # Usage:
 #   super-collect-file.sh --config <cfg.json> --type bug|feature|refactor|fix \
-#     --source sentry|posthog|github|prs|architecture|custom --title "<one line>" --body-file <md> \
+#     --source sentry|posthog|github|prs|architecture|custom|walk --title "<one line>" --body-file <md> \
 #     --fingerprint "<stable key>" [--priority high|medium|low] [--area <a>] \
 #     [--label <l>]... [--yes]          # e.g. --label needs-triage --label ux
 #   super-collect-file.sh --config <cfg.json> --adopt <issue#> --type bug|feature|refactor [--yes]
@@ -63,7 +63,8 @@ if [ -z "$ADOPT" ]; then
     sentry) FP_PREFIX="err|sentry|" ;; posthog) FP_PREFIX="posthog|" ;; github) FP_PREFIX="github|" ;;
     prs) FP_PREFIX="prs|" ;; architecture) FP_PREFIX="arch|" ;;
     custom) FP_PREFIX="custom|" ;;   # onboard's "➕ Add another source": custom|<name>|<key>
-    *) die "--source must be sentry|posthog|github|prs|architecture|custom (got: ${SOURCE:-<unset>})" 64 ;;
+    walk) FP_PREFIX="walk|" ;;       # the milestone-end agent walk: walk|<screen-or-M<n>>|<key>
+    *) die "--source must be sentry|posthog|github|prs|architecture|custom|walk (got: ${SOURCE:-<unset>})" 64 ;;
   esac
   [ -n "$TITLE" ] || die "--title is required" 64
   [ -n "$FP" ]    || die "--fingerprint is required (dedupe key)" 64

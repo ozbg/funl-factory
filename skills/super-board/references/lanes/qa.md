@@ -43,6 +43,8 @@ No key for the real model → Blocked, 🙋, `blocked-by: model key`. Never run 
    the same size, list every visible difference, commit the pair under `docs/shape/baseline/`
    and embed it. A difference not under `Cut from mock-up:` and not accepted by a note on the
    card fails the match AC, citing it. A mock-up screen that won't open is never a pass.
+   Record the verdict for the report:
+   `python3 .claude/bin/super-board-scorecard.py screen --card <N> --screen screen-<name> --passed|--failed`.
 8. **Sort findings.** A fail cites `AC<n>`, `I<n>`, `bar: <line>` or `bug: <repro steps>`.
    Anything else is a note. Out-of-scope privacy, data-loss or visible bug → Backlog card via
    `super-qa-file-bug.sh --column Backlog`; it does not fail this card.

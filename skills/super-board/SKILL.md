@@ -32,6 +32,7 @@ In Codex the skill is not a slash command: it is `$super-board <verb>`, found in
 | `super-board status ...` | `references/status.md` |
 | `super-board run ...` | `references/run-workflow.md` + `references/run.md` (lane agents load `references/lanes/<lane>.md` + `lanes/common.md`) |
 | `super-board report ...` | `references/report.md` |
+| The agent walk at milestone end, the retro | `references/walk.md`, `references/retro.md` |
 | `super-board stop ...` / "stop the run" / "pause the loop" / "kill super-board" | `references/stop.md` |
 | "resume" / "pick up where I left off" / "restart after stop" | `references/stop.md` (resume = run; no separate verb) |
 | Anything about Blocked exits, 🙋 needs you, or dropping a card | `references/block-template.md` |

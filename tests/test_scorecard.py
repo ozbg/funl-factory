@@ -265,6 +265,50 @@ class Scorecard(unittest.TestCase):
             self.assertEqual(r.returncode, 64, args)
         self.assertFalse(self.sc.exists())
 
+    # ── factory #108: screen match and the agent walk ──
+    def _rc(self, *args):
+        return subprocess.run([sys.executable, str(SCRIPT), *args, "--scorecard", str(self.sc)],
+                              capture_output=True, text=True).returncode
+
+    def test_screen_records_one_verdict(self):
+        out = json.loads(run("screen", "--card", "13", "--screen", "screen-pipeline", "--failed",
+                             "--milestone", "M1", "--scorecard", str(self.sc)))
+        self.assertEqual(out, {"recorded": "screen", "card": 13, "passed": False})
+        row = json.loads(self.sc.read_text())
+        self.assertEqual((row["event"], row["screen"], row["passed"]), ("screen", "screen-pipeline", False))
+        self.assertEqual(self._rc("screen", "--card", "1", "--screen", "screen-a"), 64)  # neither flag
+        self.assertEqual(self._rc("screen", "--card", "1", "--screen", "pipeline", "--passed"), 64)
+        self.assertIn("no scorecard rows yet", run("summary", "--scorecard", str(self.sc)))
+
+    def test_walk_needs_a_screenshot_per_screen(self):
+        shots = self.tmp / "2026-11-12-walk"
+        shots.mkdir()
+        (shots / "screen-today.png").write_bytes(b"png")
+        args = ["walk", "--screens", "2", "--passed", "2", "--questions", "3", "--answered", "3",
+                "--shots", str(shots)]
+        self.assertEqual(self._rc(*args), 64)
+        (shots / "screen-pipeline.png").write_bytes(b"png")
+        out = json.loads(run(*args, "--model", "claude-sonnet-4-5", "--scorecard", str(self.sc)))
+        self.assertEqual(out, {"recorded": "walk", "passed": True})
+        row = json.loads(self.sc.read_text())
+        self.assertEqual((row["event"], row["ok"], row["screens"], row["answered"]), ("walk", True, 2, 3))
+
+    def test_walk_failure_needs_findings_and_acceptance_needs_a_note(self):
+        shots = self.tmp / "walk"
+        shots.mkdir()
+        (shots / "a.png").write_bytes(b"png")
+        base = ["walk", "--screens", "1", "--passed", "0", "--questions", "2", "--answered", "2", "--shots", str(shots)]
+        self.assertEqual(self._rc(*base), 64)
+        findings = self.tmp / "findings.md"
+        findings.write_text("- screen-today: no snooze\n")
+        self.assertEqual(self._rc(*base, "--findings", str(findings)), 0)
+        self.assertEqual(self._rc("walk", "--screens", "1", "--passed", "2", "--questions", "0", "--answered", "0",
+                                  "--shots", str(shots)), 64)
+        self.assertEqual(self._rc("walk", "--accepted"), 64)
+        self.assertEqual(self._rc("walk", "--accepted", "--note", "snooze is M2"), 0)
+        events = [json.loads(x)["event"] for x in self.sc.read_text().splitlines()]
+        self.assertEqual(events, ["walk", "walk-accept"])
+
 
 if __name__ == "__main__":
     unittest.main()

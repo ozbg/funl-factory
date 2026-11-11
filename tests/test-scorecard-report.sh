@@ -50,6 +50,30 @@ echo "$out" | grep -q '❌ exams at pass mark: 1/2 vs all' || fail "exam target 
 echo "$out" | grep -q 'fix the spec, not the prompt' || fail "exam next step: $out"
 if $PY exam --card 4 --score 9 --total 10 --pass-mark 8 --model fake-model --scorecard "$SC" 2>/dev/null; then fail "fake model accepted"; fi
 
+# Product targets (factory #108): screens match, agent walk, mock-up cuts
+echo "$out" | grep -q '^Done: .* · milestone not done: walk not run' || fail "milestone gate without walk: $out"
+echo "$out" | grep -q 'n/a screens match: n/a vs ≥ 100%' || fail "screens n/a: $out"
+echo "$out" | grep -q 'n/a walk pass: n/a vs ≥ 100%' || fail "walk n/a: $out"
+echo "$out" | grep -q 'ℹ mock-up cuts: n/a (no target)' || fail "cuts n/a: $out"
+echo "$out" | grep -q 'run the agent walk' || fail "walk next step: $out"
+printf '\nCut from mock-up:\n- #1 · screen-today: snooze, bulk edit · archive (later.md)\n' >> "$APP/docs/shape/coverage.md"
+$PY screen --card 1 --screen screen-today --failed --milestone M1 --scorecard "$SC" >/dev/null
+$PY screen --card 1 --screen screen-today --passed --milestone M1 --scorecard "$SC" >/dev/null
+$PY screen --card 2 --screen screen-pipeline --failed --milestone M1 --scorecard "$SC" >/dev/null
+SHOTS="$APP/docs/super-board/runs/2026-11-12-walk"; mkdir -p "$SHOTS"
+touch "$SHOTS/screen-today.png" "$SHOTS/screen-pipeline.png"
+printf -- '- screen-pipeline: stage headers off the mock-up\n' > "$SHOTS/findings.md"
+$PY walk --screens 2 --passed 1 --questions 3 --answered 3 --shots "$SHOTS" --findings "$SHOTS/findings.md" --milestone M1 --scorecard "$SC" >/dev/null
+out=$($PY report --config "$CFG" --repo-path "$APP")
+echo "$out" | grep -q '❌ screens match: 1/2 (50%) vs ≥ 100%' || fail "screens fail: $out"
+echo "$out" | grep -q '❌ walk pass: 80% · screens 1/2 · questions 3/3 vs ≥ 100%' || fail "walk fail: $out"
+echo "$out" | grep -q 'ℹ mock-up cuts: 3 (no target)' || fail "cuts count: $out"
+echo "$out" | grep -q "milestone not done: walk failed: screens 1/2 · questions 3/3 · exam #5 7/12" || fail "gate on failed walk: $out"
+$PY walk --accepted --note "stage headers move to M2" --milestone M1 --scorecard "$SC" >/dev/null
+out=$($PY report --config "$CFG" --repo-path "$APP")
+echo "$out" | grep -q '^Done: .* · milestone done' || fail "accepted findings close the milestone: $out"
+echo "$out" | grep -q 'walk pass: 80% · screens 1/2 · questions 3/3 · findings accepted' || fail "accepted walk line: $out"
+
 # config targets override defaults
 echo '{"goal":{"milestone":"M1","budget_usd":60},"targets":{"first_pass_pct":60,"days_per_app":1}}' > "$T/cfg2.json"
 out=$($PY report --config "$T/cfg2.json" --repo-path "$APP")
