@@ -17,6 +17,7 @@ Print the stdout as is. Do not rewrite it.
 | Build | scorecard records (`docs/super-board/runs/scorecard.jsonl`): days from first card started to last merged, merged/total, first pass, rework, rounds per merge, k tokens and minutes per card. Models by rule counts `modelRules` on records; `n/a` when absent |
 | Cost | API-equivalent USD from the records, against `goal.budget_usd` |
 | Done | `super-board-coverage.py status --json`: done/total per must-have, demo state. Board state is the Done cards in the scorecard, or `--board-json <file>` (`[{number, status}]`) |
+| AI exams | `exam` rows in the scorecard, written by QA (`super-board-scorecard.py exam --card N --score S --total T --pass-mark P --model <id>`). The latest run per card counts: score, pass mark, model |
 
 Any input that is missing prints `n/a` on its line. Nothing crashes.
 
@@ -31,6 +32,7 @@ Config `targets` over these defaults (onboard writes them):
 | `rework_pct` | 10 | rework ≤ target |
 | `rounds_per_merge` | 1.5 | rounds ≤ target |
 | `demo_first_try` | true | demo card passed on round 1 |
+| `exam_pass` | true | every exam card's latest score is at or above its pass mark |
 
 Each prints ✅ or ❌ with its value against the target. A target with no data prints `n/a`.
 
@@ -43,6 +45,6 @@ when the records' cause data says tickets, else a generic line.
 
 `--log` appends exactly one JSON line to `<repo>/docs/super-board/factory-log.jsonl`:
 `{date, app, milestone, days, merged, total, first_pass_pct, rework_pct, rounds_per_merge, usd,
-budget_usd, demo_passed, postcard, targets_met}`. Unknown values are `null`.
+budget_usd, demo_passed, postcard, targets_met, exams}`. Unknown values are `null`.
 
 `--compare` prints that file as a table, one row per line, so app 2 sits beside app 1.

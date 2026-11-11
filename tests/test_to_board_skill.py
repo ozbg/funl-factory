@@ -158,5 +158,32 @@ class NorthStarDayOne(unittest.TestCase):
         self.assertIn("`day_one` counts the day-one lines per must-have", self.NS)
 
 
+
+class ExamCard(unittest.TestCase):
+    """factory #106: one exam card per AI feature, run on the real model."""
+    EXAM = (ROOT / "skills" / "to-board" / "references" / "exam-card.md").read_text()
+    QA = (ROOT / "skills" / "super-board" / "references" / "lanes" / "qa.md").read_text()
+
+    def test_card_cutting_points_to_exam_card(self):
+        cut = re.search(r"^### \d+\. Cut the cards\n(.*?)(?=^### )", TEXT, re.M | re.S).group(1)
+        self.assertIn("- **Exam cards**, before the Demo card: one per AI feature", cut)
+        self.assertIn("[references/exam-card.md](references/exam-card.md)", cut)
+        self.assertIn("`Exams: #18, #19`", TEXT)
+
+    def test_exam_card_format(self):
+        for want in ("one exam card per AI feature", "`## Day-one questions`", "**10 or more**",
+                     "**expected answer**", "`facts:`", "`rubric:`", "**Pass mark:**", "**Real model only.**",
+                     "refuses to\n  start on the fake or mock model", "**Seeded realistically.**", "**Privacy.**",
+                     "only what the app itself would send to that provider", "never runs it",
+                     "**Needs judgement:** `yes — AI exam on the real model`", "never green", "## Exam\n"):
+            self.assertIn(want, self.EXAM, want)
+
+    def test_qa_lane_runs_exam_and_records_score(self):
+        self.assertIn("## Exam cards", self.QA)
+        self.assertIn("super-board-scorecard.py exam --card <N>", self.QA)
+        self.assertIn("A score under the pass mark fails the card", self.QA)
+        self.assertTrue((ROOT / "skills/super-board/references/lanes" / "../../../to-board/references/exam-card.md").resolve().exists())
+
+
 if __name__ == "__main__":
     unittest.main()

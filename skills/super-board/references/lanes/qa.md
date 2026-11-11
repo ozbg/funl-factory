@@ -13,6 +13,15 @@ handoff. The `qa` card still moves on to Review with the findings.
 
 A live site with no repo is not a board. `/super-qa <url>` tests it on its own.
 
+## Exam cards
+
+A card with a `## Exam` section ([exam-card.md](../../../to-board/references/exam-card.md)) is never
+skipped as green. QA runs its exam command on the real configured model, scores any `rubric:` rows
+from the recorded answers, then records the score:
+`python3 .claude/bin/super-board-scorecard.py exam --card <N> --score <S> --total <T> --pass-mark <P> --model <id>`.
+A score under the pass mark fails the card, citing the exam's AC with `exam <S>/<T>, pass mark <P>` and the failed questions.
+No key for the real model → Blocked, 🙋, `blocked-by: model key`. Never run it on the fake model.
+
 ## Tester (first pass — repo-backed)
 
 1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree `.claude/worktrees/issue-<N>-qa/`.

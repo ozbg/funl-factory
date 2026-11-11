@@ -95,8 +95,9 @@
   //   rework_pct       — scored rounds with a rework verdict, at most this percent
   //   rounds_per_merge — average rounds per merged card, at most this
   //   demo_first_try   — true: the demo card must pass on round 1
+  //   exam_pass        — true: every AI exam card scores at or above its own pass mark
   // The budget comes from goal.budget_usd.
-  "targets": { "days_per_app": 2, "first_pass_pct": 70, "rework_pct": 10, "rounds_per_merge": 1.5, "demo_first_try": true },
+  "targets": { "days_per_app": 2, "first_pass_pct": 70, "rework_pct": 10, "rounds_per_merge": 1.5, "demo_first_try": true, "exam_pass": true },
 
   // Optional per-lane models for Claude waves, over model_tier (factory #25).
   // Each lane is a model name, "session" (this orchestrator session's model),

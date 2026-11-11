@@ -7,6 +7,7 @@ summary — one line per build model across every recorded wave.
 health  — four acting metrics; a breach steps ramp.stage down one and pauses or asks.
           Never halts. Prints {breaches, action, ...} and appends a health event row.
 demo    — record that the owner accepted a demo (an event row).
+exam    — record one AI exam score on the real model (an event row; the latest per card counts).
 digest  — short plain-text owner digest; prints only on a merge, breach or ask
           (every wave when the config's `digest` is "every-wave").
 
@@ -15,6 +16,7 @@ digest  — short plain-text owner digest; prints only on a merge, breach or ask
   super-board-scorecard.py summary --scorecard docs/super-board/runs/scorecard.jsonl
   super-board-scorecard.py health --config <cfg> [--wave <label>] [--goal-done N --goal-total N]
   super-board-scorecard.py demo --accepted
+  super-board-scorecard.py exam --card N --score 9 --total 10 --pass-mark 8 --model <model id> [--milestone M1]
   super-board-scorecard.py digest --config <cfg> --plan <plan.json> [--wave <label>]
   super-board-scorecard.py report --config <cfg> [--repo-path <app>] [--log] [--compare] [--json]
                                   [--board-json <file>]
@@ -400,6 +402,24 @@ def demo(a):
     print(json.dumps({"recorded": "demo"}))
 
 
+FAKE_MODEL = re.compile(r"\b(fake|mock|stub|dummy)\b", re.I)
+
+
+def exam(a):
+    if FAKE_MODEL.search(a.model or "") or not (a.model or "").strip():
+        print("exam: needs the real model, got {!r}".format(a.model), file=sys.stderr)
+        return 64
+    if a.total < 1 or not (0 <= a.score <= a.total) or not (0 < a.pass_mark <= a.total):
+        print("exam: want 0 <= score <= total and 0 < pass mark <= total", file=sys.stderr)
+        return 64
+    row = {"event": "exam", "card": a.card, "score": a.score, "total": a.total, "pass_mark": a.pass_mark,
+           "model": a.model, "at": now_iso()}
+    if a.milestone:
+        row["milestone"] = a.milestone
+    append(Path(a.scorecard), [row])
+    print(json.dumps({"recorded": "exam", "card": a.card, "passed": a.score >= a.pass_mark}))
+
+
 def digest(a):
     cfg = _read_cfg(a.config)
     plan = json.loads(Path(a.plan).read_text()) if a.plan else {}
@@ -440,7 +460,7 @@ def digest(a):
 # ── report (factory #63) ────────────────────────────────────────────────────
 LOG_PATH = "docs/super-board/factory-log.jsonl"
 DEFAULT_TARGETS = {"days_per_app": 2, "first_pass_pct": 70, "rework_pct": 10,
-                   "rounds_per_merge": 1.5, "demo_first_try": True}
+                   "rounds_per_merge": 1.5, "demo_first_try": True, "exam_pass": True}
 NA = "n/a"
 
 
@@ -499,6 +519,14 @@ def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=
     budget = goal.get("budget_usd")
     targets = dict(DEFAULT_TARGETS)
     targets.update(cfg.get("targets") or {})
+    exams = {}
+    for r in rows:
+        if r.get("event") == "exam" and r.get("card") is not None and (
+                not milestone or r.get("milestone") in (None, milestone)):
+            exams[r["card"]] = r  # the latest run per card counts
+    exams = [{"card": c, "score": r.get("score"), "total": r.get("total"), "pass_mark": r.get("pass_mark"),
+              "model": r.get("model"), "passed": (r.get("score") or 0) >= (r.get("pass_mark") or 0)}
+             for c, r in sorted(exams.items())]
     rows = [r for r in rows if "event" not in r and r.get("card") is not None
             and (not milestone or r.get("milestone") in (None, milestone))]
     by_card = {}
@@ -578,12 +606,14 @@ def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=
     for key, _, val, ok, _ in checks:
         met[key] = None if val is None else bool(ok(val, targets[key]))
     met["demo_first_try"] = None if demo_first is None else (demo_first or not targets["demo_first_try"])
+    met["exam_pass"] = None if not exams else (all(e["passed"] for e in exams) or not targets["exam_pass"])
     return {"milestone": milestone, "targets": targets, "targets_met": met, "define": define,
             "build": {"days": days, "merged": done, "total": total, "first_pass_pct": fp, "rework_pct": rw,
                       "rounds_per_merge": rpm, "k_tokens_per_card": tok, "min_per_card": mins,
                       "model_rules": rules or None, "causes": causes},
             "cost": {"usd": spent, "budget_usd": budget},
             "done": {"coverage": cov, "demo_passed": demo_done, "demo_first_try": demo_first},
+            "exams": exams,
             "postcard": postcard, "_checks": checks}
 
 
@@ -606,10 +636,15 @@ def render_report(app, rep):
         out.append("Done: {} · demo {}".format(per or NA, "passed" if dn["demo_passed"] else "not passed"))
     else:
         out.append("Done: {} · demo {}".format(NA, NA))
+    ex = rep["exams"]
+    out.append("AI exams: {}".format(" · ".join("#{} {}/{} (pass {}) {}".format(
+        e["card"], e["score"], e["total"], e["pass_mark"], e["model"]) for e in ex) if ex else NA))
     for key, label, val, _, op in rep["_checks"]:
         unit = "%" if key.endswith("pct") else ""
         out.append("{} {}: {} vs {} {}{}".format(mark(key), label, _num(val, unit if val is not None else ""), op, t[key], unit))
     out.append("{} demo first try: {} vs {}".format(mark("demo_first_try"), yn(dn["demo_first_try"]), yn(t["demo_first_try"])))
+    out.append("{} exams at pass mark: {} vs {}".format(mark("exam_pass"), "{}/{}".format(
+        sum(1 for e in ex if e["passed"]), len(ex)) if ex else NA, "all" if t["exam_pass"] else "any"))
     out.append("Next:")
     nxt = _next_steps(rep)
     out.extend("  " + x for x in nxt)
@@ -630,6 +665,8 @@ def _next_steps(rep):
         steps.append("write tighter AC: extra rounds mean the check was not clear up front")
     if met["demo_first_try"] is False:
         steps.append("run the demo card earlier and check it against the postcard")
+    if met["exam_pass"] is False:
+        steps.append("fix the spec, not the prompt: a failed exam means thin context or a rule that cripples the AI")
     if met["days_per_app"] is False:
         steps.append("cut the must-haves or split the milestone: the app ran over its days")
     if c["usd"] is not None and c["budget_usd"] and c["usd"] > c["budget_usd"]:
@@ -642,7 +679,8 @@ def _log_line(app, rep, today):
     return {"date": today, "app": app, "milestone": rep["milestone"], "days": b["days"], "merged": b["merged"],
             "total": b["total"], "first_pass_pct": b["first_pass_pct"], "rework_pct": b["rework_pct"],
             "rounds_per_merge": b["rounds_per_merge"], "usd": c["usd"], "budget_usd": c["budget_usd"],
-            "demo_passed": rep["done"]["demo_passed"], "postcard": rep["postcard"], "targets_met": rep["targets_met"]}
+            "demo_passed": rep["done"]["demo_passed"], "postcard": rep["postcard"], "targets_met": rep["targets_met"],
+            "exams": [{k: e[k] for k in ("card", "score", "total", "pass_mark")} for e in rep["exams"]] or None}
 
 
 def compare(repo):
@@ -737,8 +775,17 @@ def main():
     d.add_argument("--accepted", action="store_true")
     d.add_argument("--note")
     d.add_argument("--scorecard", default=DEFAULT_SC)
+    e = sub.add_parser("exam")
+    e.add_argument("--card", type=int, required=True)
+    e.add_argument("--score", type=int, required=True, help="questions passed")
+    e.add_argument("--total", type=int, required=True, help="questions asked")
+    e.add_argument("--pass-mark", type=int, required=True, help="questions needed to pass, from the card")
+    e.add_argument("--model", required=True, help="the real model id the exam ran on")
+    e.add_argument("--milestone")
+    e.add_argument("--scorecard", default=DEFAULT_SC)
     a = p.parse_args()
-    return {"record": record, "summary": summary, "health": health, "demo": demo, "digest": digest, "report": report}[a.cmd](a)
+    return {"record": record, "summary": summary, "health": health, "demo": demo, "digest": digest, "report": report,
+            "exam": exam}[a.cmd](a)
 
 
 if __name__ == "__main__":
