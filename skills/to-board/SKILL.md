@@ -97,6 +97,7 @@ Every card, without exception:
 - the blocking graph has no cycle; the Demo card is blocked by all
 - every Mock-up anchor exists in `mockup.html`
 - nothing from `later.md` or the north star's `## Nice later` has a card
+- no card body trips the secrets guard: `python3 .claude/hooks/guard-secrets.py --scan <body file>` exits 0 for each; else name the file in words ("the env file") or by key name (factory #88)
 
 ### 7. Blind review
 

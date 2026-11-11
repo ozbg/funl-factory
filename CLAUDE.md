@@ -33,8 +33,7 @@ Workers (`super-build`, `super-qa`, `super-review`) share the dispatcher's `gh` 
 
 - Required GitHub reads use `.claude/bin/super-board-github-read.py`; exit 79 stops the run.
 - Check its `--check` before GitHub writes, migrations, merges, and new dispatch; preserve work when halted.
-- Source `.claude/bin/super-board-gh-guard.sh` (`scripts/` in this repo) at worker start.
-- Call `sb_gh_guard_check 200` before any burst of `gh` calls.
+- Run `bash .claude/bin/super-board-gh-guard.sh check 200` (`scripts/` in this repo) before any burst of `gh` calls: one plain call, never sourced or chained, so an allow rule matches it.
 - Prefer local `git blame` / `git log` over `gh api graphql` for any sub-agent that doesn't need fresh state.
 - Cap adversarial sub-agents at 50 gh calls each. If a sub-agent runs out, it returns `confidence: insufficient_data` rather than burning the shared quota.
 - Append `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` to the PR handoff comment.

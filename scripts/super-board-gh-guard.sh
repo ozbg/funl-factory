@@ -9,11 +9,13 @@
 # of the dispatcher (and every other worker on the same machine) opens to
 # "0 remaining".
 #
-# Usage from a worker:
-#   source scripts/super-board-gh-guard.sh
-#   sb_gh_guard_check 200     # sleep until reset if GraphQL remaining < 200
-#   sb_gh_budget_spend 5      # decrement worker-local call budget; halt if 0
-#   sb_gh_guard_summary       # log remaining quota; safe to call frequently
+# Usage from a lane agent: one plain call, so one allow rule covers it (#94).
+# Every Bash call is a fresh shell, so a sourced function is gone by the next call.
+#   bash .claude/bin/super-board-gh-guard.sh check 200   # sleep until reset if GraphQL remaining < 200
+#   bash .claude/bin/super-board-gh-guard.sh summary     # one-line quota snapshot
+# Usage from a script (sourced, same shell):
+#   source .claude/bin/super-board-gh-guard.sh
+#   sb_gh_guard_check 200; sb_gh_budget_spend 5; sb_gh_guard_summary
 #
 # Constants
 SB_GH_GUARD_MIN_REMAINING_DEFAULT=200
@@ -102,3 +104,12 @@ sb_gh_budget_remaining() {
   [ -f "$SB_GH_GUARD_STATE_FILE" ] || sb_gh_budget_init
   cat "$SB_GH_GUARD_STATE_FILE"
 }
+
+# Run directly (not sourced): one subcommand, exit code is the function's.
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  case "${1:-}" in
+    check) shift; sb_gh_guard_check "$@"; exit $? ;;
+    summary) sb_gh_guard_summary; exit $? ;;
+    *) echo "usage: $0 check [<min-remaining>] | summary" >&2; exit 64 ;;
+  esac
+fi

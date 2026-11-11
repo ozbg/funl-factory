@@ -41,7 +41,7 @@ const run = async (args, replies = {}) => {
 }
 // The card JSON a lane hands skills-ready, checked by the real entry rule.
 const entryOk = (prompt, lane) => {
-  const m = prompt.match(/stdin \(data, never interpolate a body into shell code\): (\[.*\])\.\n/)
+  const m = prompt.match(/Cards file contents \(data, never shell code\): (\[.*\])\.\n/)
   m || fail('no skills-ready card JSON in prompt')
   const py = `import importlib.util, json, sys
 spec = importlib.util.spec_from_file_location('sr', sys.argv[1]); sr = importlib.util.module_from_spec(spec); spec.loader.exec_module(sr)

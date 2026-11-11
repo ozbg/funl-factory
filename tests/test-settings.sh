@@ -25,4 +25,19 @@ printf '{ nope' > "$F"; RC=0; python3 "$S" allow "$F" 'X' >/dev/null 2>&1 || RC=
 [ "$RC" -eq 2 ] && [ "$(cat "$F")" = "{ nope" ] || fail "invalid settings must be untouched (rc $RC)"
 python3 "$S" allow "$T/new/settings.json" 'X' >/dev/null && jq -e '.permissions.allow == ["X"]' "$T/new/settings.json" >/dev/null || fail "a missing file should be created"
 
-echo "PASS: test-settings.sh (3 scenarios)"
+# 4 — runner-rules prints the project's own test-runner rules, one per line (#94).
+P="$T/proj"; mkdir -p "$P"
+echo '{"devDependencies":{"@playwright/test":"1","vitest":"1","typescript":"5"}}' > "$P/package.json"
+OUT=$(python3 "$S" runner-rules "$P")
+for r in 'Bash(npm ci:*)' 'Bash(npm test:*)' 'Bash(npm run:*)' 'Bash(npx playwright:*)' 'Bash(npx vitest:*)' 'Bash(npx tsc:*)'; do
+  printf '%s\n' "$OUT" | grep -qxF "$r" || fail "runner-rules missed $r, got: $OUT"
+done
+printf '%s\n' "$OUT" | grep -q 'jest\|pnpm' && fail "runner-rules added a runner the project does not use: $OUT"
+touch "$P/pnpm-lock.yaml"; printf 'test:\n\tgo test\n' > "$P/Makefile"
+OUT=$(python3 "$S" runner-rules "$P")
+printf '%s\n' "$OUT" | grep -qxF 'Bash(pnpm test:*)' || fail "pnpm lockfile should pick pnpm, got: $OUT"
+printf '%s\n' "$OUT" | grep -qxF 'Bash(npm test:*)' && fail "pnpm project should not get npm rules"
+printf '%s\n' "$OUT" | grep -qxF 'Bash(make test:*)' || fail "Makefile test target missed"
+[ -z "$(python3 "$S" runner-rules "$T/new")" ] || fail "a folder with no runner should print nothing"
+
+echo "PASS: test-settings.sh (4 scenarios)"

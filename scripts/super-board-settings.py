@@ -3,6 +3,7 @@
 
     super-board-settings.py hooks <settings.json> <snippet.json> [...] [--dry-run]
     super-board-settings.py allow <settings.json> <rule> [<rule> ...]  [--dry-run]
+    super-board-settings.py runner-rules <project-dir>
 
 `hooks` adds each hook command from the snippets once per event + matcher
 (install.sh and onboard's protect-main step). `allow` adds permission rules to
@@ -10,7 +11,10 @@
 approved the printed diff). Both keep every existing key, back the file up
 (`settings.json.bak-<ts>`) before writing, write atomically, and leave an
 invalid settings.json untouched. `--dry-run` prints what would be added
-(`+ <line>`) and writes nothing.
+(`+ <line>`) and writes nothing. `runner-rules` prints, one per line, the allow
+rules for the project's own test runners, read from its files (package.json and
+its lockfile, pyproject/pytest config, Makefile, go.mod, Cargo.toml), so lane
+test commands run without a prompt (#94). It writes nothing.
 
 Exit: 0 ok (including "already present"), 2 settings.json invalid, 64 usage.
 """
@@ -84,9 +88,60 @@ def merge_allow(settings: dict, rules: list[str]) -> list[str]:
     return added
 
 
+# package.json dependency -> the npx rule its lanes run.
+NPX_TOOLS = [("@playwright/test", "playwright"), ("playwright", "playwright"), ("vitest", "vitest"),
+             ("jest", "jest"), ("typescript", "tsc"), ("eslint", "eslint"),
+             ("prettier", "prettier"), ("vite", "vite")]
+# lockfile -> package manager and the subcommands a lane runs.
+MANAGERS = [("pnpm-lock.yaml", "pnpm", ["install", "test", "run", "exec", "-C"]),
+            ("yarn.lock", "yarn", ["install", "test", "run"]),
+            ("bun.lockb", "bun", ["install", "test", "run"]),
+            ("bun.lock", "bun", ["install", "test", "run"])]
+NPM = ("npm", ["ci", "install", "test", "run", "audit", "--prefix"])
+
+
+def runner_rules(root: str) -> list[str]:
+    def has(name):
+        return os.path.exists(os.path.join(root, name))
+
+    def read(name):
+        try:
+            return open(os.path.join(root, name)).read()
+        except OSError:
+            return ""
+
+    rules: list[str] = []
+    if has("package.json"):
+        try:
+            pkg = json.loads(read("package.json"))
+        except ValueError:
+            pkg = {}
+        mgr, subs = next(((m, s) for lock, m, s in MANAGERS if has(lock)), NPM)
+        rules += [f"Bash({mgr} {s}:*)" for s in subs]
+        deps = {**(pkg.get("dependencies") or {}), **(pkg.get("devDependencies") or {})}
+        for dep, tool in NPX_TOOLS:
+            rule = f"Bash(npx {tool}:*)"
+            if dep in deps and rule not in rules:
+                rules.append(rule)
+    if has("pytest.ini") or "[tool.pytest" in read("pyproject.toml") or "[tool:pytest]" in read("setup.cfg") \
+            or (has("tests") and (has("pyproject.toml") or has("requirements.txt"))):
+        rules += ["Bash(python3 -m pytest:*)", "Bash(pytest:*)"]
+    if any(line.startswith("test:") for line in read("Makefile").splitlines()):
+        rules.append("Bash(make test:*)")
+    if has("go.mod"):
+        rules.append("Bash(go test:*)")
+    if has("Cargo.toml"):
+        rules.append("Bash(cargo test:*)")
+    return rules
+
+
 def main(argv: list[str]) -> int:
     dry = "--dry-run" in argv
     args = [a for a in argv if a != "--dry-run"]
+    if len(args) == 2 and args[0] == "runner-rules":
+        for r in runner_rules(args[1]):
+            print(r)
+        return 0
     if len(args) < 3 or args[0] not in ("hooks", "allow"):
         print(__doc__, file=sys.stderr)
         return 64

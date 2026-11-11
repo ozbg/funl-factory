@@ -42,11 +42,11 @@ No job, cadence or scheduler is created by this skill.
    requested source → stop and point at `/super-board onboard` (its collect step sets sources up).
 2. Secrets come only from `.env` (nearest walking up): `SENTRY_AUTH_TOKEN`,
    `POSTHOG_PERSONAL_API_KEY`. Never print, echo or paste them.
-3. Source `.claude/bin/super-board-gh-guard.sh`; `sb_gh_guard_check 200` before each gh burst.
+3. `bash .claude/bin/super-board-gh-guard.sh check 200` before each gh burst: one plain call, never sourced.
 4. Snapshot the board through `.claude/bin/super-board-github-read.py --kind items -- project item-list <number> --owner <owner> --format json --limit 500`. A count mismatch or read failure halts; never treat a partial board as complete.
    It is the dedupe set for verification and the "not on the board" set for `github`.
 
-Scripts live in `.claude/skills/super-collect/scripts/` (`S=` below). Every fetcher takes
+Scripts live in `.claude/skills/super-collect/scripts/`; call them by that literal path, one plain call each. Every fetcher takes
 `--since` and prints JSON; a fetcher that cannot reach its source prints
 `{"status":"unavailable","error":…}` and exits 2. Record each source as `read (n)`, `empty`,
 `unavailable` or `truncated` — never report an unreachable source as empty.
@@ -55,12 +55,12 @@ Scripts live in `.claude/skills/super-collect/scripts/` (`S=` below). Every fetc
 
 | Source | Fetch | Candidate → ticket |
 |---|---|---|
-| `sentry` | `python3 $S/collect_sentry.py list --since <w>` — Sentry REST, Bearer token (scopes `event:read project:read`): org issues list, then `event <id>` / `tags <id>` for evidence | one unresolved issue → `bug`, fp `err|sentry|<id>` |
-| `posthog` | `python3 $S/collect_posthog.py list --since <w>` — HogQL `POST {host}/api/projects/{id}/query/` | one signal group → see table below |
+| `sentry` | `python3 .claude/skills/super-collect/scripts/collect_sentry.py list --since <w>` — Sentry REST, Bearer token (scopes `event:read project:read`): org issues list, then `event <id>` / `tags <id>` for evidence | one unresolved issue → `bug`, fp `err|sentry|<id>` |
+| `posthog` | `python3 .claude/skills/super-collect/scripts/collect_posthog.py list --since <w>` — HogQL `POST {host}/api/projects/{id}/query/` | one signal group → see table below |
 | `github` | Read open candidates with `gh issue list --state open --json number,title,body,labels,url --limit 300` (a full 300 is capped coverage, not a complete repo inventory), minus issues on the board and `source:*` labels | real work → **adopt** (`--adopt <n>`), never copied |
-| `prs` | `python3 $S/collect_prs.py list --since <w>` — one GraphQL search `is:pr is:merged merged:>=DATE`, paginated, with comments, reviews and review threads (human and bot), super-review reports flagged (`<!-- super-review:report -->`) | one recurring root cause → `fix` / `refactor` / `feature`, fp `prs|<boundary>|<cause>` |
+| `prs` | `python3 .claude/skills/super-collect/scripts/collect_prs.py list --since <w>` — one GraphQL search `is:pr is:merged merged:>=DATE`, paginated, with comments, reviews and review threads (human and bot), super-review reports flagged (`<!-- super-review:report -->`) | one recurring root cause → `fix` / `refactor` / `feature`, fp `prs|<boundary>|<cause>` |
 | `architecture` | read-only finder sub-agent (below) | one finding → `refactor`, fp `arch|<module>|<problem>` |
-| custom (`collect.custom[]`) | `python3 $S/collect_custom.py list --since <w>` — http and cli sources run in the script; an `mcp` source comes back `status: agent`: call that server's read/list tool yourself (read-only), then pipe its JSON into `collect_custom.py normalize --name <n>` | one candidate → `bug` (errors, incidents) or `feature` (requests), `--source custom`, fp `custom|<name>|<key>` (the script emits it) |
+| custom (`collect.custom[]`) | `python3 .claude/skills/super-collect/scripts/collect_custom.py list --since <w>` — http and cli sources run in the script; an `mcp` source comes back `status: agent`: call that server's read/list tool yourself (read-only), then pipe its JSON into `collect_custom.py normalize --name <n>` | one candidate → `bug` (errors, incidents) or `feature` (requests), `--source custom`, fp `custom|<name>|<key>` (the script emits it) |
 
 ### custom sources
 
@@ -154,7 +154,7 @@ After Verify, write the verifier's results as one JSON array (`title`, `type`, `
 `group`, `fingerprint`, `verdict`, `evidence`, `note`). `group` is the shared root cause or
 area; findings with the same cause share one group.
 
-`python3 $S/collect_handoff.py doc --findings <verified.json> --since <w>` prints the doc (dry
+`python3 .claude/skills/super-collect/scripts/collect_handoff.py doc --findings <verified.json> --since <w>` prints the doc (dry
 run). On confirm, add `--yes`: it writes `docs/super-board/findings/collect-<YYYY-MM-DD>.md`
 (never overwrites; `-2`, `-3`, …) and prints the path. Only `file` and `needs-triage` findings go
 in; drops and duplicates are listed under "Not in this doc". Then file each one (**Filing**).
@@ -166,10 +166,10 @@ and stop.
 Every finding, adopting a `github` issue and a duplicate's "Seen again" comment go through one script, which routes to the pack's filers:
 
 ```bash
-$S/super-collect-file.sh --config <cfg> --type bug|feature|refactor|fix \
+.claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --type bug|feature|refactor|fix \
   --source sentry|posthog|github|prs|architecture|custom --title "<one line>" --body-file <md> \
   --fingerprint "<key>" [--priority p] [--area a] [--label needs-triage] [--label ux] [--yes]
-$S/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
+.claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
 ```
 
 - `bug`, `feature`, `fix` → `super-qa-file-bug.sh` (`fix` files as `tech-debt`); `refactor` →
