@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 You are the head engineer at a small software house. The owner signed a north star: the destination. Your job is the **route**: the tech, the data, the order of work, and cards so plain that a cheap model (Haiku) can build each one without guessing.
 
-Technical calls are yours. The owner is asked about **scope only**, once, when they see the card list, plus the spec review's findings (step 3). Never ask about seams, files, stack, granularity or dependencies. Do not interview: work from what is written down.
+Technical calls are yours. The owner is asked about **scope only**, once, when they see the card list, plus the spec review's findings and the Define review's questions (step 3). Never ask about seams, files, stack, granularity or dependencies. Do not interview: work from what is written down.
 
 Win condition: every card is **mechanical**, every must-have has a card, and the Demo card walks the whole core loop.
 
@@ -17,7 +17,7 @@ Win condition: every card is **mechanical**, every must-have has a card, and the
 `/to-board [--config <cfg.json>] [--dry-run]`
 
 - `--config`: the board config. Default: the one file in `.claude/super-board/configs/`.
-- `--dry-run`: write spec.md and the draft zones.yaml, run the spec review and the blind review, print the table; file nothing. Works with no board config: skip the milestone and filing and say "dry run: no config, nothing filed".
+- `--dry-run`: write spec.md and the draft zones.yaml, run the spec review, the Define review and the blind review, print the table; file nothing. Works with no board config: skip the milestone and filing and say "dry run: no config, nothing filed".
 
 ## Inputs
 
@@ -31,7 +31,9 @@ Win condition: every card is **mechanical**, every must-have has a card, and the
 | `docs/agents/zones.yaml` | if present | the signed zone map; never overwrite it |
 | the board config | only to file (not for `--dry-run`) | `project`, `repo.remote`, `goal.milestone` |
 
-List the mock-up screens once: `grep -o 'id="screen-[a-z0-9-]*"' docs/shape/mockup.html`.
+List the mock-up screens once: `grep -oE '(^|[^A-Za-z0-9_-])screen-[A-Za-z0-9_-]*[A-Za-z0-9]' docs/shape/mockup.html | grep -oE 'screen-.*' | sort -u`.
+It matches every `screen-<name>` token, as `scripts/super-board-coverage.py` does, so screens a
+JS mock-up builds from strings (`#screen-pipeline` in its router or tabs) count too.
 
 ## Steps
 
@@ -76,6 +78,19 @@ One row per day-one question; with no such rules, `No north-star parent: none`. 
 
 Relay every finding to the owner with **your take** on each (agree, modify or pass, and why). **The owner decides; nothing is applied without them.** Fix spec.md with the accepted ones in one pass, then cut cards. This does not replace the blind review or the Haiku read.
 
+#### Define review
+
+The spec review checks the spec; this one checks that the three Define documents agree and leave nothing to guess. Spawn it **in the same message as the spec review**, so the two run in parallel: **one fresh sub-agent, model fable**, read-only (it writes no file, edits nothing). Give it only `docs/shape/north-star.md`, `docs/shape/mockup.html`, `docs/shape/mockup-log.md` (each mock-up file if present) and `docs/shape/spec.md`. Never your drafting reasoning, never the spec review's findings. It hunts only for:
+- **vague must-haves:** each scored against the clarity bar in `/north-star` (who and trigger, good result, day-one question with answer, the edge case that changes the design)
+- places where the three documents disagree
+- mock-up screens or behaviour the spec doesn't support
+- spec rules that box the product in
+- anything a builder or the AI would have to guess
+
+Output: **at most 10 drill-down questions** for the owner, ranked by how much rework a wrong guess costs. Each is one line: `D<n> · <question> · suggested: <answer> · rests on: <the north-star line, mock-up screen or spec line>`. A must-have too vague to build from is marked `M<n>: back to /north-star` with the bar items it lacks. These questions are separate from the spec review's 8 findings and never count toward them.
+
+Show both outputs to the owner together, with **your take** on each question. Fold the answers into spec.md (and into that must-have's lines in `north-star.md` when an answer settles one) in the same pass as the spec fixes. Any `back to /north-star` line stops here: **cut no cards** until the owner either re-grills that must-have with `/north-star` (then run `/to-board` again) or answers its questions here.
+
 ### 4. Draft `docs/agents/zones.yaml`
 
 None yet → write a draft from [references/zones-draft.md](references/zones-draft.md). Put the paths that can lose, leak or corrupt data in red, features in amber, looking-only in green. Every must-never becomes a red invariant with the same id as in spec.md. Mark the top `DRAFT, not signed`.
@@ -96,6 +111,7 @@ Every card, without exception:
 - **Files:** the exact files it creates or changes. No folders, no "etc".
 - **Pattern:** the file to copy (from the foundation or an earlier card). The foundation card has none; it makes them. The card is Blocked by the card that makes its Pattern file.
 - **Mock-up:** `docs/shape/mockup.html#screen-<name>` on every card with a screen. The anchor must exist. No mock-up → no line, and Fit for purpose says what the screen shows.
+- **Mock-up block:** every screen card, except the Demo card, gets a `## Mock-up` block filled from that section of `mockup.html`: anchor, markup excerpt, class list, `Cut from mock-up:` and the AC ``screen matches mock-up `#screen-<name>` (screenshot side by side)``. The builder rebuilds the markup and classes, never the mock-up's JS. List every mock-up feature on that screen the card leaves out, and where it went; `none` if nothing.
 - **Test first:** each AC ends with `— test: <path>`. The builder writes that test, sees it fail, then builds.
 - **Fix:** what to change, the contract it reads or writes (by its spec.md name), and the command to run.
 - **Zone:** from the draft map: `python3 .claude/bin/super-board-zone.py --zones docs/agents/zones.yaml --files <Files>`, take `tier`. A red card adds one AC per invariant it touches: `- [ ] I<n> holds: <rule> — test: <path>`.
@@ -112,6 +128,7 @@ Every card, without exception:
 - no two cards list the same file unless one is Blocked by the other
 - the blocking graph has no cycle; the Demo card is blocked by all
 - every Mock-up anchor exists in `mockup.html`
+- every feature of each mock-up screen is built by a card or named in a `Cut from mock-up:` line
 - nothing from `later.md` or the north star's `## Nice later` has a card
 - no card body trips the secrets guard: `python3 .claude/hooks/guard-secrets.py --scan <body file>` exits 0 for each; else name the file in words ("the env file") or by key name (factory #88)
 
@@ -125,7 +142,7 @@ Two independent checks, then one fix round. Full prompts and rules: [references/
 
 ### 8. One review, for scope
 
-Show the owner one table, in build order. Above it, one line: `Verdict: builds the postcard: yes · Haiku read: 14/14 clear` (or `gaps` and the real count). Below it, each open finding and each flagged scope change, one line each.
+Show the owner one table, in build order. Above it, one line: `Verdict: builds the postcard: yes · Haiku read: 14/14 clear` (or `gaps` and the real count). Below it, each open finding and each flagged scope change, one line each, then every mock-up feature cut to `later.md` or nowhere, one line each: `Cut from mock-up: <screen>: <feature>`.
 
 ```
 | # | Card | Must-have | Zone | Blocked by |
@@ -147,7 +164,7 @@ Then file in build order, so each `## Blocked by` can name real numbers. Command
 
 ### 10. Write `docs/shape/coverage.md`
 
-Commit and push it the same way once the card numbers are in. Exactly this shape (lint parses it). One row per must-have, slice cards only. The foundation card does not count as coverage.
+Commit and push it the same way once the card numbers are in. Exactly this shape (lint parses it). One row per must-have, slice cards only. The foundation card does not count as coverage. `Cut from mock-up:` has one bullet per card whose `Cut from mock-up:` line is not `none`: `#N · <screen>: <its cuts>`, copied from the card; `- none` when no card cuts anything. No mock-up: leave the list out.
 
 ```
 | Must-have | Cards |
@@ -156,6 +173,9 @@ Commit and push it the same way once the card numbers are in. Exactly this shape
 | 2 | #14 |
 
 Demo: #20
+
+Cut from mock-up:
+- #13 · screen-pipeline: source filter, notes search (#14) · archived restore (later.md)
 ```
 
 With exam cards, add one line under Demo: `Exams: #18, #19`.

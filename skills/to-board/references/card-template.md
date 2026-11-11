@@ -2,11 +2,12 @@
 
 The board's ticket format ([ticket-format.md](../../super-board/references/ticket-format.md)),
 filled in so a cheap model can build it without a design decision. Same sections, same card
-lines; `/to-board` adds Mock-up, Pattern and Needs judgement, and a test hint on every AC.
+lines; `/to-board` adds Mock-up, Pattern and Needs judgement, a test hint on every AC, and a
+`## Mock-up` block on every screen card.
 
 ## A slice card
 
-```markdown
+````markdown
 ## Problem
 <1–3 sentences from the user's side: what they can't do yet.>
 
@@ -29,16 +30,64 @@ lines; `/to-board` adds Mock-up, Pattern and Needs judgement, and a test hint on
 <What to change, in one line.> Reads/writes `<ContractName>` (spec.md § Contracts).
 Write the tests first, see them fail, then run `<test command>` until green.
 
+## Mock-up
+- **Anchor:** docs/shape/mockup.html#screen-<name>
+- **Classes:** `<class>`, `<element.class>`, … every class the excerpt uses
+- **Cut from mock-up:** <each feature on this screen this card leaves out, and where it went> | none
+
+```html
+<the section's key HTML, trimmed to what this card builds: layout, components, classes, sample text>
+```
+
+Rebuild this structure and these classes in the app's own components. Copy the markup, never the
+mock-up's JavaScript.
+
 ## Acceptance Criteria
 - [ ] <checkable outcome> — test: <path>
 - [ ] <checkable outcome> — test: <path>
+- [ ] screen matches mock-up `#screen-<name>` (screenshot side by side) — test: QA screenshot
 
 ## Risk
 🟢 **Low** · <one line>
 
 ## Blocked by
 - #<foundation> — <the pattern and contract it copies>
+````
+
+## The mock-up block
+
+Every card with a `**Mock-up:**` line (a screen card) has a `## Mock-up` block. Lint fails a
+screen card without it. Fill it from `docs/shape/mockup.html`, not from memory:
+
+- **Anchor:** the same anchor as the Context line.
+- **Excerpt:** the part of `<section id="screen-<name>">` this card builds, at most about 40 lines.
+  Keep tags, nesting, classes and the sample text; drop scripts, event handlers, repeated rows
+  (keep one) and parts other cards build. The mock-up may be a vanilla-JS app that builds HTML
+  in template strings; write out the HTML it renders, not the JS that makes it.
+- **Classes:** every class in the excerpt, as written there (`button.link`, not "a link").
+- **Cut from mock-up:** every control, column, filter, sort, state or action on that screen this
+  card does not build, each with where it went: the card that builds it (`#14`, once filed) or
+  `later.md`. A feature that goes to `later.md` or nowhere is a scope cut: the owner sees it in
+  step 8 and in coverage.md. Nothing cut: `none`.
+- **Match AC:** ``screen matches mock-up `#screen-<name>` (screenshot side by side)``, word for
+  word. It counts toward the card's 5 ACs.
+
+Example, from a card that builds the Prospects table but not its filters:
+
+````markdown
+## Mock-up
+- **Anchor:** docs/shape/mockup.html#screen-pipeline
+- **Classes:** `table`, `pill`, `button.link`, `muted`
+- **Cut from mock-up:** source filter, notes search, "added" sort (#14) · archived restore (later.md)
+
+```html
+<table class="table">
+  <tr><th>Business</th><th>Stage</th><th>Next due</th></tr>
+  <tr><td><button class="link">Wollongong Physio</button></td>
+      <td><span class="pill">Proposal</span></td><td class="muted">Tue</td></tr>
+</table>
 ```
+````
 
 ## The foundation card
 
@@ -47,7 +96,7 @@ Same sections. Differences:
 - **Files:** every file it creates; it may pass 5 but stays under 600 source lines.
 - No **Pattern:** line. It makes the patterns: one screen, one read, one write, one test.
 - **Must-have served:** every must-have number.
-- **Mock-up:** the first screen of the core loop, when there is a mock-up.
+- **Mock-up:** the first screen of the core loop, when there is a mock-up, with its mock-up block.
 - ACs (test hints as usual):
   - the test command runs and passes
   - the test command also runs the formatter check, the linter (no empty catch, no unhandled promises, no unused code, no `any`), strict type checking and a high-severity dependency audit, and all pass
@@ -64,7 +113,8 @@ Same sections. Differences:
 - **Scenario:** the whole core loop from north-star.md, in one line.
 - **Files:** the end-to-end test file only.
 - **Pattern:** the foundation's test file.
-- **Mock-up:** the first screen; Where lists every screen of the loop as lettered steps.
+- **Mock-up:** the first screen; Where lists every screen of the loop as lettered steps. No
+  mock-up block: the Demo card builds no screen, and lint skips it by its title.
 - **Must-have served:** every must-have number.
 - ACs: one per core-loop step, each `— test: <the e2e file>`, each checked against its mock-up screen.
 - `## Blocked by`: every other card, one bullet each.

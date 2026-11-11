@@ -86,7 +86,8 @@ card; `super-board-wave.js` sends a `qa` card from Ready straight to the Tester.
 
 **Green skips QA.** When the Builder's zone step reports `green` (and no `zone:amber`/`zone:red`
 label), the Builder moves the card Building → Review and the wave runs the Reviewer next, with
-no Tester. A `qa` card still goes to QA, and so does an exam card (a `## Exam` section). A ticket with a `Zone:` line skips the classify
+no Tester. A `qa` card still goes to QA, and so does a screen card (a Mock-up line or block),
+for the screen match, or an exam card (a `## Exam` section), for its exam. A ticket with a `Zone:` line skips the classify
 agent: green, amber, red mean low, medium, high complexity.
 
 ```
@@ -119,7 +120,7 @@ A live site with no repo is not a board. `/super-qa <url>` tests it on its own.
 
 | Gate | Action |
 |---|---|
-| Round cap: a cited QA or Review bounce when the card has `loop:rebuild-N` and N + 1 ≥ the zone's `max_rounds` (green 1, amber 2, red 3 rounds in all; tier = the higher of `super-board-zone.py` on the PR's files and any `zone:<tier>` label) | The wave moves the card to Blocked with the §4 template (reason 🛡), `round cap: needs a ruling or split`, never back to Building; continue run |
+| Round cap: a cited QA or Review bounce when the card has `loop:rebuild-N` and N + 1 ≥ the zone's `max_rounds` (green 1, amber 2, red 3 rounds in all; at least 2 for a screen or exam card; tier = the higher of `super-board-zone.py` on the PR's files and any `zone:<tier>` label) | The wave moves the card to Blocked with the §4 template (reason 🛡), `round cap: needs a ruling or split`, never back to Building; continue run |
 | A QA or Review bounce with no citation (`AC<n>`, `I<n>`, `bar: …`, `bug: …`) | The wave rejects it: logged `uncited-bounce`, the finding is a Note and the card moves on to Review |
 | No card progresses for 3 consecutive waves | Halt, dump state |
 | Auth expires mid-run | Halt, ping user with refresh instruction |

@@ -8,6 +8,7 @@ import sys
 import tempfile
 import subprocess
 import os
+import re
 import shutil
 import signal
 import time
@@ -376,6 +377,113 @@ class BrowserAdapterTests(unittest.TestCase):
             report=json.loads(result.stdout)
             self.assertFalse(report['correct'])
             self.assertIn('Error',report['error'])
+
+HELPER = PATH.with_name('runtime_browser.mjs')
+ROOT = PATH.parents[3]
+
+
+@unittest.skipUnless(shutil.which('node'), 'Node is required for browser adapter')
+class ScreenShotHelperTests(unittest.TestCase):
+    """runtime_browser.mjs --shot: the screen match's capture helper (screen-match.md)."""
+    def shot(self, *args, project=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = dict(os.environ, SB_RUNTIME_PROJECT=project or tmp)
+            r = subprocess.run(['node', str(HELPER), '--shot', *args], env=env, capture_output=True, text=True, cwd=tmp)
+            return r.returncode, json.loads(r.stdout)
+
+    def test_bad_arguments_fail_before_any_browser(self):
+        for args, want in [((), '--url is required'),
+                           (('--url', 'http://localhost:3000'), '--out'),
+                           (('--url', 'ftp://x', '--out', 'a.png'), 'http, https or file'),
+                           (('--url', 'http://u:p@localhost:3000', '--out', 'a.png'), 'credentials'),
+                           (('--url', 'file:///m.html', '--out', 'a.png', '--screen', 'pipeline'), 'screen-<name>'),
+                           (('--url', 'file:///m.html', '--out', 'a.png', '--viewport', 'huge'), 'desktop, phone or WxH'),
+                           (('--url', 'file:///m.html', '--out', 'a.png', '--bogus'), 'unknown flag')]:
+            code, report = self.shot(*args)
+            self.assertEqual(code, 2, args)
+            self.assertFalse(report['ok'])
+            self.assertIn(want, report['error'])
+
+    def test_missing_playwright_is_a_structured_failure_not_a_pass(self):
+        code, report = self.shot('--url', 'file:///m.html#screen-pipeline', '--screen', 'screen-pipeline', '--out', 'a.png')
+        self.assertEqual(code, 2)
+        self.assertFalse(report['ok'])
+        self.assertEqual(report['screen'], 'screen-pipeline')
+
+    @unittest.skipUnless(os.environ.get('SB_TEST_PLAYWRIGHT_PROJECT'), 'set SB_TEST_PLAYWRIGHT_PROJECT to an app with Playwright')
+    def test_js_built_mockup_opens_by_hash_or_tab_and_a_missing_screen_fails(self):
+        page = ('<nav></nav><main></main><script>const nav=document.querySelector("nav"),main=document.querySelector("main");'
+                'for(const n of ["pipeline","new-deal"]){const b=document.createElement("button");b.setAttribute("role","tab");'
+                'b.textContent=n.replace("-"," ");b.onclick=()=>show(n);nav.append(b);const s=document.createElement("section");'
+                's.id="screen-"+n;s.className="screen board";s.hidden=true;main.append(s);s.textContent=n}'
+                'function show(n){for(const s of main.children)s.hidden=s.id!=="screen-"+n}show("pipeline")</script>')
+        with tempfile.TemporaryDirectory() as tmp:
+            mock = pathlib.Path(tmp) / 'mockup.html'
+            mock.write_text(page)
+            project = os.environ['SB_TEST_PLAYWRIGHT_PROJECT']
+            code, report = self.shot('--url', mock.as_uri() + '#screen-pipeline', '--screen', 'screen-pipeline',
+                                     '--out', str(pathlib.Path(tmp) / 'a.png'), project=project)
+            self.assertEqual((code, report['opened']), (0, 'on load'))
+            self.assertEqual(report['classes'], ['board', 'screen'])
+            code, report = self.shot('--url', mock.as_uri() + '#screen-new-deal', '--screen', 'screen-new-deal',
+                                     '--viewport', 'phone', '--out', str(pathlib.Path(tmp) / 'b.png'), project=project)
+            self.assertEqual((code, report['opened'], report['viewport']), (0, 'tab "new deal"', '390x844'))
+            code, report = self.shot('--url', mock.as_uri(), '--screen', 'screen-gone',
+                                     '--out', str(pathlib.Path(tmp) / 'c.png'), project=project)
+            self.assertEqual(code, 2)
+            self.assertIn('could not open #screen-gone', report['error'])
+
+
+class ScreenMatchRuleTests(unittest.TestCase):
+    """The QA and review steps that prove a screen card's match AC (#105)."""
+    def read(self, rel):
+        return (ROOT / rel).read_text()
+
+    def test_qa_lane_runs_the_screen_match_on_every_screen_card_green_too(self):
+        qa = self.read('skills/super-board/references/lanes/qa.md')
+        self.assertIn('7b. **Screen match** on every screen card', qa)
+        self.assertIn('super-qa/references/screen-match.md', qa)
+        self.assertIn('A green screen card is the exception: run step 7b', qa)
+        self.assertIn('fails the match AC, citing it', qa)
+        self.assertIn('never a pass', qa)
+
+    def test_screen_match_reference_sets_baseline_capture_list_and_embed(self):
+        ref = self.read('skills/super-qa/references/screen-match.md')
+        for rule in ['Until the first build ships, the baseline is the mock-up',
+                     'After the first build ships, the mock-up is frozen',
+                     'docs/shape/baseline/screen-<name>.png', 'docs/shape/baseline/mockup/',
+                     'Same size on both sides', '390×844', 'runtime_browser.mjs --shot',
+                     '`--click', 'never a pass', 'Cut from mock-up:', '`❌ AC<n>` for anything else',
+                     'A pass with no list is not a pass', 'never links', '<base-sha>']:
+            self.assertIn(rule, ref)
+        for name in ('mockup/screen-pipeline', 'screen-pipeline'):
+            self.assertRegex(ref, r'<img src="https://github\.com/<o>/<r>/raw/[0-9a-f]{7}/docs/shape/baseline/' + name + r'\.png"')
+
+    def test_super_qa_allows_only_the_pair_to_be_committed(self):
+        skill = self.read('skills/super-qa/SKILL.md')
+        self.assertIn('references/screen-match.md', skill)
+        self.assertIn("The one exception is a screen card's screenshot pair", skill)
+
+    def test_review_checks_the_pair_and_a_missing_pair_blocks(self):
+        review = self.read('skills/super-board/references/lanes/review.md')
+        self.assertIn('4c. **Screen pair** (every tier, green too)', review)
+        step = review.split('4c. **Screen pair**')[1].split('\n5. ')[0]
+        self.assertIn('Missing pair, an unlisted difference', step)
+        self.assertIn('**Blocker**', step)
+        self.assertIn('do steps 4b and 4c', review)
+
+    def test_to_board_lists_screens_a_js_mockup_builds(self):
+        skill = self.read('skills/to-board/SKILL.md')
+        self.assertNotIn("grep -o 'id=\"screen-", skill)
+        cmd = re.search(r"List the mock-up screens once: `(.+?)`\.", skill)
+        self.assertIsNotNone(cmd)
+        with tempfile.TemporaryDirectory() as tmp:
+            mock = pathlib.Path(tmp) / 'docs/shape/mockup.html'
+            mock.parent.mkdir(parents=True)
+            mock.write_text('<a href="#screen-pipeline">P</a>\nconst routes = {"screen-new-deal": 1}\n<section id="screen-today">\n')
+            out = subprocess.run(cmd.group(1), shell=True, cwd=tmp, capture_output=True, text=True, check=True).stdout.split()
+        self.assertEqual(out, ['screen-new-deal', 'screen-pipeline', 'screen-today'])
+
 
 if __name__ == '__main__':
     unittest.main()

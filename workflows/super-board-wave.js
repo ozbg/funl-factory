@@ -266,11 +266,10 @@ const lanePrompt = (lane, card, { greenEntry = false } = {}) => [
   `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' || lane === 'review' ? BOUNCE_RULES : []),
-  ...(lane === 'build' && hasExam(card)
-    ? [`Return tier and maxRounds from your zone step (3c). Exam card: it never skips QA, even when green: move the card Building → QA and return column QA.`]
-    : []),
-  ...(lane === 'build' && !labelsOf(card).includes('qa') && !hasExam(card)
-    ? [`Return tier and maxRounds from your zone step (3c). Green tier, and no zone:amber or zone:red label → no QA lane: move the card Building → Review, not QA, and return column Review.`]
+  ...(lane === 'build' && !labelsOf(card).includes('qa')
+    ? [needsQa(card)
+      ? `Return tier and maxRounds from your zone step (3c). This is a screen card or an exam card (a Mock-up section or a ## Exam section): it always goes Building → QA, for the screen match or the exam, even when green.`
+      : `Return tier and maxRounds from your zone step (3c). Green tier, and no zone:amber or zone:red label → no QA lane: move the card Building → Review, not QA, and return column Review.`]
     : []),
   ...(greenEntry
     ? [`Green card: it skips QA and comes straight from Building. If the board still shows it in Building or QA, move it to Review first; there is no Tester report — check the builder's AC proof, rerun its tests, and tick each AC whose test passed with its proof line before the gate (lanes/review.md step 4).`]
@@ -338,8 +337,13 @@ const zoneOfBody = (card) => {
   const m = typeof card.body === 'string' && card.body.match(ZONE_LINE)
   return m ? m[1].toLowerCase() : null
 }
-// An exam card (to-board/references/exam-card.md) never skips QA: QA runs its exam on the real model.
-const hasExam = (card) => typeof card.body === 'string' && /^##[ \t]+Exam[ \t]*$/m.test(card.body)
+// A screen card (a Mock-up line or block) always gets QA's screen match, and an exam card
+// (a `## Exam` section, to-board/references/exam-card.md) its exam on the real model, even when green.
+const MOCKUP_LINE = /^[ \t]*(?:[-*][ \t]*\**Mock-up\**:|##[ \t]+Mock-up[ \t]*$)/im
+const EXAM_SECTION = /^##[ \t]+Exam[ \t]*$/m
+const isScreenCard = (card) => typeof card.body === 'string' && MOCKUP_LINE.test(card.body)
+const hasExam = (card) => typeof card.body === 'string' && EXAM_SECTION.test(card.body)
+const needsQa = (card) => isScreenCard(card) || hasExam(card)
 const zoneOfLabels = (card) => highest(...labelsOf(card).map((l) => (l.match(/^zone:(green|amber|red)$/) || [])[1]))
 // N in `loop:rebuild-N` when the wave started: rebuilds so far (none = 0).
 const rebuildsOf = (card) => Math.max(0, ...labelsOf(card).map((l) => +((l.match(/^loop:rebuild-(\d+)$/) || [])[1] || 0)))
@@ -369,7 +373,8 @@ const enforce = async (card, lines, history, mark) => {
 //   - no valid citation → rejected: the stage counts as a pass with a note, the
 //     card goes to Review, never back to Building. Logged as `uncited-bounce`.
 //   - cited, and N + 1 ≥ the zone's max_rounds (this round was the last one) →
-//     Blocked, "round cap: needs a ruling or split". Green 1, amber 2, red 3 rounds.
+//     Blocked, "round cap: needs a ruling or split". Green 1, amber 2, red 3 rounds;
+//     a screen or exam card gets at least 2.
 // Returns true when the chain may go on to the Review lane.
 const judgeBounce = async (lane, card, r, history) => {
   const n = rebuildsOf(card)
@@ -387,7 +392,9 @@ const judgeBounce = async (lane, card, r, history) => {
     return lane === 'qa' && e.status === 'advanced'
   }
   const tier = highest(r.tier, zoneOfLabels(card), zoneOfBody(card)) || 'amber'
-  const max = r.tier === tier && Number.isInteger(r.maxRounds) && r.maxRounds > 0 ? r.maxRounds : DEFAULT_ROUNDS[tier]
+  const zmax = r.tier === tier && Number.isInteger(r.maxRounds) && r.maxRounds > 0 ? r.maxRounds : DEFAULT_ROUNDS[tier]
+  // A screen or exam card gets at least 2 rounds: one difference goes back to Build, not to Blocked.
+  const max = needsQa(card) ? Math.max(2, zmax) : zmax
   if (n + 1 >= max) {
     log(`round-cap: #${card.number} ${tier} max_rounds ${max}, rebuilds ${n} — ${citation}`)
     await enforce(card, [
@@ -539,8 +546,8 @@ const results = await pipeline(
       if (b.status !== 'advanced') return done()
       zone = highest(zone, b.tier)
       // Green skips QA (lanes/qa.md step 4): Build → Review. Only on the
-      // builder's own zone-script tier, never on the ticket's word alone. Never an exam card.
-      greenEntry = b.tier === 'green' && zone === 'green' && !hasExam(card)
+      // builder's own zone-script tier, never on the ticket's word alone. Never a screen or exam card.
+      greenEntry = b.tier === 'green' && zone === 'green' && !needsQa(card)
       at = greenEntry ? 'Review' : 'QA'
     }
     // A `qa`-labelled card skips Building: Ready → QA, Tester first

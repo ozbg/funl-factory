@@ -112,6 +112,21 @@ const amber = '## Context\n- **Zone:** amber\n'
       } else c.prompts['enforce:#4'] && fail(`not capped, no enforcement (${what})`)
     }
   }
+  // A screen or exam card gets at least 2 rounds, even green: one difference goes back to Build.
+  // [body, labels, lane maxRounds, capped?]
+  const qaCases = [
+    ['- **Mock-up:** docs/shape/mockup.html#screen-x', ['feature'], 1, false],   // green screen card, round 1 of 2
+    ['## Exam\nPass mark: 8/10', ['feature'], 1, false],                          // green exam card, round 1 of 2
+    ['## Exam\nPass mark: 8/10', ['feature', 'loop:rebuild-1'], 1, true],         // round 2 of 2
+    ['- **Mock-up:** docs/shape/mockup.html#screen-x', ['feature', 'loop:rebuild-2', 'zone:red'], undefined, true], // red keeps 3
+  ]
+  for (const [body, labels, maxRounds, capped] of qaCases) {
+    const c = await run({ cards: [card(15, { status: 'QA', lane: 'qa', labels, body })] }, {
+      'qa:#15': { status: 'bounced', column: 'Ready', detail: 'fail', citation: 'AC1', tier: labels.includes('zone:red') ? 'red' : 'green', maxRounds },
+      'enforce:#15': { status: 'blocked', column: 'Blocked', detail: 'round cap: needs a ruling or split' },
+    })
+    eq(c.card.roundCapped, capped, `screen/exam round cap for ${JSON.stringify([body, labels])}`)
+  }
   // A lane that blocked at its own cap counts as round-capped too.
   const own = await run({ cards: [card(5, { status: 'QA', lane: 'qa' })] },
     { 'qa:#5': { status: 'blocked', column: 'Blocked', detail: 'round cap: needs a ruling or split' } })
@@ -127,12 +142,20 @@ const amber = '## Context\n- **Zone:** amber\n'
   eq(g.card.lanesRun, 'build:advanced → review:advanced', 'green lanes')
   eq(g.card.tier, 'green', 'summary tier')
   ;/Building → Review, not QA/.test(g.prompts['build:#6']) || fail('build prompt must route green to Review')
+  // A green screen card (Mock-up line or block) still runs QA for the screen match (#105).
+  for (const body of ['- **Mock-up:** docs/shape/mockup.html#screen-pipeline', '## Mock-up\n- **Anchor:** x']) {
+    const sc = await run({ cards: [card(13, { lane: 'build', body })] },
+      { 'build:#13': { status: 'advanced', column: 'QA', detail: 'built', tier: 'green', maxRounds: 1 } })
+    sc.prompts['qa:#13'] || fail(`a green screen card runs QA (${JSON.stringify(body)})`)
+    ;/Green card/.test(sc.prompts['review:#13']) && fail('a green screen card has a Tester report')
+    ;/screen card .*Building → QA/.test(sc.prompts['build:#13']) || fail('build prompt must route a screen card to QA')
+  }
   // 4b — an exam card (## Exam section) never skips QA, even on a green build.
   const ex = await run({ cards: [card(16, { lane: 'build', body: '## Problem\nx\n\n## Exam\nPass mark: 8/10\n' })] },
     { 'build:#16': { status: 'advanced', column: 'QA', detail: 'built', tier: 'green', maxRounds: 1 } })
   ex.prompts['qa:#16'] || fail('an exam card must run the QA lane even when green')
   ;/Green card: it skips QA/.test(ex.prompts['review:#16'] || '') && fail('exam card review must not say it skipped QA')
-  ;/Exam card: it never skips QA/.test(ex.prompts['build:#16']) || fail('build prompt must route an exam card to QA')
+  ;/exam card .*Building → QA/.test(ex.prompts['build:#16']) || fail('build prompt must route an exam card to QA')
   ;/Building → Review, not QA/.test(ex.prompts['build:#16']) && fail('build prompt must not route an exam card to Review')
   eq(ex.card.lanesRun, 'build:advanced → qa:advanced → review:advanced', 'exam card lanes')
   // Amber still goes through QA, and the built card's QA entry passes skills-ready (was exit 64).

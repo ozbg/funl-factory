@@ -3,6 +3,7 @@
 
   super-board-coverage.py lint   --repo-path <app>
   super-board-coverage.py status --repo-path <app> --board-json <file|-> [--milestone M1] [--json]
+  super-board-coverage.py cards  --repo-path <app> --issues-json <file|->
 
 coverage.md (written by /to-board):
 
@@ -13,12 +14,23 @@ coverage.md (written by /to-board):
 
     Demo: #20
 
+    Cut from mock-up:
+    - #13 · screen-pipeline: source filter (#14) · archived restore (later.md)
+
 docs/shape/north-star.md lists the must-haves under `## Must have` as `1. ...`.
 Board JSON is a list of {number, status}; a card is done when status is "Done".
 
 lint: exit 1 if a must-have has no row or an empty Cards cell, or there is no
 `Demo:` line. A row naming a must-have not in the north star is a warning. A
-missing coverage.md is a warning and exit 0 (old apps are not failed).
+missing coverage.md is a warning and exit 0 (old apps are not failed). With a
+docs/shape/mockup.html, a coverage.md with no `Cut from mock-up:` list is a
+warning (old apps again).
+cards: checks the mock-up block on every screen card (a card with a
+`Mock-up:` line; the Demo card, titled `[test] demo:`, is skipped). Issues JSON
+is a list of {number, title, body}. Exit 1 when a screen card lacks the
+`## Mock-up` block, its anchor, the markup excerpt, the class list, the
+`Cut from mock-up:` line or the match AC; when the anchor is not in mockup.html;
+or when coverage.md's cut list leaves out a card that cuts something.
 status: prints done/total per must-have and one milestone line. Silent (no
 output, exit 0) when coverage.md is missing. Read-only; stdlib only.
 
@@ -39,6 +51,48 @@ ROW_RE = re.compile(r"^\s*\|\s*(\d+)\s*\|(.*)\|\s*$")
 DEMO_RE = re.compile(r"^\s*Demo:\s*(.*)$", re.IGNORECASE)
 CARD_RE = re.compile(r"#(\d+)")
 MUST_RE = re.compile(r"^\s*(\d+)[.)]\s+\S")
+CUTS_RE = re.compile(r"^\s*Cut from mock-up:\s*(.*)$", re.IGNORECASE)
+BULLET_RE = re.compile(r"^\s*[-*]\s+(.*\S)\s*$")
+MOCKUP = Path("docs/shape/mockup.html")
+
+
+def card_line(body: str, name: str) -> str | None:
+    """Value of the last `Name:` line, bullet and bold allowed: `- **Mock-up:** x`."""
+    rx = re.compile(r"^\s*(?:[-*]\s+)?(?:\*\*)?" + re.escape(name) + r":(?:\*\*)?[ \t]*(.*?)\s*$",
+                    re.IGNORECASE | re.M)
+    found = rx.findall(body or "")
+    return found[-1] if found else None
+
+
+def section(body: str, heading: str) -> str | None:
+    """Text under the last `## <heading>`, up to the next `## `; fenced code is kept whole."""
+    lines = (body or "").splitlines()
+    start = None
+    fence = False
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("```"):
+            fence = not fence
+        if not fence and re.match(r"^##\s+" + re.escape(heading) + r"\s*$", line, re.IGNORECASE):
+            start = i + 1
+    if start is None:
+        return None
+    out, fence = [], False
+    for line in lines[start:]:
+        if line.lstrip().startswith("```"):
+            fence = not fence
+        if not fence and re.match(r"^##\s+", line):
+            break
+        out.append(line)
+    return "\n".join(out)
+
+
+def anchor_of(value: str | None) -> str | None:
+    m = re.search(r"#(screen-[A-Za-z0-9_-]+)", value or "")
+    return m.group(1) if m else None
+
+
+def is_none(value: str) -> bool:
+    return value.strip().strip("`*_.").lower() == "none"
 
 
 def parse_coverage(text: str) -> dict:
@@ -59,7 +113,23 @@ def parse_coverage(text: str) -> dict:
             c = CARD_RE.search(m.group(1))
             if c:
                 demo = int(c.group(1))
-    return {"rows": rows, "demo": demo}
+    cuts = None
+    in_cuts = False
+    for line in (text or "").splitlines():
+        m = CUTS_RE.match(line)
+        if m:
+            cuts, in_cuts = [], True
+            if m.group(1).strip():
+                cuts.append(m.group(1).strip())
+            continue
+        if in_cuts:
+            b = BULLET_RE.match(line)
+            if b:
+                cuts.append(b.group(1))
+            elif line.strip():
+                in_cuts = False
+    cut_cards = sorted({int(c) for item in (cuts or []) for c in CARD_RE.findall(item.split("·")[0].split(":")[0])})
+    return {"rows": rows, "demo": demo, "cuts": cuts, "cut_cards": cut_cards}
 
 
 def parse_must_haves(text: str) -> list[int]:
@@ -133,7 +203,10 @@ def cmd_lint(args) -> int:
     ntext = read(root / NORTH_STAR)
     if ntext is None:
         print(f"warning: {NORTH_STAR} not found; checking the Demo line only")
-    errors, warnings = lint_problems(parse_coverage(ctext), parse_must_haves(ntext or ""))
+    cov = parse_coverage(ctext)
+    errors, warnings = lint_problems(cov, parse_must_haves(ntext or ""))
+    if cov["cuts"] is None and (root / MOCKUP).is_file():
+        warnings.append("coverage.md has no `Cut from mock-up:` list; the owner can't see what the cards left out")
     for w in warnings:
         print(f"warning: {w}")
     for e in errors:
@@ -172,6 +245,84 @@ def cmd_status(args) -> int:
     return 0
 
 
+def card_problems(card: dict, screens: set[str] | None, cov: dict | None) -> list[str]:
+    """Mock-up block problems on one card; [] when fine or not a screen card."""
+    body = card.get("body") or ""
+    title = card.get("title") or ""
+    ctx_line = card_line(section(body, "Context") or body, "Mock-up")
+    if ctx_line is None or re.search(r"\[test\]\s*demo:", title, re.IGNORECASE):
+        return []
+    want = anchor_of(ctx_line)
+    out: list[str] = []
+    if want is None:
+        out.append("Mock-up line names no `#screen-<name>` anchor")
+    elif screens is not None and want not in screens:
+        out.append(f"anchor #{want} is not in {MOCKUP}")
+    block = section(body, "Mock-up")
+    if block is None:
+        return out + ["no `## Mock-up` block (anchor, markup excerpt, classes, cuts)"]
+    got = anchor_of(card_line(block, "Anchor"))
+    if got is None:
+        out.append("mock-up block has no `Anchor:` line with `#screen-<name>`")
+    elif want and got != want:
+        out.append(f"mock-up block anchor #{got} differs from the Mock-up line #{want}")
+    if not re.search(r"`[^`]+`|\.[A-Za-z]", card_line(block, "Classes") or ""):
+        out.append("mock-up block has no class list (`Classes:` with the classes to use)")
+    m = re.search(r"^\s*```(?:html)?\s*\n(.*?)^\s*```", block, re.M | re.S)
+    if not m or "<" not in m.group(1):
+        out.append("mock-up block has no markup excerpt (an ```html block)")
+    cut = card_line(block, "Cut from mock-up")
+    if not (cut or "").strip():
+        out.append("mock-up block has no `Cut from mock-up:` line (list the cuts, or `none`)")
+    elif cov is not None and cov["cuts"] is not None and not is_none(cut) \
+            and card.get("number") is not None and int(card["number"]) not in cov["cut_cards"]:
+        out.append("cuts features from the mock-up, but coverage.md's `Cut from mock-up:` list leaves it out")
+    acs = section(body, "Acceptance Criteria") or ""
+    target = want or got or "screen-"
+    at = re.compile("#" + re.escape(target) + r"(?![A-Za-z0-9_-])")
+    if not any("matches mock-up" in ln.lower() and at.search(ln)
+               for ln in acs.splitlines() if re.match(r"^\s*[-*]\s+\[[ xX]\]", ln)):
+        out.append(f"no AC `screen matches mock-up `#{target}` (screenshot side by side)`")
+    return out
+
+
+def load_issues(src: str) -> list[dict]:
+    raw = sys.stdin.read() if src == "-" else Path(src).read_text(encoding="utf-8")
+    data = json.loads(raw)
+    if not isinstance(data, list):
+        raise ValueError("issues JSON must be a list")
+    return [i for i in data if isinstance(i, dict)]
+
+
+def cmd_cards(args) -> int:
+    root = Path(args.repo_path)
+    try:
+        issues = load_issues(args.issues_json)
+    except (OSError, ValueError) as e:
+        print(f"cannot read issues json: {e}", file=sys.stderr)
+        return 64
+    mtext = read(root / MOCKUP)
+    # Every `screen-<name>` token, not only literal ids: a vanilla-JS mock-up builds
+    # `id="screen-${name}"` from a list of names.
+    screens = set(re.findall(r"(?<![A-Za-z0-9_-])(screen-[A-Za-z0-9_-]*[A-Za-z0-9])", mtext)) if mtext is not None else None
+    ctext = read(root / COVERAGE)
+    cov = parse_coverage(ctext) if ctext is not None else None
+    bad = 0
+    checked = 0
+    for card in issues:
+        probs = card_problems(card, screens, cov)
+        if card_line(section(card.get("body") or "", "Context") or card.get("body") or "", "Mock-up") is not None:
+            checked += 1
+        for p in probs:
+            print(f"error: #{card.get('number')}: {p}")
+        bad += bool(probs)
+    if bad:
+        print(f"{bad} screen card(s) fail the mock-up block check")
+        return 1
+    print(f"mock-up blocks ok ({checked} card(s) with a Mock-up line)")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -184,6 +335,10 @@ def main(argv=None) -> int:
     b.add_argument("--milestone", default="M1")
     b.add_argument("--json", action="store_true")
     b.set_defaults(fn=cmd_status)
+    c = sub.add_parser("cards")
+    c.add_argument("--repo-path", default=".")
+    c.add_argument("--issues-json", required=True)
+    c.set_defaults(fn=cmd_cards)
     args = p.parse_args(argv)
     return args.fn(args)
 

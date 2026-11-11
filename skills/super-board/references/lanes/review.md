@@ -14,7 +14,7 @@ Read `common.md` (this folder) first: branch + PR model, PR template, review thr
    - `[qa]` open → comment, move card Review → QA.
    - Both open → bounce to whichever is older; the other gets picked up later.
    - Clean up worktree, exit.
-3. Read the issue ACs and the raw diff (code + test files) FIRST and write 2–4 hypotheses of your own — what must hold, where it would break. Only then read the PR description, the `[builder] [report]` comment and Tester's handoff, and check each claim like a hypothesis. Spot-check Tester's evidence (one screenshot at least), read CLAUDE.md / AGENTS.md.
+3. Read the issue ACs and the raw diff (code + test files) FIRST and write 2–4 hypotheses of your own — what must hold, where it would break. Only then read the PR description, the `[builder] [report]` comment and Tester's handoff, and check each claim like a hypothesis. Spot-check Tester's evidence (one screenshot at least; a screen card's pair is step 4c), read CLAUDE.md / AGENTS.md.
 3b. **Prior-report check (review remembers — added 2.5.0).** Load the last Reviewer report on this PR as `prior_report`. One call:
    ```
    gh pr view <PR> --json comments \
@@ -26,11 +26,20 @@ Read `common.md` (this folder) first: branch + PR model, PR template, review thr
    - An unfixed Note never bounces; its row stays `❌ not fixed`.
    - Otherwise → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
 3c. **Zone + round cap.** Tier = the higher of the card's `zone:<tier>` label and `python3 .claude/bin/super-board-zone.py --zones docs/agents/zones.yaml --files <changed files>` (also gives `max_rounds`, `bar`, `invariants`). You may raise a tier with a `zone:<tier>` label, never lower one. `loop:rebuild-N` with N ≥ `max_rounds` → Blocked with the §4 template, `Why blocked: round cap — needs a ruling or split`. Exit.
-4. Review the code (logic, conventions) and the tests. **Green card:** skip this — check the builder's AC proof, rerun tests (step 5), then tick each AC whose test passed, with its proof line (no QA ticked them; the gate refuses unticked ACs, exit 13), do step 4b, then go to step 7.
+4. Review the code (logic, conventions) and the tests. **Green card:** skip this — check the builder's AC proof, rerun tests (step 5), then tick each AC whose test passed, with its proof line (no QA ticked them; the gate refuses unticked ACs, exit 13), do steps 4b and 4c, then go to step 7.
    Severity is two levels. **Blocker** must cite `AC<n>`, an invariant id, `bar: <line>` or `bug: <repro>`; no citation → **Note**. Over-engineering is always a Note; so are missing tests, edge cases, a11y and i18n unless they cite. Deepening opportunities and visible bugs outside the card's scope → file to Backlog (super-review → "Route fixes").
 4b. **Spec stays true** (every tier, green too): the diff changes a contract or the data model that
    `docs/shape/spec.md` names, and spec.md is not updated to match → **Blocker**, class Gap, citation
    `bar: spec.md matches the code`. No `docs/shape/spec.md` in the repo → skip.
+4c. **Screen pair** (every tier, green too) on a screen card (a `**Mock-up:**` line or a `## Mock-up`
+   block). Find the pair in the latest `[qa] [report]` comment for this head
+   (`../../super-qa/references/screen-match.md`), then check:
+   - Both images are embedded and load, are pinned to a sha, and were taken at the same size.
+   - The baseline is the right one: the mock-up anchor the card names, or the frozen baseline PNG.
+   - Look at the pair yourself. Each difference you see is in QA's list, and each `✅` row quotes
+     the card's `Cut from mock-up:` line or links a note that accepts it.
+   Missing pair, an unlisted difference, or a `✅` row the card doesn't back → **Blocker**, class
+   Verification miss, citing the match AC. Open a `[qa]` thread and move the card Review → QA.
 5. **Reviewer-side test rerun** (always — closes the Tester self-verification gap):
    - Pull `issue-<N>-<slug>` into the review worktree.
    - Re-run the test command Tester used (recorded in Tester's PR handoff comment as `Local tests:` line).
