@@ -267,7 +267,9 @@ const lanePrompt = (lane, card, { greenEntry = false } = {}) => [
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' || lane === 'review' ? BOUNCE_RULES : []),
   ...(lane === 'build' && !labelsOf(card).includes('qa')
-    ? [`Return tier and maxRounds from your zone step (3c). Green tier, and no zone:amber or zone:red label → no QA lane: move the card Building → Review, not QA, and return column Review.`]
+    ? [isScreenCard(card)
+      ? `Return tier and maxRounds from your zone step (3c). This is a screen card (it has a Mock-up section): it always goes Building → QA for the screen match, even when green.`
+      : `Return tier and maxRounds from your zone step (3c). Green tier, and no zone:amber or zone:red label → no QA lane: move the card Building → Review, not QA, and return column Review.`]
     : []),
   ...(greenEntry
     ? [`Green card: it skips QA and comes straight from Building. If the board still shows it in Building or QA, move it to Review first; there is no Tester report — check the builder's AC proof, rerun its tests, and tick each AC whose test passed with its proof line before the gate (lanes/review.md step 4).`]
@@ -335,6 +337,9 @@ const zoneOfBody = (card) => {
   const m = typeof card.body === 'string' && card.body.match(ZONE_LINE)
   return m ? m[1].toLowerCase() : null
 }
+// A screen card (a Mock-up line or block) always gets QA's screen match, even when green.
+const MOCKUP_LINE = /^[ \t]*(?:[-*][ \t]*\**Mock-up\**:|##[ \t]+Mock-up[ \t]*$)/im
+const isScreenCard = (card) => typeof card.body === 'string' && MOCKUP_LINE.test(card.body)
 const zoneOfLabels = (card) => highest(...labelsOf(card).map((l) => (l.match(/^zone:(green|amber|red)$/) || [])[1]))
 // N in `loop:rebuild-N` when the wave started: rebuilds so far (none = 0).
 const rebuildsOf = (card) => Math.max(0, ...labelsOf(card).map((l) => +((l.match(/^loop:rebuild-(\d+)$/) || [])[1] || 0)))
@@ -535,7 +540,7 @@ const results = await pipeline(
       zone = highest(zone, b.tier)
       // Green skips QA (lanes/qa.md step 4): Build → Review. Only on the
       // builder's own zone-script tier, never on the ticket's word alone.
-      greenEntry = b.tier === 'green' && zone === 'green'
+      greenEntry = b.tier === 'green' && zone === 'green' && !isScreenCard(card)
       at = greenEntry ? 'Review' : 'QA'
     }
     // A `qa`-labelled card skips Building: Ready → QA, Tester first

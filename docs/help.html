@@ -408,6 +408,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td><code>docs/shape/mockup.html</code></td><td><span class="cmd">/mockup</span></td><td>to-board, builders (via card links), the Demo card</td><td>Double-click to open in a browser</td></tr>
     <tr><td><code>docs/shape/spec.md</code></td><td><span class="cmd">/to-board</span></td><td>builders (contracts, test command), reviewers</td><td>Editor, or on GitHub once committed</td></tr>
     <tr><td><code>docs/agents/zones.yaml</code></td><td>to-board (draft), you (sign)</td><td>every lane, the merge gate</td><td>Editor; comments explain each zone</td></tr>
+    <tr><td><code>docs/shape/baseline/</code></td><td>QA, on each screen card</td><td>QA and review (the baseline after the first build), triage</td><td>PNGs: the app's screens, and the mock-up's under <code>mockup/</code>. A screen's file updates when its card merges</td></tr>
     <tr><td><code>docs/shape/coverage.md</code></td><td><span class="cmd">/to-board</span></td><td>lint, status, report</td><td>Editor; <span class="cmd">/super-board status</span> shows progress</td></tr>
     <tr><td>Cards</td><td><span class="cmd">/to-board</span>, super-collect</td><td>the board run</td><td>The GitHub Project board</td></tr>
     <tr><td><code>.claude/super-board/configs/*.json</code></td><td><span class="cmd">/super-board onboard</span></td><td>everything</td><td>Editor: milestone, budget, targets, models</td></tr>
@@ -468,7 +469,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   <p class="sub">Every file sits in a zone (<code>docs/agents/zones.yaml</code>). A card takes the highest zone of any file it touches. The zone sets how hard it's checked.</p>
   <div class="tablebox"><table>
     <tr><th>Zone</th><th>What lives there</th><th>Checks</th><th>Rounds</th><th>Builder</th></tr>
-    <tr><td><span class="tag g">green</span></td><td>Screens, read-only views, copy</td><td>Typecheck, tests, light review. No QA lane.</td><td>1</td><td>Haiku</td></tr>
+    <tr><td><span class="tag g">green</span></td><td>Screens, read-only views, copy</td><td>Typecheck, tests, light review. No QA lane, except the screen match on a screen card.</td><td>1</td><td>Haiku</td></tr>
     <tr><td><span class="tag a">amber</span></td><td>Features that change data through the red write path</td><td>Every AC tested, the zone's bar, scenario run, review</td><td>2</td><td>Haiku</td></tr>
     <tr><td><span class="tag r">red</span></td><td>Anything that can lose, leak or corrupt data, or give the agent rights only you have</td><td>Invariant suite, mutation test, security pass, adversarial review</td><td>3</td><td>Sonnet</td></tr>
   </table></div>
@@ -529,7 +530,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   <p class="sub">QA proves the card does what it says. How hard it looks depends on the zone.</p>
   <div class="tablebox"><table>
     <tr><th>Zone</th><th>What QA does</th></tr>
-    <tr><td><span class="tag g">green</span></td><td>No QA lane. The reviewer re-runs the tests and ticks each check that passed.</td></tr>
+    <tr><td><span class="tag g">green</span></td><td>No QA lane, except a screen card still gets its screenshot beside the mock-up. The reviewer re-runs the tests and ticks each check that passed.</td></tr>
     <tr><td><span class="tag a">amber</span></td><td>Every acceptance check proven by a passing test. Every screen card: a screenshot of the app beside its mock-up section (or the baseline, after the first build), with every difference listed; an unaccepted difference fails it. The zone's bar: the scenario works in the real app, errors say what happened in one line, empty, loading and error states exist, inputs are validated where they enter, no data skips the safe write path. Plus the ticket's own edge cases.</td></tr>
     <tr><td><span class="tag r">red</span></td><td>All of amber, plus a test for each rule (<code>I1</code>…) the card touches, one deliberate break per guarded line to prove the test catches it, and the security pass.</td></tr>
   </table></div>
@@ -537,7 +538,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><th>Standard</th><th>What it means</th></tr>
     <tr><td>Cite or it's a note</td><td>A fail must point at a check (<code>AC2</code>), a rule (<code>I3</code>), a bar line, or a bug with steps to reproduce. Anything else is a note and doesn't send the card back.</td></tr>
     <tr><td>Proof is a file</td><td>Each ticked check names the test that proves it. "Looked fine" doesn't count; the merge gate refuses it.</td></tr>
-    <tr><td>Evidence stays local</td><td>Screenshots, logs and recordings go to <code>.claude/super-board/evidence/</code> (not committed). The PR gets a text table: check, result, proof. The QA comment shows each screen beside its mock-up, and review looks at the pair before passing.</td></tr>
+    <tr><td>Evidence stays local</td><td>Screenshots, logs and recordings go to <code>.claude/super-board/evidence/</code> (not committed). The PR gets a text table: check, result, proof. The one exception is a screen's pair: QA commits it under <code>docs/shape/baseline/</code>, shows the screen beside its mock-up in the QA comment, and review looks at the pair before passing.</td></tr>
     <tr><td>Stay in scope</td><td>A real problem outside the card becomes a new Backlog card; it doesn't fail this one.</td></tr>
     <tr><td>Round caps</td><td>Green 1, amber 2, red 3 tries. Then Blocked with "split, steer or ask".</td></tr>
     <tr><td>The whole loop</td><td>The Demo card walks the core loop end to end. Then the agent walk uses the real app with the real AI, screen by screen, and runs every AI exam. Its failures come back as feedback.</td></tr>

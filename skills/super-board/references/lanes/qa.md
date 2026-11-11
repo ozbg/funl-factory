@@ -21,24 +21,31 @@ A live site with no repo is not a board. `/super-qa <url>` tests it on its own.
 3. Read issue + PR + Builder's handoff comment.
 4. **Zone.** Run `python3 .claude/bin/super-board-zone.py` on the diff's files (super-qa → "Zone first").
    Green → move QA → Review with `Did: green zone — no QA lane`, `citation: "none"`. Stop.
+   A green screen card is the exception: run step 7b only, then pass or fail as steps 9–10.
 5. **Checks** (super-qa → "Checks by zone"). Amber: AC ledger, the zone's bar, the ticket's own
    edge cases. Red: those, plus a test per touched invariant and one mutation per guarded line.
    Accepted limits are never checked. Existing project verifier → affected features only.
 6. **Security pass** on red, or amber with `boundary: true` (super-qa → "Security pass").
 7. Run the tests. Evidence goes to `.claude/super-board/evidence/<issue>/v<V>/` in the main
-   checkout, gitignored. Never commit it, never embed images.
+   checkout, gitignored. Never commit it, never embed images. The one exception is step 7b.
    An AC that cannot be proven by a test or file is a fail: the merge gate refuses unticked or path-less proof (common.md → "No partial merge").
+7b. **Screen match** on every screen card (a `**Mock-up:**` line or a `## Mock-up` block), every
+   zone: follow `../../super-qa/references/screen-match.md`. Capture the app and its baseline at
+   the same size, list every visible difference, commit the pair under `docs/shape/baseline/`
+   and embed it. A difference not under `Cut from mock-up:` and not accepted by a note on the
+   card fails the match AC, citing it. A mock-up screen that won't open is never a pass.
 8. **Sort findings.** A fail cites `AC<n>`, `I<n>`, `bar: <line>` or `bug: <repro steps>`.
    Anything else is a note. Out-of-scope privacy, data-loss or visible bug → Backlog card via
    `super-qa-file-bug.sh --column Backlog`; it does not fail this card.
-9. **Pass** → commit and push test files only → tick the `ac` block with proof lines, write
-   `visual` as text for UI, append a `history` row, rewrite `status` → `[qa] [report] ✅` PR
-   comment with the AC table (text) → issue comment → move QA → Review. Result
+9. **Pass** → commit and push test files only (and the 7b pair) → tick the `ac` block with proof
+   lines, write `visual` as text for UI (a screen card: the 7b pair), append a `history` row,
+   rewrite `status` → `[qa] [report] ✅` PR comment with the AC table (text) and any 7b pair →
+   issue comment → move QA → Review. Result
    `citation: "none"`. Clean up worktree.
 10. **Fail** → read `loop:rebuild-N` (none = 0). N + 1 ≥ the zone's `max_rounds` (this was the last allowed round) → Blocked with the
     block template, reason 🛡, line `ruling or split: <what keeps failing>`. Otherwise leave the
     failing ACs unchecked with the reason, append a `history` row, rewrite `status` →
-    `[qa] [report] ❌` PR comment with the AC table and expected/actual per cited fail → issue
+    `[qa] [report] ❌` PR comment with the AC table, expected/actual per cited fail and any 7b pair → issue
     comment → label `loop:rebuild-<N+1>` → move QA → Ready. Result `citation: "<first cited>"`.
     Clean up worktree.
 

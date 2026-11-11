@@ -5,8 +5,9 @@ description: >-
   by zone: amber maps each AC to a test and checks the zone's bar and the ticket's own edge cases;
   red adds invariant tests and one mutation per guarded line; green skips QA. A fail must cite an
   AC, an invariant, a bar line or a reproducible bug. Evidence stays local; the PR gets an AC
-  table as text. Standalone, it crawls routes from `docs/super-qa/queue.md` with Playwright,
-  records screenshots/logs/HARs and files product-readable issues. Use when the user says
+  table as text, and every screen card gets its screenshot beside the mock-up. Standalone, it
+  crawls routes from `docs/super-qa/queue.md` with Playwright, records screenshots/logs/HARs
+  and files product-readable issues. Use when the user says
   "run super-qa", "QA review", "bug bash", "verify and fix", or invokes `/super-qa`.
 ---
 
@@ -44,7 +45,8 @@ card with no diff is amber.
 
 **Green — no QA lane.** The Builder proves the ACs and the Reviewer checks them. A later ticket
 makes the workflow skip QA for green; until then a green card that reaches QA moves straight to
-Review with `Did: green zone — no QA lane` and `citation: "none"`.
+Review with `Did: green zone — no QA lane` and `citation: "none"`. A green screen card gets the
+screen match (below) first.
 
 **Amber:**
 
@@ -62,6 +64,12 @@ Review with `Did: green zone — no QA lane` and `citation: "none"`.
    restore it, see green. The mutation never reaches a commit. One per guarded line.
 
 **Accepted limits** in the zones file are never checked, never noted, never filed.
+
+**Screen cards, every zone.** A card with a `**Mock-up:**` line or a `## Mock-up` block gets the
+screen match: the app and its baseline (the mock-up anchor until the first build ships, then the
+frozen app screenshot) captured at the same size, every visible difference listed and judged
+against the card. A difference not under `Cut from mock-up:` and not accepted by a note on the
+card fails the match AC. Follow [references/screen-match.md](references/screen-match.md).
 
 ## No citation, no bounce
 
@@ -115,7 +123,9 @@ mkdir -p <ev>/<issue>/v<V>
 Then, if `<ev>/.gitignore` is missing, write it (one line: `*`) with the Write tool.
 
 Screenshots, logs, HARs and test output go there. Never `git add` them, never embed images in a
-comment. The PR comment carries the AC table as text:
+comment. The one exception is a screen card's screenshot pair: it is committed under
+`docs/shape/baseline/` and embedded, pinned to a sha (screen-match.md). The PR comment carries
+the AC table as text:
 
 ```markdown
 | AC | Result | Proof |
@@ -124,7 +134,7 @@ comment. The PR comment carries the AC table as text:
 | AC2 | ❌ | want TTFB < 800 ms, got 1240 ms |
 ```
 
-Evidence adds 0 lines to the PR. Only tests the Tester writes are committed.
+Evidence adds 0 lines to the PR. Only tests the Tester writes, and a screen card's pair, are committed.
 
 ## Lifecycle (board lane)
 

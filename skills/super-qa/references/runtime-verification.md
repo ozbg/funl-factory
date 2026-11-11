@@ -151,3 +151,10 @@ same total from the same data, alternates five samples each and saves CDP eviden
 It reduces deliberate work from 180 ms to 30 ms; this demonstrates measurement,
 not a production optimization. `--changed-delay 180` gives unchanged/noisy evidence;
 `--changed-delay 400` demonstrates slower. Neither downloads nor installs anything.
+
+## Screenshots for the screen match
+
+The same browser helper takes the screen match's screenshots: `runtime_browser.mjs --shot`
+captures one page or one `#screen-<name>` of the mock-up at a fixed viewport, with no timing.
+QA's steps, the baseline rules and the comment format are in
+[screen-match.md](screen-match.md).
