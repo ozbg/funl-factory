@@ -242,6 +242,29 @@ class Scorecard(unittest.TestCase):
         self.assertIn("budget-burn", run("health", "--config", str(cfg), "--scorecard", str(self.sc)))
         self.assertIn("Asks: budget", out)
 
+    # ── factory #106: AI exam scores ──
+    def test_exam_records_an_event_row_skipped_by_card_reads(self):
+        out = json.loads(run("exam", "--card", "12", "--score", "7", "--total", "10", "--pass-mark", "8",
+                             "--model", "claude-sonnet-4-5", "--milestone", "M1", "--scorecard", str(self.sc)))
+        self.assertEqual(out, {"recorded": "exam", "card": 12, "passed": False})
+        row = json.loads(self.sc.read_text())
+        self.assertEqual({k: row[k] for k in ("event", "card", "score", "total", "pass_mark", "model", "milestone")},
+                         {"event": "exam", "card": 12, "score": 7, "total": 10, "pass_mark": 8,
+                          "model": "claude-sonnet-4-5", "milestone": "M1"})
+        self.assertIn("no scorecard rows yet", run("summary", "--scorecard", str(self.sc)))
+
+    def test_exam_refuses_the_fake_model_and_bad_numbers(self):
+        for args in (["--model", "fake"], ["--model", "mock-llm"], ["--model", "claude-sonnet-4-5", "--score", "11"],
+                     ["--model", "claude-sonnet-4-5", "--pass-mark", "0"]):
+            base = {"--card": "1", "--score": "9", "--total": "10", "--pass-mark": "8"}
+            for i in range(0, len(args), 2):
+                base[args[i]] = args[i + 1]
+            flat = [x for kv in base.items() for x in kv]
+            r = subprocess.run([sys.executable, str(SCRIPT), "exam", *flat, "--scorecard", str(self.sc)],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 64, args)
+        self.assertFalse(self.sc.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

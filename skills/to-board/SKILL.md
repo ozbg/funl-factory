@@ -105,6 +105,8 @@ Use [references/card-template.md](references/card-template.md). Cut in this orde
 2. **Slice cards**: one per step of the core loop, then one per must-have not yet covered. Each is a thin vertical slice: data, logic, screen and test for one thing the user does. Demoable alone.
 3. **Demo card**, last: walks the whole core loop end to end against the mock-up screens. Blocked by every other card.
 
+- **Exam cards**, before the Demo card: one per AI feature (a must-have served by an AI call), 10 or more day-one questions run on the real model against a pass mark. Format and rules: [references/exam-card.md](references/exam-card.md).
+
 Every card, without exception:
 - **Files:** the exact files it creates or changes. No folders, no "etc".
 - **Pattern:** the file to copy (from the foundation or an earlier card). The foundation card has none; it makes them. The card is Blocked by the card that makes its Pattern file.
@@ -175,6 +177,8 @@ Demo: #20
 Cut from mock-up:
 - #13 · screen-pipeline: source filter, notes search (#14) · archived restore (later.md)
 ```
+
+With exam cards, add one line under Demo: `Exams: #18, #19`.
 
 ### 11. Hand off
 

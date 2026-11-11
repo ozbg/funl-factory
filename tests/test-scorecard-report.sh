@@ -34,6 +34,21 @@ echo "$out" | grep -q '✅ rework: 0% vs ≤ 10%' || fail "rework target: $out"
 echo "$out" | grep -q '✅ rounds per merge: 1.33 vs ≤ 1.5' || fail "rounds target: $out"
 echo "$out" | grep -q '✅ demo first try: yes vs yes' || fail "demo target: $out"
 echo "$out" | grep -q 'sharpen tickets: most bounces cite ticket' || fail "next: $out"
+echo "$out" | grep -q '^AI exams: n/a' || fail "no exams: $out"
+echo "$out" | grep -q 'n/a exams at pass mark: n/a vs all' || fail "exam target n/a: $out"
+
+# AI exams: the latest run per card counts; one under its pass mark fails the target
+$PY exam --card 4 --score 6 --total 10 --pass-mark 8 --model claude-sonnet-4-5 --milestone M1 --scorecard "$SC" >/dev/null
+$PY exam --card 4 --score 9 --total 10 --pass-mark 8 --model claude-sonnet-4-5 --milestone M1 --scorecard "$SC" >/dev/null
+$PY exam --card 5 --score 10 --total 12 --pass-mark 10 --model claude-sonnet-4-5 --scorecard "$SC" >/dev/null
+out=$($PY report --config "$CFG" --repo-path "$APP")
+echo "$out" | grep -q '^AI exams: #4 9/10 (pass 8) claude-sonnet-4-5 · #5 10/12 (pass 10) claude-sonnet-4-5' || fail "exams line: $out"
+echo "$out" | grep -q '✅ exams at pass mark: 2/2 vs all' || fail "exam target pass: $out"
+$PY exam --card 5 --score 7 --total 12 --pass-mark 10 --model claude-sonnet-4-5 --scorecard "$SC" >/dev/null
+out=$($PY report --config "$CFG" --repo-path "$APP")
+echo "$out" | grep -q '❌ exams at pass mark: 1/2 vs all' || fail "exam target fail: $out"
+echo "$out" | grep -q 'fix the spec, not the prompt' || fail "exam next step: $out"
+if $PY exam --card 4 --score 9 --total 10 --pass-mark 8 --model fake-model --scorecard "$SC" 2>/dev/null; then fail "fake model accepted"; fi
 
 # config targets override defaults
 echo '{"goal":{"milestone":"M1","budget_usd":60},"targets":{"first_pass_pct":60,"days_per_app":1}}' > "$T/cfg2.json"
@@ -51,6 +66,7 @@ d = json.loads(open(sys.argv[1]).read())
 for k in "date app milestone days merged total first_pass_pct rework_pct rounds_per_merge usd budget_usd demo_passed postcard targets_met".split():
     assert k in d, k
 assert d["app"] == "charter-hub" and d["postcard"] is True and d["targets_met"]["first_pass_pct"] is False
+assert d["targets_met"]["exam_pass"] is False and len(d["exams"]) == 2, d
 P
 $PY report --config "$T/cfg2.json" --repo-path "$APP" --log >/dev/null
 [ "$(wc -l < "$LOG")" -eq 2 ] || fail "log should have two lines"
