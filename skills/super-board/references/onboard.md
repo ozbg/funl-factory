@@ -345,6 +345,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    Undetected Sentry / PostHog are left out. More than 4 options → split into two questions
    │    in the same call ("Error sources", "Code sources") — the tool takes 4 per question.
    │    "Other" = ➕ Add another source (link, app, API URL, MCP or command).
+   ├─ Feedback is not asked: every app gets the feedback icon (/to-board cuts its card), so
+   │    `feedback` always joins collect.sources, with collect.feedback.dir = the app's data
+   │    folder + `/feedback` (default `data/feedback`). No key, no ping.
    ├─ Built-ins: ask only what detection missed (Sentry org/project/host, PostHog host/project_id).
    │    Missing key → the exact .env line to add (name only) + scopes: Sentry `event:read
    │    project:read`; PostHog personal key `query:read error_tracking:read`. PostHog failure

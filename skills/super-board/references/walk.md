@@ -14,8 +14,8 @@ step 2):
 - its `walk` is `not run` or `failed`
 - no card on the goal is left in Ready, Building, QA or Review
 
-A failed walk's findings go to Backlog. When the owner moves them to Ready on the goal and they
-merge, the next run walks again.
+A failed walk's findings go through triage, like every collect finding: a clear fix goes to Ready,
+the rest to Backlog as proposals. When the fixes on the goal merge, the next run walks again.
 
 ## Who walks
 
@@ -82,17 +82,31 @@ Write `<run folder>/findings.md`: one table row per screen, question and exam.
 | E1 | exam #18 | ✅ | 9/10, pass mark 8, claude-sonnet-4-5 | | |
 ```
 
-File every ❌ to Backlog as one card, through the collect filer:
+Every ❌ goes through collect's triage, then the collect filer, as one card. The walk saw it
+fail, so its verdict is `file`.
+
+- a. Write one finding per ❌ into `<run folder>/triage.json`, with the triage fields
+  (`../../super-collect/SKILL.md` § Triage): `track`, `decision`, `breaks` (the rubric line plus
+  the mock-up anchor, must-have or day-one question it breaks), `screens`, `touches`, `zone`,
+  `recommendation`.
+- b. Run the rules in code:
+  `python3 .claude/skills/super-collect/scripts/collect_handoff.py triage --findings <run folder>/triage.json --config <cfg>`.
+- c. File each with its final `track` and `decision`. A fix lands in Ready, a proposal in Backlog:
 
 ```bash
 .claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --type bug \
   --source walk --title "<one line>" --body-file <md> \
-  --fingerprint "walk|screen-<name>|<key>" --yes
+  --fingerprint "walk|screen-<name>|<key>" --track <track> --decision <decision> --yes
 ```
+
+- d. Put each fix card on the goal, so the next walk waits for it:
+  `gh issue edit <n> --milestone <goal.milestone>`.
 
 - `--type bug` when a must-have, an AC or the mock-up says it should work; `--type feature` when
   nothing on the board covers it.
-- The body is the ticket format (writing-standard.md § 3). Context names the screen or question,
+- The body is the ticket format (writing-standard.md § 3), plus the lines its decision needs
+  (`Breaks:` and `Failing test:` for a bug fix, `## Before and after` for a tweak,
+  `## Recommendation` for a proposal). Context names the screen or question,
   the rubric line, the must-have, and embeds the shot as a path in the run folder. A bug adds the
   Evidence table.
 - Fingerprint `walk|screen-<name>|<key>` for a screen, `walk|M<n>|<key>` for a question, so a
@@ -117,8 +131,9 @@ pass mark. The agent returns one line: `walk: screens <p>/<n> · questions <a>/<
 - **Passed.** `super-board status` and `report` show the milestone done. The orchestrator commits
   the run folder with the run manifest and reports `🎯 <title> reached`.
 - **Failed.** The milestone stays not done. The orchestrator commits the run folder and posts one
-  `needs-you` item on the Demo card: the findings table and two choices. Move the finding cards to
-  Ready on the goal (the next run builds them, then walks again), or accept them as they are.
+  `needs-you` item on the Demo card: the findings table, with each card's triage decision, and two
+  choices. Build them (the fixes are in Ready already; accept the proposals onto the goal, and the
+  next run builds them, then walks again), or accept them as they are.
 - **Accepted.** On the owner's word only, never the agent's:
   `super-board-scorecard.py walk --accepted --note "<the owner's reason>" --milestone <goal.milestone>`.
   The finding cards stay in Backlog for later.

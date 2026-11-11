@@ -1,6 +1,6 @@
 ---
 name: super-collect
-description: Find problems in one project, verify each, triage each into a track (bug, tweak, body of work), write one findings doc and file it in the ticket format - a fix to Ready (capped per run), everything else to Backlog as a proposal for the owner. Source plug-ins - sentry (app errors), posthog (exceptions, rage/dead clicks, failure events, web vitals, tracking gaps), github (issues not on the board), prs (recurring problems in merged PRs and their review comments), architecture (refactor findings), plus any custom source added in onboard (an MCP server, HTTP API, CLI command or app). Each candidate is checked by one fresh verifier first. Dry-run by default. Use when the user says "super-collect", "/super-collect", "/super-collect sentry", "collect tickets", "triage errors onto the board", "what keeps breaking", or "find refactors".
+description: Find problems in one project, verify each, triage each into a track (bug, tweak, body of work), write one findings doc and file it in the ticket format - a fix to Ready (capped per run), everything else to Backlog as a proposal for the owner. Source plug-ins - sentry (app errors), posthog (exceptions, rage/dead clicks, failure events, web vitals, tracking gaps), github (issues not on the board), prs (recurring problems in merged PRs and their review comments), architecture (refactor findings), feedback (the app's in-app feedback icon), plus any custom source added in onboard (an MCP server, HTTP API, CLI command or app). Each candidate is checked by one fresh verifier first. Dry-run by default. Use when the user says "super-collect", "/super-collect", "/super-collect sentry", "collect tickets", "triage errors onto the board", "what keeps breaking", or "find refactors".
 ---
 
 # super-collect — find problems, triage them, file them
@@ -26,7 +26,7 @@ plain words: [routing](../../docs/super-board/routing.md).
 | Command | Does |
 |---|---|
 | `/super-collect` | every source enabled in `collect.sources` |
-| `/super-collect <source> [<source>…]` | just those: `sentry`, `posthog`, `github`, `prs`, `architecture`, or a custom source's `name` |
+| `/super-collect <source> [<source>…]` | just those: `sentry`, `posthog`, `github`, `prs`, `architecture`, `feedback`, or a custom source's `name` |
 | `--since 30d` / `--since 2026-09-01` | window; default `collect.window_days`, else 14 days |
 | `--yes` | write and file without the confirm step (never skips verify or dedupe) |
 
@@ -64,8 +64,38 @@ Scripts live in `.claude/skills/super-collect/scripts/`; call them by that liter
 | `github` | Read open candidates with `gh issue list --state open --json number,title,body,labels,url --limit 300` (a full 300 is capped coverage, not a complete repo inventory), minus issues on the board and `source:*` labels | real work → **adopt** (`--adopt <n>`), never copied |
 | `prs` | `python3 .claude/skills/super-collect/scripts/collect_prs.py list --since <w>` — one GraphQL search `is:pr is:merged merged:>=DATE`, paginated, with comments, reviews and review threads (human and bot), super-review reports flagged (`<!-- super-review:report -->`) | one recurring root cause → `fix` / `refactor` / `feature`, fp `prs|<boundary>|<cause>` |
 | `architecture` | read-only finder sub-agent (below) | one finding → `refactor`, fp `arch|<module>|<problem>` |
-| feedback (#103) | the in-app feedback items, read from the app's own data folder and redacted on the factory side | one item → a candidate like any other; triage picks its track |
+| `feedback` | `python3 .claude/skills/super-collect/scripts/collect_feedback.py list` — the items the app's feedback icon saved in its own data folder (`collect.feedback.dir`, default `data/feedback`), redacted by the script | one group of repeats → a candidate like any other, `--source feedback`, fp `feedback|<route>|<element>|<text>` (the script emits it); triage picks its track |
 | custom (`collect.custom[]`) | `python3 .claude/skills/super-collect/scripts/collect_custom.py list --since <w>` — http and cli sources run in the script; an `mcp` source comes back `status: agent`: call that server's read/list tool yourself (read-only), then pipe its JSON into `collect_custom.py normalize --name <n>` | one candidate → `bug` (errors, incidents) or `feature` (requests), `--source custom`, fp `custom|<name>|<key>` (the script emits it) |
+
+### feedback — the in-app icon
+
+Every app has a feedback icon (`.claude/skills/to-board/references/feedback-card.md`). It saves
+one `feedback/1` item (JSON, plus a PNG when there is a screenshot) in the app's own data folder
+and sends nothing. `collect_feedback.py list` reads the items not yet in that folder's
+`filed.json` and prints candidates:
+
+- **Redacted first.** Emails, phone numbers, the values of name-like state keys (and those names
+  wherever they appear), query-string values and token-like log strings are replaced before the
+  JSON is printed. Work only from that output; never open the raw item.
+  Item ids and file paths are local only (`ids`, `screenshots_local`): they never go in a card,
+  a comment or the findings doc. The card carries the opaque `refs` instead, one line in Context:
+  `- **Feedback:** fb-b7d9560a, fb-22734fb7`. The build and QA lanes on this machine open them
+  with `collect_feedback.py show <ref>` to see the screenshot and markup. A name the script
+  missed in the user's own words, you replace with `[name]` too.
+- **Screenshots stay local.** They are never uploaded or embedded. The candidate lists the local
+  PNG paths. You may look at one and describe the problem in a line of words in the card's
+  Context ("the save button sits under the panel"), never a name, number or text read off it.
+  The Evidence table's Screenshots row reads `kept local`.
+- **Repeats merge.** Items on the same route (ids collapsed) and element whose words overlap are
+  one candidate, with every item id. One that matches an item already filed reuses its
+  fingerprint, so the filer adds "Seen again" to the open issue instead of a copy.
+- **Marked once filed.** After the filer answers with an issue (the new number, or the `#N` of a
+  duplicate or a rejected one), record it: `collect_feedback.py mark --ids <id,id> --issue <n> --fingerprint <fp>`. It writes
+  `filed.json`, which keeps the item from being filed twice and gives the app's list its status.
+  A dry run marks nothing.
+
+A missing folder is `unavailable` (the app has no icon yet), never `empty`. Items in a schema
+the script doesn't know are listed under `skipped`, with why.
 
 ### custom sources
 
@@ -156,7 +186,7 @@ evidence.
 ## Triage — a track, then fix or propose
 
 Every source feeds the same step: triage reads only the verified findings, so a new source (the
-feedback icon's items, #103) joins by emitting candidates. One fresh triage sub-agent per run
+feedback icon's items, the agent walk's failures) joins by emitting candidates. One fresh triage sub-agent per run
 reads `docs/shape/spec.md`, `docs/shape/north-star.md`, `docs/agents/zones.yaml` and the baseline
 screens, then adds to each `file` / `needs-triage` finding:
 
@@ -208,7 +238,7 @@ Every finding, adopting a `github` issue and a duplicate's "Seen again" comment 
 
 ```bash
 .claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --type bug|feature|refactor|fix \
-  --source sentry|posthog|github|prs|architecture|custom|walk --title "<one line>" --body-file <md> \
+  --source sentry|posthog|github|prs|architecture|custom|walk|feedback --title "<one line>" --body-file <md> \
   --fingerprint "<key>" [--priority p] [--area a] [--label needs-triage] [--label ux] \
   --track bug|tweak|body --decision fix|propose [--yes]
 .claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
@@ -229,7 +259,7 @@ track (`bug` or `tweak`). A proposal lands in Backlog, labelled with its track (
   `posthog|<signal>|<key>` (fetchers emit it) or `gap|<workflow>`, github `github|<n>`, prs
   `prs|<boundary>|<cause>`, architecture `arch|<module>|<problem>`, custom `custom|<name>|<key>`,
   walk `walk|<screen-name or M<n>>|<key>` (the agent walk's findings, filed by the walk agent:
-  `.claude/skills/super-board/references/walk.md`).
+  `.claude/skills/super-board/references/walk.md`), feedback `feedback|<route>|<element>|<text>`.
 - **Dedupe** uses complete guarded paginated issue history, exact-fingerprint, repo-wide, any label: an open hit gets a "Seen again" comment; a
   closed-only hit is a **recurrence**, filed again naming the closed issue.
 - **Column** is `Ready` for a fix (none → refused, exit 65). Everything else goes to the board's holding

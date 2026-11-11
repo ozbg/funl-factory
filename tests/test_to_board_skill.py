@@ -327,5 +327,55 @@ class SpecReviewCoversDefineGaps(unittest.TestCase):
         self.assertIn("mock-up screens the spec doesn't support and anything a builder or the AI would have to guess", html)
 
 
+class FeedbackCard(unittest.TestCase):
+    """factory #103: every app gets the feedback icon, cut as one amber card after the foundation."""
+    SPEC = (ROOT / "skills" / "to-board" / "references" / "feedback-card.md").read_text()
+
+    def test_card_cutting_adds_the_feedback_card_after_the_foundation(self):
+        cut = re.search(r"^### \d+\. Cut the cards\n(.*?)(?=^### )", TEXT, re.M | re.S).group(1)
+        self.assertIn("- **Feedback card**, right after the foundation, in every app: one amber card", cut)
+        self.assertIn("[references/feedback-card.md](references/feedback-card.md)", cut)
+        self.assertLess(cut.index("**Foundation card**"), cut.index("**Feedback card**"))
+        check = re.search(r"^### \d+\. Check before showing\n(.*?)(?=^### )", TEXT, re.M | re.S).group(1)
+        self.assertIn("the feedback card is there, Blocked by the foundation", check)
+
+    def test_spec_defines_the_icon(self):
+        for want in ("small fixed icon", "every screen", "one text box", "`Mark up a screenshot`",
+                     "the route or screen", "the app version or commit", "ids and counts, never whole records",
+                     "last 50 client lines", "`<data>/feedback/<id>.json`", "`<id>.png`",
+                     "**Sends nothing.** No network call, no token, no third-party library that phones home",
+                     "**A tiny list.**", "`filed #N`", "`filed.json`"):
+            self.assertIn(want, self.SPEC, want)
+
+    def test_spec_versions_the_item_schema(self):
+        self.assertIn("## The item, `feedback/1`", self.SPEC)
+        self.assertIn('"schema": "feedback/1"', self.SPEC)
+        for field in ("`schema`", "`id`, `created_at`, `text`, `route`", "`app`", "`state`", "`logs`",
+                      "`screenshot`", "`marked_up`"):
+            self.assertIn(field, self.SPEC, field)
+        self.assertIn("collect skips a schema it doesn't know", self.SPEC)
+
+    def test_card_is_amber_with_its_acs_and_a_conditional_anchor(self):
+        card = self.SPEC.split("## The card", 1)[1]
+        self.assertIn("One **amber** card", card)
+        self.assertIn("Blocked by it", card)
+        self.assertIn("only if the mock-up shows the icon", card)
+        acs = re.findall(r"^  - \[ \] (.+)$", card, re.M)
+        self.assertTrue(2 <= len(acs) <= 5, acs)
+        for want in ("saves one `<data>/feedback/<id>.json`", "No outbound call", "validates against `feedback/1`"):
+            self.assertTrue(any(want in a for a in acs), want)
+
+    def test_fixture_items_follow_the_spec(self):
+        items = ROOT / "tests" / "fixtures" / "collect" / "feedback"
+        import json
+        good = [json.loads(p.read_text()) for p in items.glob("2026*.json")]
+        self.assertTrue(good)
+        for item in good:
+            self.assertEqual(item["schema"], "feedback/1")
+            for k in ("id", "created_at", "text", "route", "app"):
+                self.assertIn(k, item)
+            self.assertNotIn("status", item, "the app never writes status")
+
+
 if __name__ == "__main__":
     unittest.main()

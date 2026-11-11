@@ -143,9 +143,10 @@ is "old intake source gone" 64 "$(run --type bug --source intake --title T --bod
 is "fp must match source"   64 "$(run --type bug --source posthog --title T --body-file "$WORK/bug.md" --fingerprint "err|sentry|1" >/dev/null; echo $?)"
 is "gap only for posthog"  64 "$(run --type feature --source sentry --title T --body-file "$WORK/fix.md" --fingerprint "gap|checkout" >/dev/null; echo $?)"
 is "walk fp must start walk|" 64 "$(run --type bug --source walk --title T --body-file "$WORK/bug.md" --fingerprint "custom|x|y" >/dev/null; echo $?)"
+is "feedback fp must start feedback|" 64 "$(run --type bug --source feedback --title T --body-file "$WORK/bug.md" --fingerprint "walk|x|y" >/dev/null; echo $?)"
 is "custom fp must start custom|" 64 "$(run --type bug --source custom --title T --body-file "$WORK/bug.md" --fingerprint "linear|ENG-1" >/dev/null; echo $?)"
 is "fp prefix needs a key"  64 "$(run --type bug --source sentry --title T --body-file "$WORK/bug.md" --fingerprint "err|sentry|" >/dev/null; echo $?)"
-for pair in "sentry err|sentry|9" "posthog posthog|exception|abc123" "posthog gap|checkout" "github github|55" "prs prs|merge-gate|drift" "architecture arch|order-intake|shallow" "custom custom|linear|ENG-42" "walk walk|screen-pipeline|stage-headers"; do
+for pair in "sentry err|sentry|9" "posthog posthog|exception|abc123" "posthog gap|checkout" "github github|55" "prs prs|merge-gate|drift" "architecture arch|order-intake|shallow" "custom custom|linear|ENG-42" "walk walk|screen-pipeline|stage-headers" "feedback feedback|/clients/N|22513f69283c|d4648ab91b7c"; do
   src=${pair%% *}; fp=${pair#* }
   OUT=$(run --type bug --source "$src" --title T --body-file "$WORK/bug.md" --fingerprint "$fp")
   has "fingerprint shape accepted for $src" "$OUT" "would-file|bug|T|Backlog"
