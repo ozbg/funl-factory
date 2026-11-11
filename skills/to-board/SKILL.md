@@ -78,7 +78,7 @@ No north-star parent: I7 (keep or drop?)
 
 One row per day-one question; with no such rules, `No north-star parent: none`. Every `no` and every rule with no parent needs the owner's call, like a finding.
 
-Relay every finding to the owner with **your take** on each (agree, modify or pass, and why). **The owner decides; nothing is applied without them.** Fix spec.md with the accepted ones in one pass, then cut cards. This does not replace the blind review or the Haiku read.
+Relay every finding to the owner with **your take** on each (agree, modify or pass, and why). **The owner decides; nothing is applied without them.** A finding that needs the owner's business call is relayed as usual and also noted as a north-star miss, for the retro. Fix spec.md with the accepted ones in one pass, then cut cards. This does not replace the blind review or the Haiku read.
 
 ### 4. Draft `docs/agents/zones.yaml`
 

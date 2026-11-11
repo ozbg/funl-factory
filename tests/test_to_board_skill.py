@@ -282,6 +282,13 @@ class ClarityReviewInNorthStar(unittest.TestCase):
         self.assertIn("**inside the drill**, one at a time, with the suggested answer", d)
         self.assertIn('The clarity line keeps updating. "Enough" still ends it.', d)
 
+    def test_looks_ahead_to_business_rules_within_the_six(self):
+        d = self.drill()
+        self.assertIn("It also looks ahead to the spec: any business rule the build will need that the draft leaves open", d)
+        for rule in ("when a client counts as won", "who may see what", "what data must never leave the machine",
+                     "money, deletion, sending on the owner's behalf", "These share the 6."):
+            self.assertIn(rule, d)
+
     def test_log_counts_review_questions(self):
         self.assertIn('"review_questions":0', self.NS)
         self.assertIn("`review_questions` the clarity review's questions you asked", self.NS)
@@ -299,6 +306,7 @@ class SpecReviewCoversDefineGaps(unittest.TestCase):
         self.assertIn("- mock-up screens or behaviour the spec doesn't support\n", s)
         self.assertIn("- anything a builder or the AI would have to guess. A must-have too vague to build from is a finding like any other", s)
         self.assertEqual(s.count("model fable"), 1)
+        self.assertIn("A finding that needs the owner's business call is relayed as usual and also noted as a north-star miss, for the retro.", s)
 
     def test_help_describes_the_move(self):
         html = (ROOT / "docs/help.html").read_text()
