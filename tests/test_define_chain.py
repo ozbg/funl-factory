@@ -39,7 +39,7 @@ class Mockup(unittest.TestCase):
         s = section(MOCKUP, "Design polish")
         for want in ("`frontend-design`", "Keep every `screen-<name>` id", "every button",
                      "every behaviour", "before and after screenshots", "1280px", "390px",
-                     "owner picks what stays"):
+                     "owner picks what stays", "start a new session (plugins load at session start)"):
             self.assertIn(want, s)
 
     def test_hand_off_depends_on_board_config(self):
@@ -61,6 +61,11 @@ class Chain(unittest.TestCase):
         ob = (ROOT / "skills/super-board/references/onboard.md").read_text()
         self.assertIn("frontend-design@claude-plugins-official", ob)
         self.assertIn("enabledPlugins", ob)
+        self.assertIn("this session's available skills (any namespace", ob)
+        self.assertIn("`<plugin-id>:frontend-design`", ob)
+        self.assertIn('enable "frontend-design" in claude.ai plugins (desktop app)', ob)
+        self.assertIn("start a NEW session", ob)
+        self.assertIn("plugins load at session start", ob)
         self.assertIn("Next: /to-board --dry-run", ob)
 
     def test_help_shows_chain_in_order(self):
