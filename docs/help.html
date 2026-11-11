@@ -90,20 +90,20 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
 <header class="wrap top">
   <div class="eyebrow">funl-factory-master · super-board 3.3</div>
   <h1>Factory Field Guide</h1>
-  <p class="lede">How an idea becomes a built, tested app: who does what at each stage, what moves a card, what "done" means, and which skill to reach for.</p>
+  <p class="lede">How an idea becomes a built, tested app, and how it keeps getting better: who does what at each stage, what moves a card, what "done" means, and which skill to reach for.</p>
 </header>
 
 <nav class="bar" aria-label="Sections"><div class="in">
-  <a href="#path">The path</a><a href="#stages">Step by step</a><a href="#files">Where things live</a><a href="#board">The board</a><a href="#zones">Zones</a><a href="#security">Security</a><a href="#standards">Code standards</a><a href="#qa">QA</a><a href="#done">Done</a><a href="#models">Models</a><a href="#numbers">Numbers</a><a href="#sdd">Spec-driven</a><a href="#you">Your calls</a><a href="#after-v1">After v1</a><a href="#lessons">Lessons</a><a href="#skills">Skills</a>
+  <a href="#path">The path</a><a href="#stages">Step by step</a><a href="#iterate">Iterating</a><a href="#files">Where things live</a><a href="#board">The board</a><a href="#zones">Zones</a><a href="#security">Security</a><a href="#standards">Code standards</a><a href="#qa">QA</a><a href="#done">Done</a><a href="#models">Models</a><a href="#numbers">Numbers</a><a href="#sdd">Spec-driven</a><a href="#you">Your calls</a><a href="#skills">Skills</a>
 </div></nav>
 
 <main class="wrap">
 
 <section id="path">
   <h2>The path</h2>
-  <p class="sub">Five steps. You sign three things; the factory does the rest and asks only when it must.</p>
-  <div class="diagram" role="img" aria-label="Path: north-star, mockup (with outside review and design polish), to-board (with spec review), run, report. You sign the postcard, the mock-up, and the scope and zone map.">
-  <svg viewBox="0 0 980 230" xmlns="http://www.w3.org/2000/svg">
+  <p class="sub">Six steps. The first five build the first version; the sixth keeps it improving, for as long as the app lives. You sign a few things; agents do the legwork and ask only when they must.</p>
+  <div class="diagram" role="img" aria-label="Path: north-star, mockup (with outside review and design polish), to-board (with spec review), run, report. You sign the postcard, the mock-up, and the scope and zone map. After the first build, iterate: the feedback icon feeds agent triage, which sends bugs and tweaks to a card and the run, and bodies of work through grilling, an exam and a brief you sign, then to-board.">
+  <svg viewBox="0 0 980 370" xmlns="http://www.w3.org/2000/svg">
     <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
     <g font-size="13">
       <!-- boxes -->
@@ -169,6 +169,30 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
       <!-- loop back -->
       <path d="M295 40 C295 8, 95 8, 95 38" fill="none" stroke="var(--muted)" stroke-dasharray="4 4" marker-end="url(#ar)"/>
       <text x="195" y="18" text-anchor="middle" fill="var(--muted)" font-size="12">must-have wrong? re-sign</text>
+      <!-- 6: iterate -->
+      <text x="10" y="244" fill="var(--muted)" font-size="12" font-family="var(--f-mono)">6 · ITERATE, AFTER THE FIRST BUILD</text>
+      <path d="M890 132V244" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="780" y="248" width="190" height="80" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="875" y="274" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">feedback icon</text>
+      <text x="875" y="296" text-anchor="middle" fill="var(--fg)">click, type a line</text>
+      <text x="875" y="316" text-anchor="middle" fill="var(--muted)" font-size="12">any screen · plus walk, errors</text>
+      <path d="M780 288H744" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="540" y="248" width="200" height="80" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="640" y="274" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">agent triage</text>
+      <text x="640" y="296" text-anchor="middle" fill="var(--fg)">fix it, or propose it</text>
+      <text x="640" y="316" text-anchor="middle" fill="var(--muted)" font-size="12">redacts · merges repeats</text>
+      <path d="M540 276C520 276, 520 268, 504 268" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar)"/>
+      <path d="M540 300C520 300, 520 332, 504 332" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="270" y="242" width="230" height="52" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="385" y="264" text-anchor="middle" fill="var(--accent)" font-weight="600">bug · tweak</text>
+      <text x="385" y="283" text-anchor="middle" fill="var(--fg)" font-size="12">a card to Ready, then the run</text>
+      <rect x="270" y="306" width="230" height="52" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="385" y="328" text-anchor="middle" fill="var(--accent)" font-weight="600">body of work</text>
+      <text x="385" y="347" text-anchor="middle" fill="var(--fg)" font-size="12">grill, exam, brief, then /to-board</text>
+      <rect x="40" y="310" width="190" height="44" rx="22" fill="var(--you-soft)"/>
+      <text x="135" y="328" text-anchor="middle" fill="var(--you)" font-weight="600" font-size="12">you: sign the brief</text>
+      <text x="135" y="345" text-anchor="middle" fill="var(--you)" font-size="12">accept or reject proposals</text>
+      <path d="M270 332H232" stroke="var(--you)" stroke-dasharray="3 3"/>
     </g>
   </svg>
   </div>
@@ -179,7 +203,8 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <li><span class="cmd">/super-board onboard</span>: sets up the board. Skipped if the app already has a board.</li>
     <li><span class="cmd">/to-board --dry-run</span>: spec → spec review (a fresh Fable agent) → cards → blind review and Haiku read → your scope review. Nothing filed.</li>
     <li><span class="cmd">/to-board</span>: files the cards to Ready.</li>
-    <li>You sign <code>zones.yaml</code> → <span class="cmd">/super-board lint</span> → <span class="cmd">/super-board run</span> → report.</li>
+    <li>You sign <code>zones.yaml</code> → <span class="cmd">/super-board lint</span> → <span class="cmd">/super-board run</span>. The run ends with an agent walking every screen of the real app → report.</li>
+    <li>From then on, iterate: the feedback icon and <span class="cmd">/super-collect</span> feed agent triage. Bugs and tweaks go straight to Ready and the next run; a body of work goes back through grilling and a brief you sign, then <span class="cmd">/to-board</span>.</li>
   </ol>
   <p>Run Define (<span class="cmd">/north-star</span>, <span class="cmd">/mockup</span>, <span class="cmd">/to-board</span>) in the app's folder, or in an empty folder to test an idea. <span class="cmd">/to-board --dry-run</span> writes the spec and shows the cards without touching a board.</p>
 </section>
@@ -191,7 +216,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   <div class="stage">
     <div class="sh"><span class="n">1</span><h3><span class="cmd">/north-star</span> · the vision</h3><span class="tag you">you answer</span></div>
     <dl>
-      <dt>Does</dt><dd>A short interview. It listens first, then offers one-line guesses you accept or fix. It pins down why the app exists, the few things it must do, what it must never do, the one thing users do most (the core loop), and one small moment of delight. It reads back a <strong>postcard</strong>: two or three sentences describing a good day with the app. Then a fresh agent sketches the app from the postcard alone, and you score how close it is.</dd>
+      <dt>Does</dt><dd>A short interview. It listens first, then offers one-line guesses you accept or fix. It pins down why the app exists, the few things it must do, what it must never do, the one thing users do most (the core loop), and one small moment of delight. For each must-have it asks what you'll actually ask or do on day one, and what a good answer looks like. Those day-one questions later become the AI's exam and the agent walk's script. It reads back a <strong>postcard</strong>: two or three sentences describing a good day with the app. Then a fresh agent sketches the app from the postcard alone, and you score how close it is.</dd>
       <dt>You</dt><dd>Answer at most 12 questions, say yes, nearly or no to the postcard, and score the sketch 1–5. Re-read it the next morning.</dd>
       <dt>Output</dt><dd>A <strong>one-page vision</strong>, not a spec: <code>docs/shape/north-star.md</code>. It has the postcard, the north-star outcome, the core loop, numbered must-haves, must-nevers, the sparkle, nice-laters and what was assumed. No screens, fields or tech. Details you mentioned go to <code>docs/shape/later.md</code>; the run is logged in <code>docs/shape/north-star-log.jsonl</code>.</dd>
       <dt>Next</dt><dd>Run <span class="cmd">/mockup</span> in the same folder. It reads <code>north-star.md</code> itself; you pass nothing.</dd>
@@ -204,7 +229,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
       <dt>Does</dt><dd>Builds 2–3 <strong>radically different mock-ups</strong> of the core loop, all in one web page with fake but realistic data: one tab per step of the loop, a switch at the bottom to flip between versions, buttons that really do something. The sparkle is shown working, and every must-never visibly doesn't happen.</dd>
       <dt>Then</dt><dd>Once you say it feels right: a <strong>fresh Fable agent</strong> that never saw the chat reviews it against the north star and your own words (kept in <code>docs/shape/mockup-log.md</code>) and returns at most 8 ranked issues. The factory gives its take on each; you decide. Then a <strong>design polish</strong> with <code>frontend-design</code> fixes sizing, spacing and type, keeping every screen and button; you see before and after at desktop and phone width and keep what you like.</dd>
       <dt>You</dt><dd>Click through each version, pick one, ask for at most two rounds of tweaks, say which review findings to take and which polish to keep, then answer "Is that the postcard?" If a must-have turns out wrong, it sends you back to <span class="cmd">/north-star</span>.</dd>
-      <dt>Output</dt><dd><strong>A clickable mock-up</strong>: <code>docs/shape/mockup.html</code>, one file that opens with a double-click in any browser, your pick showing first. Each screen has a fixed name (<code>#screen-capture</code>) that the build cards link to, so builders copy the look. It adds a <code>Mock-up: … · postcard: yes</code> line to <code>north-star.md</code>; small tweaks go to <code>later.md</code>; your inputs and the factory's pushbacks go to <code>mockup-log.md</code>.</dd>
+      <dt>Output</dt><dd><strong>A clickable mock-up</strong>: <code>docs/shape/mockup.html</code>, one file that opens with a double-click in any browser, your pick showing first. Each screen has a fixed name (<code>#screen-capture</code>) that the build cards link to, so builders copy the look. It adds a <code>Mock-up: … · postcard: yes</code> line to <code>north-star.md</code>; small tweaks go to <code>later.md</code>; your inputs and the factory's pushbacks go to <code>mockup-log.md</code>. The mock-up is the design truth until the first build ships. Then it's frozen, and screenshots of the real app become the baseline that later changes are checked against.</dd>
       <dt>Next</dt><dd>No board yet: <span class="cmd">/super-board onboard</span>, which then names <span class="cmd">/to-board --dry-run</span>. A board already: <span class="cmd">/to-board --dry-run</span> in the same folder. It reads the north star and the mock-up itself.</dd>
     </dl>
   </div>
@@ -216,19 +241,19 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
         <ol>
           <li>Reads the north star, the mock-up and any existing code, then makes the technical calls: stack, data model, how it's tested.</li>
           <li>Writes the <strong>one-page build spec</strong>.</li>
-          <li>Spec review: a fresh Fable agent checks the spec against the north star, the mock-up and your inputs, then reads it as an attacker: can one client reach another's data, what works without signing in, which path breaks a must-never. The factory gives its take on each finding; you decide what changes.</li>
+          <li>Spec review: a fresh Fable agent checks the spec against the north star, the mock-up and your inputs, then reads it as an attacker: can one client reach another's data, what works without signing in, which path breaks a must-never. It also runs a capability pass: can this design answer each day-one question? Any rule the north star never asked for is flagged, for you to keep or drop, so the spec can't quietly cripple the app. The factory gives its take on each finding; you decide what changes.</li>
           <li>Drafts the zone map: which files are risky (red), features (amber) or looks only (green).</li>
-          <li>Cuts the work into cards: a foundation card first (the skeleton and one finished example of each pattern), a thin slice for each step of the core loop, and a Demo card last that walks the whole loop.</li>
+          <li>Cuts the work into cards: a foundation card first (the skeleton and one finished example of each pattern), a thin slice for each step of the core loop, and a Demo card last that walks the whole loop. Every screen card carries its mock-up section: the anchor, the markup and the style classes to use, and a check that the screen matches. Any mock-up feature a card leaves out is listed on the card. Every AI feature gets an exam card: its day-one questions with expected answers, run on the real model.</li>
           <li>Blind review: a fresh agent checks the cards against the north star without seeing the spec, and Haiku reads every card and lists any question it would need answered. One round of fixes.</li>
           <li>Shows you the card table with the verdict.</li>
           <li>Commits and pushes its files, so builders can see them, then files the cards to the board and writes the coverage map.</li>
         </ol>
       </dd>
-      <dt>You</dt><dd>Look at the table once and say what's missing or unwanted. That's scope only; how it's cut is the factory's call. Then sign the zone map.</dd>
+      <dt>You</dt><dd>Look at the table once and say what's missing or unwanted, including any mock-up feature that was cut. That's scope only; how it's cut is the factory's call. Then sign the zone map.</dd>
       <dt>Output</dt><dd>
         <code>docs/shape/spec.md</code>: the build spec (postcard on top, must-haves, must-nevers as numbered rules <code>I1</code>, <code>I2</code>…, volumes, tech decisions, data model, the data shapes where cards meet, the test command).<br>
         <code>docs/agents/zones.yaml</code>: the draft zone map, for you to sign.<br>
-        <code>docs/shape/coverage.md</code>: which cards deliver each must-have, and the Demo card.<br>
+        <code>docs/shape/coverage.md</code>: which cards deliver each must-have, the mock-up features cut, the exam cards and the Demo card.<br>
         The cards themselves, in the board's Ready column on GitHub.
       </dd>
       <dt>Next</dt><dd>Sign <code>zones.yaml</code>, then <span class="cmd">/super-board lint</span>. The files are already committed: builders work from <code>main</code> and only see what's there, so run <span class="cmd">/to-board</span> on <code>main</code>. Try it first with <span class="cmd">/to-board --dry-run</span>: it writes the spec and shows the table but files nothing.</dd>
@@ -238,18 +263,30 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   <div class="stage">
     <div class="sh"><span class="n">4</span><h3><span class="cmd">/super-board run</span> · the build</h3><span class="tag fac">factory</span></div>
     <dl>
-      <dt>Does</dt><dd>Drains the board in waves. For each card: a builder (Haiku, or Sonnet for red and flagged cards) works in its own copy of the code, writes the tests first, makes the change and opens a draft PR. QA proves every check. A Sonnet reviewer reads it (Opus on red cards), and the merge gate re-runs everything against the latest <code>main</code> before merging. Cards that don't pass go back, at most 1–3 times by zone, then wait in Blocked with the reason. Waves run 3 cards wide by default, picked so no two cards touch the same files.</dd>
+      <dt>Does</dt><dd>Drains the board in waves. For each card: a builder (Haiku, or Sonnet for red and flagged cards) works in its own copy of the code, writes the tests first, makes the change and opens a draft PR. QA proves every check, and for a screen it puts a screenshot of the app beside the mock-up and lists every difference; an unaccepted difference sends the card back. A Sonnet reviewer reads it (Opus on red cards), and the merge gate re-runs everything against the latest <code>main</code> before merging. Cards that don't pass go back, at most 1–3 times by zone, then wait in Blocked with the reason. Waves run 3 cards wide by default, picked so no two cards touch the same files.</dd>
       <dt>You</dt><dd>Nothing, unless a digest asks: a 🙋 card (money, auth, a destructive schema change, a live database) or a budget question. If a safety check refuses a lane's merge, the foreman runs the merge gate itself, pinned to the exact commit that was reviewed. You aren't asked to click merge on work you'd just approve anyway.</dd>
       <dt>Output</dt><dd>Merged PRs on <code>main</code>, cards in Done, a short digest on each merge, breach or question. <span class="cmd">/super-board status</span> shows where it is any time.</dd>
-      <dt>Next</dt><dd>When the Demo card is Done, use the app and check it against the postcard.</dd>
+      <dt>Then</dt><dd><strong>The agent walk.</strong> When the Demo card is Done, a Sonnet agent uses the real app as you would: every screen, with the real AI settings. It works from a written checklist and the day-one questions, compares each screen with the mock-up, and runs every AI exam. Whatever fails is filed as feedback, so it goes through step 6. The milestone isn't done until the walk passes.</dd>
+      <dt>Next</dt><dd><span class="cmd">/super-board report</span>, then use the app yourself and check it against the postcard.</dd>
     </dl>
   </div>
 
   <div class="stage">
     <div class="sh"><span class="n">5</span><h3><span class="cmd">/super-board report</span> · the score</h3><span class="tag you">you read</span></div>
     <dl>
-      <dt>Does</dt><dd>Puts the whole app on one page: how long Define took, days to build, cost against budget, how many cards passed first time, rework, rounds, whether the demo passed, and the postcard. Each against a target, with up to three things to change next time.</dd>
-      <dt>Output</dt><dd>Printed in the chat. With <code>--log</code>, one line in <code>docs/super-board/factory-log.jsonl</code>; <code>--compare</code> lists every app side by side.</dd>
+      <dt>Does</dt><dd>Puts the whole app on one page: how long Define took, days to build, cost against budget, how many cards passed first time, rework, rounds, whether the demo passed, and the postcard. It also scores the product, not just the build: how many screens match the mock-up, the AI exam scores, and the agent walk's pass rate. Each against a target, with up to three things to change next time.</dd>
+      <dt>Output</dt><dd>Printed in the chat. With <code>--log</code>, one line in <code>docs/super-board/factory-log.jsonl</code>; <code>--compare</code> lists every app side by side. The retro beside the run log covers product quality as well as process.</dd>
+      <dt>Next</dt><dd>The app is in use. Every change from here goes through step 6.</dd>
+    </dl>
+  </div>
+
+  <div class="stage">
+    <div class="sh"><span class="n">6</span><h3>Iterate · bugs, tweaks and bigger work</h3><span class="tag you">you click and type</span></div>
+    <dl>
+      <dt>Does</dt><dd>Every app the factory builds has a small <strong>feedback icon</strong>. Click it and type a line. It captures the screen, the page, the app's state and recent logs, and you can mark up the screenshot if words aren't enough. The item is saved inside the app; nothing is sent anywhere. <span class="cmd">/super-collect</span> then picks it up with the agent walk's findings and real errors. It removes contact details, merges repeats and files each one to Backlog. An agent triages each item into one of three tracks (see <a href="#iterate">Iterating</a>). It either <strong>fixes it</strong> (the item breaks a spec line, rule or mock-up screen it can point to) or <strong>proposes it</strong> to you (anything new, anything that changes direction, anything it's unsure about).</dd>
+      <dt>You</dt><dd>Click and type when something's wrong or could be better. Read the proposals digest: accept, or reject in one click with a reason. Sign the brief for a body of work.</dd>
+      <dt>Output</dt><dd>Bug and tweak cards in Ready for the next run. A proposals digest with a recommendation on each. For a body of work: a signed brief and an updated spec, then new cards from <span class="cmd">/to-board</span>.</dd>
+      <dt>Next</dt><dd><span class="cmd">/super-board run</span> picks up the new cards. Every run ends with an agent walk and a report, the same as the first build.</dd>
     </dl>
   </div>
 
@@ -259,16 +296,16 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
       <div class="n">After real use</div>
       <h3><span class="cmd">/super-collect</span> <span class="tag fac">factory</span></h3>
       <ul>
-        <li>Pulls problems from Sentry, PostHog, GitHub, merged PRs, architecture</li>
-        <li>Each one checked by a fresh verifier</li>
-        <li>Verified findings go to Backlog in the card format</li>
+        <li>Pulls feedback-icon items, agent-walk findings, Sentry, PostHog, GitHub, merged PRs and architecture</li>
+        <li>Redacts, merges repeats, and checks each with a fresh verifier</li>
+        <li>Triage files fixes to Ready and proposals to your digest</li>
       </ul>
     </div>
     <div class="step">
-      <div class="n">Rescope</div>
+      <div class="n">Rescope · a body of work</div>
       <h3><span class="cmd">/north-star</span> again, then <span class="cmd">/to-board</span></h3>
       <ul>
-        <li>Change the vision first, re-sign the postcard</li>
+        <li>Grill the change and write its exam, then sign the brief and re-sign the postcard if it moved</li>
         <li><span class="cmd">/to-board</span> updates the spec, files only new cards, and lists the ones to drop for you to close</li>
       </ul>
     </div>
@@ -281,6 +318,54 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
       </ul>
     </div>
   </div>
+</section>
+
+<section id="iterate">
+  <h2>Iterating</h2>
+  <p class="sub">After the first build, every change takes one of three tracks. What it touches picks the track, not what it's called: anything that touches a rule (<code>I1</code>…), the data model or more than one screen is a body of work.</p>
+  <div class="diagram" role="img" aria-label="Iteration: the feedback icon, the agent walk and real errors feed agent triage. A bug or tweak becomes a card in Ready, then the run. A proposal goes to your digest; if accepted, a body of work is grilled, gets an exam and a brief you sign, then the spec is updated and to-board cuts cards for the run. Every run ends with an agent walk, which feeds back into triage.">
+  <svg viewBox="0 0 980 250" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+    <g font-size="13">
+      <rect x="10" y="20" width="180" height="40" rx="6" fill="var(--panel)" stroke="var(--line)"/><text x="100" y="45" text-anchor="middle" fill="var(--fg)">feedback icon</text>
+      <rect x="10" y="80" width="180" height="40" rx="6" fill="var(--panel)" stroke="var(--line)"/><text x="100" y="105" text-anchor="middle" fill="var(--fg)">agent walk findings</text>
+      <rect x="10" y="140" width="180" height="40" rx="6" fill="var(--panel)" stroke="var(--line)"/><text x="100" y="165" text-anchor="middle" fill="var(--fg)">errors · analytics</text>
+      <path d="M190 40C220 40, 230 90, 252 96" fill="none" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#ar4)"/>
+      <path d="M190 100H252" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#ar4)"/>
+      <path d="M190 160C220 160, 230 110, 252 104" fill="none" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#ar4)"/>
+      <rect x="256" y="66" width="170" height="70" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="341" y="92" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">agent triage</text>
+      <text x="341" y="114" text-anchor="middle" fill="var(--fg)" font-size="12">redact · merge · route</text>
+      <path d="M426 86C450 86, 450 40, 476 40" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar4)"/>
+      <path d="M426 116C450 116, 450 170, 476 170" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar4)"/>
+      <text x="438" y="26" fill="var(--green)" font-size="12">fix it</text>
+      <text x="438" y="200" fill="var(--you)" font-size="12">propose it</text>
+      <rect x="480" y="16" width="250" height="50" rx="8" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="605" y="38" text-anchor="middle" fill="var(--accent)" font-weight="600">bug · tweak</text>
+      <text x="605" y="56" text-anchor="middle" fill="var(--fg)" font-size="12">card with a failing test or before/after</text>
+      <rect x="480" y="146" width="250" height="50" rx="22" fill="var(--you-soft)"/>
+      <text x="605" y="167" text-anchor="middle" fill="var(--you)" font-weight="600">you: accept or reject</text>
+      <text x="605" y="185" text-anchor="middle" fill="var(--you)" font-size="12">one digest, a recommendation each</text>
+      <path d="M605 196V214" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#ar4)"/>
+      <text x="612" y="210" fill="var(--muted)" font-size="11">accepted</text>
+      <rect x="480" y="216" width="250" height="30" rx="6" fill="var(--panel)" stroke="var(--accent)"/>
+      <text x="605" y="236" text-anchor="middle" fill="var(--fg)" font-size="12">body of work: grill, exam, brief, spec, /to-board</text>
+      <rect x="790" y="90" width="180" height="70" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="880" y="116" text-anchor="middle" font-family="var(--f-mono)" font-weight="600" fill="var(--accent)">/super-board run</text>
+      <text x="880" y="138" text-anchor="middle" fill="var(--fg)" font-size="12">ends with an agent walk</text>
+      <path d="M730 41C770 41, 770 100, 786 108" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar4)"/>
+      <path d="M730 231C775 231, 775 160, 786 146" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar4)"/>
+    </g>
+  </svg>
+  </div>
+  <div class="tablebox"><table>
+    <tr><th>Track</th><th>What it is</th><th>What it goes through</th><th>You</th></tr>
+    <tr><td>Bug</td><td>The app differs from the spec, a rule or the design baseline</td><td>Triage reproduces it and writes a card with a test that fails now. Then build, QA and review, like any card.</td><td>Nothing: the spec already decided what's right</td></tr>
+    <tr><td>Tweak</td><td>A look, copy or behaviour change on one screen, with no contract or data change</td><td>A card with before and after. QA's proof is the new screen beside the baseline, and the baseline updates on merge.</td><td>Only if it changes how the product behaves</td></tr>
+    <tr><td>Body of work</td><td>Anything that touches a rule, the data model or more than one screen, or is new</td><td>a. Grill it, including day-one questions<br>b. Write the exam: questions and expected answers<br>c. Write the brief: what, why, rules it changes, out of scope<br>d. A fresh Fable agent reviews the brief<br>e. You sign it<br>f. The spec is updated, then <span class="cmd">/to-board</span> cuts cards<br>g. The run, the agent walk, the exam on the real model, the report</td><td>Accept the proposal; sign the brief</td></tr>
+  </table></div>
+  <p><strong>Fix or propose.</strong> Triage fixes on its own only when the item points to the spec line, rule or baseline screen it breaks, touches one screen, changes no contract or data model, and isn't red zone. Everything else is proposed, and so is anything triage is unsure of. Auto-fix cards per run are capped, so a noisy week can't take over the board.</p>
+  <p><strong>Nothing leaves the app.</strong> The feedback icon saves to the app's own data folder, so an app that promises no outbound calls keeps that promise. Redaction happens on the factory side, before anything reaches GitHub.</p>
 </section>
 
 <section id="files">
@@ -326,6 +411,8 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td><code>docs/shape/coverage.md</code></td><td><span class="cmd">/to-board</span></td><td>lint, status, report</td><td>Editor; <span class="cmd">/super-board status</span> shows progress</td></tr>
     <tr><td>Cards</td><td><span class="cmd">/to-board</span>, super-collect</td><td>the board run</td><td>The GitHub Project board</td></tr>
     <tr><td><code>.claude/super-board/configs/*.json</code></td><td><span class="cmd">/super-board onboard</span></td><td>everything</td><td>Editor: milestone, budget, targets, models</td></tr>
+    <tr><td>Feedback items</td><td>The app's feedback icon</td><td><span class="cmd">/super-collect</span>, then triage</td><td>Saved in the app's own data folder; never sent by the app</td></tr>
+    <tr><td><code>docs/super-board/runs/</code></td><td>The run, the agent walk, the report</td><td>report, the retro, you</td><td>Run log, walk screenshots, exam scores, retro</td></tr>
     <tr><td><code>docs/shape/north-star-log.jsonl</code> · <code>docs/super-board/factory-log.jsonl</code></td><td>north-star · report <code>--log</code></td><td>report <code>--compare</code></td><td>One JSON line per run</td></tr>
   </table></div>
 </section>
@@ -366,10 +453,10 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   </div>
   <div class="tablebox"><table>
     <tr><th>Column</th><th>How a card gets here</th><th>What happens</th></tr>
-    <tr><td>Backlog</td><td>super-collect findings, splits, refused cards</td><td>Waits. Not part of a run until you move it to Ready.</td></tr>
-    <tr><td>Ready</td><td><span class="cmd">/to-board</span> after your scope review</td><td>Lint checks it. The planner admits it if it has ACs, a must-have and no file clash.</td></tr>
+    <tr><td>Backlog</td><td>super-collect findings, proposals waiting for you, splits, refused cards</td><td>Waits. Not part of a run until it moves to Ready: triage moves its fixes, you move accepted work.</td></tr>
+    <tr><td>Ready</td><td><span class="cmd">/to-board</span> after your scope review, or triage after the first build</td><td>Lint checks it. The planner admits it if it has ACs, a must-have and no file clash.</td></tr>
     <tr><td>Building</td><td>A wave picks it up</td><td>Its own worktree. Test first, smallest change, draft PR.</td></tr>
-    <tr><td>QA</td><td>Amber and red cards after Build</td><td>Every AC proven by a test; red adds invariant tests and a security pass.</td></tr>
+    <tr><td>QA</td><td>Amber and red cards after Build</td><td>Every AC proven by a test; screens checked side by side with the mock-up; red adds invariant tests and a security pass.</td></tr>
     <tr><td>Review</td><td>After QA, or straight from Build for green</td><td>Sonnet reviews (Opus on red), then the merge gate re-proves the branch and merges.</td></tr>
     <tr><td>Blocked</td><td>Round cap hit, or a step only you can do (🙋)</td><td>Last comment line says <code>blocked-by:</code> and what's needed.</td></tr>
     <tr><td>Done</td><td>Merged through the gate</td><td>Counts towards its must-have in <code>coverage.md</code>.</td></tr>
@@ -395,7 +482,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><th>Level</th><th>Done when</th><th>Checked by</th></tr>
     <tr><td>Card</td><td>Every AC ticked, each with a proof that names a file at the PR head, and the gate's own test run is green. Unmet AC → back to Build, or split into a new linked card.</td><td>Merge gate (exit 13 refuses)</td></tr>
     <tr><td>Must-have</td><td>Every card listed for it in <code>coverage.md</code> is Done.</td><td><code>super-board-coverage.py</code></td></tr>
-    <tr><td>Milestone</td><td>Every must-have done, and the Demo card walked the whole core loop against the mock-up. <span class="tag a">building now</span> Plus: an agent walks every screen of the real app with the real AI, each screen matches the mock-up, and every AI feature passes its exam.</td><td>Demo card · agent walk · report</td></tr>
+    <tr><td>Milestone</td><td>Every must-have done, and the Demo card walked the whole core loop, and the agent walk passed: every screen of the real app matches the mock-up, and every AI feature passed its exam on the real model.</td><td>Demo card · agent walk · report</td></tr>
     <tr><td>App</td><td>You use it and say yes to the postcard.</td><td>You</td></tr>
   </table></div>
 </section>
@@ -443,17 +530,17 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
   <div class="tablebox"><table>
     <tr><th>Zone</th><th>What QA does</th></tr>
     <tr><td><span class="tag g">green</span></td><td>No QA lane. The reviewer re-runs the tests and ticks each check that passed.</td></tr>
-    <tr><td><span class="tag a">amber</span></td><td>Every acceptance check proven by a passing test. The zone's bar: the scenario works in the real app, errors say what happened in one line, empty, loading and error states exist, inputs are validated where they enter, no data skips the safe write path. Plus the ticket's own edge cases.</td></tr>
+    <tr><td><span class="tag a">amber</span></td><td>Every acceptance check proven by a passing test. Every screen card: a screenshot of the app beside its mock-up section (or the baseline, after the first build), with every difference listed; an unaccepted difference fails it. The zone's bar: the scenario works in the real app, errors say what happened in one line, empty, loading and error states exist, inputs are validated where they enter, no data skips the safe write path. Plus the ticket's own edge cases.</td></tr>
     <tr><td><span class="tag r">red</span></td><td>All of amber, plus a test for each rule (<code>I1</code>…) the card touches, one deliberate break per guarded line to prove the test catches it, and the security pass.</td></tr>
   </table></div>
   <div class="tablebox"><table>
     <tr><th>Standard</th><th>What it means</th></tr>
     <tr><td>Cite or it's a note</td><td>A fail must point at a check (<code>AC2</code>), a rule (<code>I3</code>), a bar line, or a bug with steps to reproduce. Anything else is a note and doesn't send the card back.</td></tr>
     <tr><td>Proof is a file</td><td>Each ticked check names the test that proves it. "Looked fine" doesn't count; the merge gate refuses it.</td></tr>
-    <tr><td>Evidence stays local</td><td>Screenshots, logs and recordings go to <code>.claude/super-board/evidence/</code> (not committed). The PR gets a text table: check, result, proof.</td></tr>
+    <tr><td>Evidence stays local</td><td>Screenshots, logs and recordings go to <code>.claude/super-board/evidence/</code> (not committed). The PR gets a text table: check, result, proof. The QA comment shows each screen beside its mock-up, and review looks at the pair before passing.</td></tr>
     <tr><td>Stay in scope</td><td>A real problem outside the card becomes a new Backlog card; it doesn't fail this one.</td></tr>
     <tr><td>Round caps</td><td>Green 1, amber 2, red 3 tries. Then Blocked with "split, steer or ask".</td></tr>
-    <tr><td>The whole loop</td><td>The Demo card is the final QA: it walks the core loop end to end against the mock-up.</td></tr>
+    <tr><td>The whole loop</td><td>The Demo card walks the core loop end to end. Then the agent walk uses the real app with the real AI, screen by screen, and runs every AI exam. Its failures come back as feedback.</td></tr>
   </table></div>
   <p>Standalone: <span class="cmd">/super-qa &lt;url&gt;</span> crawls a live site with a real browser, records screenshots and logs, and files what it finds as plain-English issues.</p>
 </section>
@@ -464,7 +551,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><th>Lane</th><th>Model</th><th>When it changes</th></tr>
     <tr><td>Build, QA</td><td>Haiku</td><td>Sonnet for red cards and cards marked <code>Needs judgement: yes</code>. Nothing else moves up without your OK.</td></tr>
     <tr><td>Review</td><td>Sonnet</td><td>Opus (the session) on red cards. It's the quality gate.</td></tr>
-    <tr><td>AI exam, agent walk</td><td>Sonnet <span class="tag a">building now</span></td><td>Judging whether an app is useful and looks right needs more than Haiku.</td></tr>
+    <tr><td>AI exam, agent walk</td><td>Sonnet</td><td>Judging whether an app is useful and looks right needs more than Haiku.</td></tr>
     <tr><td>Classify, pre-flight</td><td>Haiku</td><td>—</td></tr>
   </table></div>
   <p>Many cards marked <code>Needs judgement</code> means the spec isn't finished. Fix the spec, not the model.</p>
@@ -478,7 +565,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td><span class="cmd">/super-board status</span></td><td>Board state, health, and the milestone line: <code>M1: 9/12 cards done · demo #20 not run</code></td><td>Any time</td></tr>
     <tr><td>Digest</td><td>Merges, breaches and questions for you</td><td>Only on a merge, breach or ask</td></tr>
     <tr><td>Health check</td><td>Round-capped cards, rounds per merge, budget burn against progress, factory failures</td><td>Every wave. A breach pauses new cards; budget asks you. Never halts.</td></tr>
-    <tr><td><span class="cmd">/super-board report</span></td><td>Days, cost against budget, first pass, rework, rounds, demo, postcard, each ✅ or ❌</td><td>End of a milestone</td></tr>
+    <tr><td><span class="cmd">/super-board report</span></td><td>Days, cost against budget, first pass, rework, rounds, demo, postcard, plus mock-up match, exam scores and walk pass rate, each ✅ or ❌</td><td>End of a milestone</td></tr>
     <tr><td><code>factory-log.jsonl</code></td><td>One line per app. <code>report --compare</code> shows whether the factory is improving.</td><td>After each report <code>--log</code></td></tr>
     <tr><td><code>north-star-log.jsonl</code></td><td>Questions, minutes, postcard attempts, blind match per idea</td><td>Every <span class="cmd">/north-star</span></td></tr>
   </table></div>
@@ -489,6 +576,9 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Rework</td><td>≤ 10%</td><td>Same as above</td></tr>
     <tr><td>Rounds per merge</td><td>≤ 1.5</td><td>Spec gaps; look at Needs judgement</td></tr>
     <tr><td>Demo passes first try</td><td>yes</td><td>Coverage gap or a contract mismatch between cards</td></tr>
+    <tr><td>Screens match the mock-up</td><td>all</td><td>A card lacked its mock-up section, or QA missed a difference</td></tr>
+    <tr><td>AI exams pass</td><td>each card's pass mark</td><td>The design can't answer day-one questions: thin context, or a rule that cripples it. Fix the spec, not the prompt.</td></tr>
+    <tr><td>Agent walk passes</td><td>every screen</td><td>Something works in tests but not for a user; its findings become cards</td></tr>
     <tr><td>Budget</td><td><code>goal.budget_usd</code></td><td>The factory asks: keep going, raise it, or stop</td></tr>
   </table></div>
 </section>
@@ -504,7 +594,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Small tasks</td><td><code>tasks.md</code></td><td>Cards with exact files, a pattern to copy, and test-first checks</td></tr>
     <tr><td>Rules that always hold</td><td>Spec Kit's constitution</td><td>Invariants <code>I1</code>… in <code>zones.yaml</code>, and the decision rights</td></tr>
     <tr><td>Traceability</td><td>requirement IDs</td><td><code>coverage.md</code>: every must-have has its cards</td></tr>
-    <tr><td>Verified against the spec</td><td>scenarios · checklists</td><td>QA by zone, the merge gate refusing unproven checks, the Demo card</td></tr>
+    <tr><td>Verified against the spec</td><td>scenarios · checklists</td><td>QA by zone, screens checked against the mock-up, the merge gate refusing unproven checks, the Demo card, the agent walk and AI exams</td></tr>
     <tr><td>The spec stays true</td><td>specs updated by each change</td><td>A card that changes a contract or the data model updates <code>spec.md</code> in the same PR; review blocks it if not</td></tr>
   </table></div>
   <p>What it adds for AI builders: every card is written so a cheap model can build it without guessing, the build is checked harder where data can be lost or leaked (zones), every card is test-first, and an independent review checks the spec before anything is built.</p>
@@ -524,57 +614,11 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Merge money, auth and destructive-schema PRs; run anything on a live database</td><td>A 🙋 card in Blocked</td></tr>
     <tr><td>Keep going, raise the budget, or stop</td><td>Budget breach in the digest</td></tr>
     <tr><td>Re-read the north star next morning</td><td>The day after signing</td></tr>
-    <tr><td>Accept or reject a proposal from triage</td><td>The proposals digest, after v1</td></tr>
+    <tr><td>Accept or reject a proposal from triage</td><td>The proposals digest, after the first build</td></tr>
+    <tr><td>Sign the brief for a body of work</td><td>Before its cards are cut</td></tr>
+    <tr><td>Click the feedback icon when something's off</td><td>Any time you use the app</td></tr>
   </table></div>
 </section>
-
-<section id="after-v1">
-  <h2>After v1: how changes flow <span class="tag a">building now</span></h2>
-  <p class="sub">Once the first version ships, every change takes one of three tracks. The size of what it touches picks the track, not its label. Agents do the legwork; you decide direction.</p>
-  <div class="tablebox"><table>
-    <tr><th>Track</th><th>What it is</th><th>What it goes through</th><th>You</th></tr>
-    <tr><td>Bug</td><td>The app differs from the spec or the design</td><td>Reproduce it, ticket it with a test that fails now, then build, QA and review</td><td>Nothing: the spec already decided what's right</td></tr>
-    <tr><td>Tweak</td><td>A look, copy or behaviour change on one screen, with no contract or data change</td><td>Ticket with before and after, then lanes. Proof is a screenshot next to the baseline.</td><td>Only if it changes how the product behaves</td></tr>
-    <tr><td>Body of work</td><td>Touches a rule (<code>I1</code>…), the data model, or more than one screen</td><td>Grill it with day-one questions, then the exam, the brief, Fable review, your signature, the spec, cards, a run, an agent walk and the report</td><td>Sign the brief</td></tr>
-  </table></div>
-  <p><strong>Feedback in one click.</strong> Every app the factory builds gets a small feedback icon. Click it and type: it captures the screen, the page, the state and recent logs, and you can mark up a screenshot if you want. The item is saved inside the app, with nothing sent anywhere. A factory command removes contact details, merges duplicates and files it to Backlog.</p>
-  <p><strong>Triage, not autopilot.</strong> An agent reads each item and decides:</p>
-  <ul>
-    <li><strong>Fix it</strong> when the item breaks a spec line, rule or mock-up screen it can point to, touches one screen, changes no data model and isn't red zone.</li>
-    <li><strong>Propose it to you</strong> otherwise, or whenever it's unsure. Proposals come in one digest, with a recommendation each.</li>
-    <li>You reject in one click, and the reason is kept.</li>
-  </ul>
-  <p><strong>Design truth after v1.</strong> The mock-up is frozen. Screenshots of the real app become the baseline that tweaks are checked against.</p>
-</section>
-
-<section id="lessons">
-  <h2>What the first app taught us</h2>
-  <p class="sub">funl M1 (Nov 2026): 28 of 28 cards merged, 92% first pass, 3% rework, 1.08 rounds per merge, $58 of $140. Every target met. Then the first real use found the AI agent near-useless and the screens far from the mock-up. A delivery success and a product miss: the factory built exactly what the cards said, and the cards weren't the product. Every miss becomes a default, so it can't happen twice.</p>
-
-  <p class="groupcap">Already added</p>
-  <div class="tablebox"><table>
-    <tr><th>Change</th><th>What it fixed</th></tr>
-    <tr><td>Cards go to lanes as files, and lane commands are single steps (#96)</td><td>A card mentioning a secrets file tripped the guard and halted a wave; chained commands asked you to approve constantly</td></tr>
-    <tr><td>Overlap counts only a card's Files list (#97)</td><td>"Pattern" and "Mock-up" references were treated as clashes, which serialised cards that could run together</td></tr>
-    <tr><td>Review on Sonnet, Opus on red</td><td>The same quality at a fraction of the cost on everyday cards</td></tr>
-    <tr><td>Merge size never blocks (cap 5000)</td><td>Splitting proven work just to stay small cost tokens and rounds</td></tr>
-    <tr><td>The foreman merges when a check refuses the lane</td><td>Merges waited for you to click a button you'd always click</td></tr>
-  </table></div>
-
-  <p class="groupcap">Building now <span class="tag a">remodel</span></p>
-  <div class="tablebox"><table>
-    <tr><th>Change</th><th>The miss it prevents</th></tr>
-    <tr><td>Spec review adds a capability pass: "can this design answer what the owner asks on day one?" It also flags any rule the north star never asked for (#107)</td><td>The spec invented rule I7 (one model round, results never reach the model), which crippled the agent. A page-only brain got signed.</td></tr>
-    <tr><td>UI cards carry their mock-up section's markup and classes, plus a "matches the mock-up" check. Mock-up features left out are listed (#104)</td><td>Screens were rebuilt instead of copied, and features were dropped silently</td></tr>
-    <tr><td>Every AI feature gets an exam of 10 day-one questions, run on the real model (#106)</td><td>Everything passed on the fake AI; the real agent said "I do not know" to the ABN</td></tr>
-    <tr><td>QA puts a screenshot of the app beside the mock-up for every UI card (#105)</td><td>Screenshots were taken but never compared with anything</td></tr>
-    <tr><td>At milestone end an agent walks the real app, and the report gains mock-up match, exam score and walk pass rate as targets (#108)</td><td>"Done" meant tests passed; the report measured only conformance to the cards</td></tr>
-    <tr><td>The three-track protocol (#102) and the feedback icon with triage (#103)</td><td>No path for changes after v1</td></tr>
-    <tr><td>Run fixes: close an issue left open after merge (#98), refresh stale worktrees (#99), demo cards run their own app (#100), count hand merges (#101), and more</td><td>Idle waves, false blocks, and a report that undercounted</td></tr>
-  </table></div>
-  <p>The lesson in one line: cards tuned so a cheap model never needs judgement push the judgement work (prompt design, context, visual fidelity) somewhere nobody checks. So the factory now checks it.</p>
-</section>
-
 <section id="skills">
   <h2>Skills</h2>
   <p class="sub">Installed into every app. The board runs some of them for you; type the rest.</p>
@@ -586,7 +630,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td><span class="cmd">/mockup</span></td><td>Right after the north star is signed, to feel the core loop.</td></tr>
     <tr><td><span class="cmd">/to-board</span></td><td>After the mock-up. Also after a north-star change (it rescopes). <code>--dry-run</code> to test.</td></tr>
     <tr><td><span class="cmd">/super-board</span></td><td><code>onboard</code> to set up or repair · <code>lint</code> before a run · <code>run</code> · <code>status</code> · <code>stop</code> · <code>report</code></td></tr>
-    <tr><td><span class="cmd">/super-collect</span></td><td>After real use: turn errors, rage clicks and repeated PR fixes into Backlog cards.</td></tr>
+    <tr><td><span class="cmd">/super-collect</span></td><td>After real use: files feedback-icon items and agent-walk findings, turns errors, rage clicks and repeated PR fixes into cards, and runs triage.</td></tr>
     <tr><td><span class="cmd">/git-sync</span></td><td>Commit, pull and push the current branch. Never force pushes.</td></tr>
   </table></div>
 
