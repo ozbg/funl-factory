@@ -118,4 +118,19 @@ echo "$OUT10" | jq -e '.["61"].verdict == "sequence" and .["61"].tag == "overlap
 echo "$OUT10" | jq -e '.["62"].verdict == "proceed" and (.["60"] | has("_files") | not)' >/dev/null \
   || fail "#62 is clean and no internal _files leaks: $OUT10"
 
-echo "PASS: test-preflight.sh (10 scenarios)"
+# 11 — only `**Files:**` lists overlap (#95). #71's Pattern and Mock-up name files #70
+#      changes: those are read-only references, so #71 is not sequenced. #72 lists one
+#      of #70's files in its own Files line, so it still waits behind #70.
+issue 70 "Prospects list screen" $'## Context\n- **Files:** web/src/screens/Prospects.tsx, server/routes/prospects.ts, `web/src/screens/Prospects.test.tsx`\n- **Mock-up:** docs/shape/mockup.html#screen-prospects\n'"$AC"
+issue 71 "Prospect detail screen" $'## Context\n- **Files:** web/src/screens/ProspectDetail.tsx, server/routes/prospect-detail.ts\n- **Pattern:** web/src/screens/Prospects.tsx\n- **Mock-up:** docs/shape/mockup.html#screen-prospect\n- Pattern: server/routes/prospects.ts\n'"$AC"
+issue 72 "Prospects filter" $'## Context\n- **Files:** server/routes/prospects.ts, web/src/screens/ProspectFilter.tsx\n- **Pattern:** web/src/screens/Prospects.tsx\n'"$AC"
+OUT11=$(run --issues 70,71,72)
+echo "$OUT11" | jq -e '.["70"].verdict == "proceed"' >/dev/null || fail "#70 must proceed: $OUT11"
+echo "$OUT11" | jq -e '.["71"].verdict == "proceed" and .["71"].blockedBy == []' >/dev/null \
+  || fail "#71 only references #70's files (Pattern, Mock-up): it must not be sequenced: $OUT11"
+echo "$OUT11" | jq -e '.["72"].verdict == "sequence" and .["72"].blockedBy == [70]' >/dev/null \
+  || fail "#72 lists server/routes/prospects.ts in Files like #70: it must wait behind #70: $OUT11"
+echo "$OUT11" | jq -e '.["72"].evidence | any(test("server/routes/prospects.ts")) and (any(test("Prospects.tsx")) | not)' >/dev/null \
+  || fail "#72's evidence must name only the shared Files entry: $OUT11"
+
+echo "PASS: test-preflight.sh (11 scenarios)"

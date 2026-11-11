@@ -436,6 +436,7 @@ const preflightPrompt = (batch) => [
   `Other cards in this wave: ${JSON.stringify(input.cards.map(({ number, status, title }) => ({ number, status, title })))}`,
   `Run .claude/bin/super-board-preflight.sh once for the whole batch, then judge its candidates semantically.`,
   `hold / sequence-behind → post the Block template (block-template.md) and move the card to Blocked yourself.`,
+  `Overlap means two cards' **Files:** lists (or an open PR's changed files and a card's Files) share a path. Pattern: and Mock-up: paths are read-only references and never count as overlap.`,
   `Two Ready cards overlapping each other with no open PR: the lower-numbered one proceeds; sequence only the other, blockedBy [the lower]. Never both.`,
   `A sequence with nothing to wait on (empty blockedBy) leaves the card in Ready: return column Ready and it builds.`,
   BOARD_IO(),
