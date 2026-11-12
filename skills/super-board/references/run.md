@@ -151,9 +151,16 @@ Before planning any wave, `super-board-wave-plan.sh` reports five lists the orch
   Move it to **Review** and remove stale `needs-you:done` display labels. The Reviewer
   reviews the new code and lets the gate produce a new pinned request, then returns
   it to **Blocked** for a fresh human reply. This is not an approved resume.
-- **`flag`** — cards whose `## Blocked by` section could not be parsed. Leave them where they are
-  and comment asking for the line to be fixed, quoting the `why`. Never guess: a card treated as
-  free on an unreadable line gets built against a base that does not have what it needs.
+- **`flag`** — cards with a ticket gap the planner will not guess past. The `why` names which:
+  a `## Blocked by` section that could not be parsed; an AC `— test: <path>` that is not on the
+  base branch and sits outside the project's test include globs, so no test run would run it; or
+  an open blocker that is not on the project board, so nothing will ever move it. Leave the card
+  where it is and comment asking for the fix, quoting the `why`. Never guess: a card treated as
+  free on an unreadable line gets built against a base that does not have what it needs. A card
+  flagged for its AC test is not built until the path or the runner config is fixed.
+- **`refused`** — Ready cards that fail the ticket gate (no ACs, no `Files:` line, a missing or
+  unlisted `Must-have served:`). They go to **Backlog** with a comment naming the missing field,
+  and are never dispatched (run-workflow.md → "Refused cards").
 
 **Why the sweep exists.** `Blocked` used to be terminal. A card parked naming the issue it waited
 for, that issue later merged, and nothing ever read the note back — the run's own done-condition

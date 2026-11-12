@@ -201,15 +201,66 @@ echo "$OUT20B" | jq -e '[.cards[].number] == [35] and (.refused | all(.number ==
   || fail "no north star: every non-bug card refused naming the file, got: $OUT20B"
 
 # 21 — overlap. Two cards sharing a path prefix never land in one wave; a card
-#      with no Files: line overlaps everything; in-flight cards pick first.
+#      in-flight cards pick first. A card with no Files: line is refused at the
+#      gate (scenario 24), so it never reaches the overlap pass.
 O_ITEMS=$(jq -n '{items: [{status:"Review", content:{type:"Issue", number:40, title:"r", assignees:[]}}]
                   + [range(41;45) as $n | {status:"Ready", content:{type:"Issue", number:$n, title:"c\($n)", assignees:[]}}]}')
 O_DEPS=$(jq -n '{"40":{files:["src/api/"]}, "41":{files:["src/api/users.ts"]}, "42":{files:["docs/a.md"]},
                  "43":{files:["docs/"]}, "44":{}}
                 | map_values(. + {runnable:true, parseable:true, blockers:[], acs:1, mustHave:[1]})')
 OUT21=$("$PLAN" --config <(echo "$NOCAP") --items <(echo "$O_ITEMS") --deps <(echo "$O_DEPS"))
-echo "$OUT21" | jq -e '[.cards[].number] == [40,42] and ([.deferred[] | [.number, .reason]] == [[41,"overlap"],[43,"overlap"],[44,"overlap"]])' >/dev/null \
-  || fail "overlap: expected cards [40,42], deferred 41 43 44, got: $OUT21"
+echo "$OUT21" | jq -e '[.cards[].number] == [40,42] and ([.deferred[] | [.number, .reason]] == [[41,"overlap"],[43,"overlap"]])' >/dev/null \
+  || fail "overlap: expected cards [40,42], deferred 41 43, got: $OUT21"
+
+# 24 — a Ready card with no `Files:` line is REFUSED, not deferred as "overlap"
+#      (FunlOS-factory #155 sat 4 waves as a look-alike file clash). Same path as a
+#      missing Must-have; an empty Files line counts as none. #44 above is that card.
+echo "$OUT21" | jq -e '[.refused[] | [.number, .reason]] == [[44, "no `Files:` line"]] and ([.deferred[].number] | index(44) == null)' >/dev/null \
+  || fail "no Files line: #44 must be refused, never deferred, got: $OUT21"
+OUT24=$("$PLAN" --config <(echo "$NOCAP") --items <(echo "$O_ITEMS") --deps <(echo "$O_DEPS" | jq '.["44"].files = []'))
+echo "$OUT24" | jq -e '[.refused[].reason] == ["no `Files:` line"]' >/dev/null || fail "an empty Files line is no Files line: $OUT24"
+
+# 25 — AC test paths. The project is a git repo on main with vitest's include
+#      limited to tests/api/**/*.test.ts and one real test there. A path outside
+#      the include (and not on main) is flagged naming the path; a NEW file inside
+#      the include is not (a builder may create it); an existing file is not, even
+#      outside the include; a complete card plans as before. The card with the bad
+#      path is not built.
+T_REPO="$TMPDIR_GOAL/trepo"; mkdir -p "$T_REPO/docs/shape" "$T_REPO/tests/api" "$T_REPO/tests/unit"
+cp "$REPO/docs/shape/north-star.md" "$T_REPO/docs/shape/"
+printf "import { defineConfig } from 'vitest/config'\nexport default defineConfig({\n  test: { include: ['tests/api/**/*.test.ts'], coverage: { include: ['src/**'] } },\n})\n" > "$T_REPO/vitest.config.ts"
+echo x > "$T_REPO/tests/api/exists.test.ts"; echo x > "$T_REPO/tests/unit/old.test.ts"
+git -C "$T_REPO" init -q -b main && git -C "$T_REPO" add -A && git -C "$T_REPO" -c user.email=t@t -c user.name=t commit -q -m base
+T_ITEMS=$(jq -n '{items: [range(70;75) as $n | {status:"Ready", content:{type:"Issue", number:$n, title:"c\($n)", assignees:[]}}]}')
+T_DEPS=$(jq -n '{"70":{acTests:["tests/ai-tier.test.ts"]}, "71":{acTests:["tests/api/new-thing.test.ts"]},
+                 "72":{acTests:["tests/api/exists.test.ts"]}, "73":{acTests:["tests/unit/old.test.ts"]}, "74":{acTests:[]}}
+                | map_values(. + {runnable:true, parseable:true, blockers:[], acs:1, mustHave:[1]}) | with_entries(.value.files = ["t\(.key)/"])')
+TCFG=$(echo "$NOCAP" | jq --arg r "$T_REPO" '.repo.path = $r | .ramp.stage = 5')
+OUT25=$("$PLAN" --config <(echo "$TCFG") --items <(echo "$T_ITEMS") --deps <(echo "$T_DEPS"))
+echo "$OUT25" | jq -e '[.flag[].number] == [70]' >/dev/null || fail "only #70 (outside the include, not on main) is flagged: $OUT25"
+echo "$OUT25" | jq -e '.flag[0].why | contains("tests/ai-tier.test.ts") and contains("include globs") and contains("tests/api/**/*.test.ts")' >/dev/null \
+  || fail "the flag must name the path and the globs: $(echo "$OUT25" | jq -c .flag)"
+echo "$OUT25" | jq -e '([.cards[].number] | sort) == [71,72,73,74] and (.refused | length) == 0' >/dev/null \
+  || fail "new in-glob file (#71), existing files (#72 #73) and no test path (#74) plan as before; #70 not built: $OUT25"
+# Runner config missing or unreadable: skip, never guess.
+rm "$T_REPO/vitest.config.ts"
+OUT25B=$("$PLAN" --config <(echo "$TCFG") --items <(echo "$T_ITEMS") --deps <(echo "$T_DEPS"))
+echo "$OUT25B" | jq -e '(.flag | length) == 0 and ([.cards[].number] | index(70)) != null' >/dev/null || fail "no runner config must skip the check: $OUT25B"
+printf "export default { test: { include: [...base.include, 'x'] } }\n" > "$T_REPO/vitest.config.ts"
+OUT25C=$("$PLAN" --config <(echo "$TCFG") --items <(echo "$T_ITEMS") --deps <(echo "$T_DEPS"))
+echo "$OUT25C" | jq -e '(.flag | length) == 0' >/dev/null || fail "an unreadable include must skip the check: $OUT25C"
+
+# 26 — a Blocked-by issue that is open but not on the project board is flagged:
+#      nothing will ever move it. One on the board, or closed, is not.
+B_ITEMS=$(jq -n '{items: [{status:"Ready", content:{type:"Issue", number:80, title:"on", assignees:[]}},
+                          {status:"Ready", content:{type:"Issue", number:81, title:"off", assignees:[]}},
+                          {status:"Building", content:{type:"Issue", number:82, title:"blocker on board", assignees:["x"]}},
+                          {status:"Blocked", content:{type:"Issue", number:83, title:"closed blocker", assignees:[]}}]}')
+B_DEPS=$(jq -n '{"80":{blockers:[82],openBlockers:[82]}, "81":{blockers:[99],openBlockers:[99]}, "83":{blockers:[7],openBlockers:[]}}
+                | map_values(. + {runnable:false, parseable:true, acs:1, mustHave:[1], files:["b/"]})')
+OUT26=$("$PLAN" --config <(echo "$NOCAP") --items <(echo "$B_ITEMS") --deps <(echo "$B_DEPS"))
+echo "$OUT26" | jq -e '[.flag[].number] == [81] and (.flag[0].why | contains("#99") and contains("not on the project board"))' >/dev/null \
+  || fail "only #81 (open #99 off the board) is flagged naming #99: $OUT26"
 
 # 22 — ramp. Lanes never exceed ramp.stage or max_workers, whichever is lower;
 #      goal.foundation forces 1; no ramp key means stage 1; stages 4–6 widen (factory #92);
@@ -238,4 +289,4 @@ OUT23=$("$PLAN" --config <(echo "$NOCAP" | jq '.ramp.stage = 3') --items <(echo 
 echo "$OUT23" | jq -e '([.cards[] | {(.number|tostring): .judgement}] | add) == {"60":true,"61":false}' >/dev/null \
   || fail "judgement per card: $OUT23"
 
-echo "PASS: test-wave-plan.sh (23 scenarios)"
+echo "PASS: test-wave-plan.sh (26 scenarios)"

@@ -53,7 +53,10 @@
 # with a one-line reason; the orchestrator moves them to Backlog. The wave is
 # capped at min(max_workers, ramp.stage); goal.foundation forces 1. In-flight
 # cards go first; a Ready card whose `Files:` prefixes overlap a picked card is
-# `deferred` (no `Files:` line overlaps everything).
+# `deferred`. A card with no `Files:` line is `refused` ("no `Files:` line"): unknown
+# files would overlap everything and defer it every wave. A Ready card whose AC
+# `— test: <path>` the runner never runs, or whose open blocker is not on the
+# board, goes to `flag` (left in Ready, not built) with the reason.
 #
 # Usage:
 #   super-board-wave-plan.sh --config <config.json> [--items <project-items.json>]
@@ -144,17 +147,181 @@ else
     rc=$?; echo "could not derive the dependency graph for ${REPO}" >&2; exit "$rc"; }
 fi
 
+# AC test paths the project's runner would never run. For each Ready card's
+# `— test: <path>` ACs (deps `acTests`): a path on the base branch is fine; a path
+# that is not there yet is fine when it sits inside the runner's literal include
+# globs (a builder may create it, so a NEW test file in an include glob is never
+# flagged); a path outside every glob is flagged. Globs come from a literal
+# `include` (vitest), `testMatch` (jest) or `testDir`/`testMatch` (playwright) in
+# the config at the repo root. No runner config, or one not readable as literals
+# (spread, variable, regex), means the check is skipped: never guess.
+BASE_BRANCH=$(echo "$CONFIG_JSON" | jq -r '.base_branch // "main"')
+TEST_PAIRS=$(jq -n -c --argjson items "$ITEMS" --argjson deps "$DEPS" \
+  '[ $items.items[] | select(.status == "Ready" and .content.type == "Issue")
+     | .content.number as $n | { n: $n, t: ($deps[($n | tostring)].acTests // []) }
+     | select(.t | length > 0) ]')
+test_flags() { python3 - <<'PYEOF'
+import json, os, re, subprocess, sys
+
+repo, base = os.environ.get("SB_REPO_PATH", "."), os.environ["SB_BASE"]
+pairs = json.loads(os.environ["SB_PAIRS"])
+JS = ["ts", "mts", "cts", "js", "mjs", "cjs"]
+
+def norm(p):
+    return re.sub(r"^(\./)+", "", p)
+
+def read(name):
+    try:
+        with open(os.path.join(repo, name), encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
+
+def config(prefix, exts):
+    for e in exts:
+        src = read("%s.%s" % (prefix, e))
+        if src is not None:
+            return "%s.%s" % (prefix, e), src
+    return None, None
+
+def strip_block(src, key):
+    # Drop key: { ... } so coverage.include is not read as test.include.
+    while True:
+        m = re.search(r"\b%s\s*:\s*\{" % key, src)
+        if not m:
+            return src
+        i, depth = m.end(), 1
+        while i < len(src) and depth:
+            depth += {"{": 1, "}": -1}.get(src[i], 0)
+            i += 1
+        src = src[:m.start()] + src[i:]
+
+def literal(src, key):
+    # [] of strings after key:; None when the key is absent, False when not plain literals.
+    m = re.search(r"\b%s\s*:\s*(\[[^\]]*\]|['\"\x60][^'\"\x60]*['\"\x60])" % key, src)
+    if not m:
+        return None if not re.search(r"\b%s\s*:" % key, src) else False
+    body = m.group(1).strip()
+    parts = body[1:-1].split(",") if body.startswith("[") else [body]
+    out = []
+    for p in parts:
+        if not p.strip():
+            continue
+        s = re.match(r"""^\s*(['"\x60])([^'"\x60$]*)\1\s*$""", p)
+        if not s:
+            return False
+        out.append(s.group(2))
+    return out
+
+globs, used, unreadable = [], [], False
+
+name, src = config("vitest.config", JS)
+if src is not None:
+    v = literal(strip_block(src, "coverage"), "include")
+    if v is None:
+        v = ["**/*.{test,spec}.?(c|m)[jt]s?(x)"]  # vitest's documented default
+    if v is False:
+        unreadable = True
+    else:
+        globs += v; used.append(name)
+
+name, src = config("jest.config", JS)
+if src is not None:
+    v = literal(src, "testMatch")
+    if not v:  # absent (default too broad to judge), regex or non-literal
+        unreadable = True
+    else:
+        globs += v; used.append(name)
+
+name, src = config("playwright.config", JS)
+if src is not None:
+    d, m = literal(src, "testDir"), literal(src, "testMatch")
+    if not d or len(d) != 1 or m is False:
+        unreadable = True
+    else:
+        d = norm(d[0].strip()).rstrip("/")
+        for p in (m or ["**/*.@(spec|test).?(c|m)[jt]s?(x)"]):
+            p = norm(p)
+            p = p if "/" in p else "**/" + p
+            globs.append((d + "/" if d else "") + p)
+        used.append(name)
+
+if unreadable or not globs:
+    print("{}"); sys.exit(0)  # unknown runner config: skip, never guess
+
+def to_regex(g):
+    out, i, stack = "", 0, []
+    while i < len(g):
+        c = g[i]
+        if g.startswith("**/", i):
+            out += "(?:.*/)?"; i += 3; continue
+        if g.startswith("**", i):
+            out += ".*"; i += 2; continue
+        if g[i:i + 2] in ("?(", "@(", "*("):
+            stack.append("?" if c == "?" else ("*" if c == "*" else "")); out += "(?:"; i += 2; continue
+        if c in "{(":
+            stack.append(""); out += "(?:"
+        elif c in "})":
+            out += ")" + (stack.pop() if stack else "")
+        elif c in ",|":
+            out += "|"
+        elif c == "*":
+            out += "[^/]*"
+        elif c == "?":
+            out += "[^/]"
+        elif c == "[":
+            k = g.find("]", i)
+            if k < 0:
+                out += r"\["
+            else:
+                out += g[i:k + 1]; i = k + 1; continue
+        else:
+            out += re.escape(c)
+        i += 1
+    return re.compile("^" + out + "$")
+
+regs = [to_regex(g) for g in globs]
+
+def on_base(path):
+    for ref in ("origin/" + base, base):
+        if subprocess.run(["git", "-C", repo, "rev-parse", "--verify", "-q", ref + "^{commit}"],
+                          capture_output=True).returncode == 0:
+            return subprocess.run(["git", "-C", repo, "cat-file", "-e", ref + ":" + path],
+                                  capture_output=True).returncode == 0
+    return os.path.exists(os.path.join(repo, path))  # no git ref: the working tree
+
+flags = {}
+for p in pairs:
+    bad = [t for t in (norm(x) for x in p["t"])
+           if not on_base(t) and not any(r.match(t) for r in regs)]
+    if bad:
+        flags[str(p["n"])] = ("AC cites " + ", ".join("\x60%s\x60" % t for t in bad) + ", not on " + base
+                              + " and outside the test include globs (" + ", ".join(globs) + ") of "
+                              + ", ".join(used) + ", so the runner never runs it")
+print(json.dumps(flags))
+PYEOF
+}
+TESTFLAGS=$(SB_BASE="$BASE_BRANCH" SB_PAIRS="$TEST_PAIRS" test_flags)
+
+# Open `## Blocked by` issues that are not on the project board: nothing will ever
+# move them, so a card waiting on one waits forever. Reported in `flag`.
+BOARD_NUMBERS=$(echo "$ITEMS" | jq -c '[ .items[] | select(.content.type == "Issue") | .content.number ]')
+
 # Review extras used to be gated behind human_approves_merge, because concurrent
 # auto-merges into one base branch race. That guard now lives where the race
 # actually is — the merge step takes a lock inside the wave workflow and the
 # freshness gate re-verifies under it — so reviews may run in parallel here.
 echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$CAP" --argjson deps "$DEPS" --arg goal "$GOAL" \
-                  --argjson must "$MUST" '
+                  --argjson must "$MUST" --argjson tf "$TESTFLAGS" --argjson board "$BOARD_NUMBERS" '
   def dep($n): $deps[($n | tostring)];
   # One-line reason a Ready card is refused, or "" when admitted.
   def refusal:
     dep(.number) as $d
     | ( if ($d.acs // 0) == 0 then "no Acceptance Criteria checkboxes" else empty end ),
+      # No `Files:` line (or an empty one): the card cannot be placed against the
+      # others, and unknown files overlap everything, so it would be deferred
+      # forever as a look-alike file clash. Refused like a missing must-have.
+      ( if (($d.files // []) | length) == 0 then "no `Files:` line" else empty end ),
       ( if (.labels | index("bug") or index("qa")) then empty
         elif $must == null then "docs/shape/north-star.md missing, so no must-have can be served"
         elif ($d.mustHave // []) == [] then "no `Must-have served:` line"
@@ -195,7 +362,8 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$CAP" --argjson deps
   # Ready: only the ones the graph says are actually free, then the gate.
   | [ $all[] | select(.status == "Ready") | select(free(.number)) | select(on_goal)
       | . + { reason: ([ refusal ] | join("; ")) } ] as $gated
-  | [ $gated[] | select(.reason == "") | del(.reason) ] as $ready
+  # A card flagged for an AC test the runner never runs stays in Ready, unbuilt.
+  | [ $gated[] | select(.reason == "") | select($tf[(.number | tostring)] == null) | del(.reason) ] as $ready
   # Free but not on the goal: reported so the report can say what is waiting, never run.
   | [ $all[] | select(.status == "Ready") | select(free(.number)) | select(on_goal | not)
       | { number, title, milestone } ] as $offgoal
@@ -235,10 +403,21 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$CAP" --argjson deps
 
       # Cards the graph could not read. Left where they are, reported so the
       # orchestrator can ask for the line to be fixed.
-      flag:  [ $all[]
+      # Also flagged, one entry per card with the reasons joined: a Ready card whose
+      # AC cites a test path the runner never runs, and a Ready/Blocked card waiting
+      # on an open issue that is not on the project board.
+      flag:  ( [ $all[]
                | select(.status as $s | ["Ready","Blocked"] | index($s))
-               | select(dep(.number) != null and (dep(.number).parseable | not))
-               | { number, title, why: (dep(.number) | .why) } ],
+               | . as $c | dep(.number) as $d
+               | { number, title,
+                   why: ( [ ( if $d != null and ($d.parseable | not) then $d.why else empty end ),
+                            ( if .status == "Ready" and $tf[(.number | tostring)] != null
+                              then $tf[(.number | tostring)] else empty end ),
+                            ( [ ($d.openBlockers // [])[] | select(. as $b | $board | index($b) | not) ] as $off
+                              | if ($off | length) > 0
+                                then "waits on open \($off | map("#\(.)") | join(", ")), not on the project board, so nothing will ever move it"
+                                else empty end ) ] | join("; ") ) }
+               | select(.why != "") ] ),
 
       # Building with no claim between waves = no live worker. Back to Ready.
       stranded: [ $all[] | select(.status == "Building") | { number, title } ] }'

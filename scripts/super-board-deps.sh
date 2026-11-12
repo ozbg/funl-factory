@@ -46,12 +46,14 @@
 #             "parseable": true, "humanGated": false, "runnable": false, "why": "",
 #             "needsYou": false, "needsYouDone": false,
 #             "acs": 3, "mustHave": [1,3], "files": ["src/a/","docs/x.md"],
-#             "judgement": false } }
+#             "acTests": ["tests/a.test.ts"], "judgement": false } }
 #
 # Card lines the wave planner gates on (ticket-format.md):
 # `acs` — `- [ ]` / `- [x]` lines under the last `## Acceptance Criteria`.
 # `mustHave` — numbers on the last `Must-have served:` line; null with no line.
 # `files` — comma-separated path prefixes on the last `Files:` line; null with no line.
+# `acTests` — the path on each AC line ending `— test: <path>` (backticks, a trailing
+# `::name` and punctuation stripped); [] when no AC cites a path.
 # `judgement` — true when the last `Needs judgement:` line starts with `yes` (any case).
 #
 # `needsYou` — the newest Block comment carries the 🙋 reason tag, or the issue
@@ -222,6 +224,12 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
           files: ( ($i.body // "") | card_line("Files")
                    | if . == null then null
                      else [ split(",")[] | gsub("^[ \t`]+|[ \t`]+$"; "") | select(. != "") ] end ),
+          acTests: ( ($i.body // "") | under("Acceptance Criteria")
+                     | map(select(test("^[ \t]*- \\[[ xX]\\]")))
+                     | [ .[] | capture("[—–-][ \t]*test:[ \t]*`?(?<p>[^ \t`),;]+)"; "i")?
+                             | .p | sub("::.*$"; "") | sub("[.]$"; "")
+                             | select(test("^[A-Za-z0-9_./@\\[\\]-]+$") and test("[.]")) ]
+                     | unique ),
           judgement: ( ($i.body // "") | card_line("Needs judgement")
                        | . != null and test("^[ \t]*yes([^a-zA-Z]|$)"; "i") ) }
     ]
