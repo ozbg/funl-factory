@@ -145,6 +145,10 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ verification commands: preserve valid `verify_commands`; otherwise inspect the owning
    │    project's documented checks and stage those commands. Unresolved checks are a setup
    │    halt. Never save placeholders or invent a universal runner.
+   │    A new app mid-Define (`docs/shape/north-star.md` exists, no app manifest such as
+   │    package.json, pyproject.toml, go.mod or Cargo.toml) has no code and no checks yet:
+   │    stage `verify_commands: []`, say in one line "Checks are set at /to-board, once the
+   │    spec picks the stack.", and never report it as a failure (DONE, self-check).
    ├─ project verifier: detect `.agents/skills/verify-*/SKILL.md` and feature maps.
    │    For creation or upkeep read `../../super-qa/references/project-verifier.md`;
    │    stage real project checks only when source names accepted features. Optional
@@ -238,6 +242,8 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    └─ bot_identity: new board with a machine account → bot username; existing board → keep its
       configured claim identity. Otherwise `super-board-bot[bot]` when a GitHub App is installed
       on the repo, else the login. Stage `notifications.bot_identity` for step 8; see second-account.md.
+      Stage `notifications.owner_name` too: the repo owner's GitHub name
+      (`gh api users/<owner> --jq '.name // .login'`); an existing value is kept.
 
 3. 🗂️ BOARD — one question: which board
    ├─ One checklist line, one labels line, no question about either:
@@ -310,10 +316,11 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
     a. "Merge" — "Who merges a change that passes review?" [Robot merges normal changes
        (Recommended) / I merge everything]; production base: the order flips, and robot-merges
        sets merge_policy.allow_auto_on_production: true (run.md's guard needs it).
-       → merge_policy.default "auto" | "human"; auto_max_lines 600 source lines (tests,
+       → merge_policy.default "auto" | "human"; auto_max_lines 5000 source lines (tests,
          lockfiles, generated, snapshots, migration SQL not counted; over it → a deeper
          review, not you, unless the tier is red); always_human = schema defaults (money,
-         auth, destructive schema). A matching PR parks in Blocked with 🙋.
+         auth, destructive schema). A matching PR parks in Blocked with 🙋. Card size is
+         separate: `card_max_lines` 600, the yardstick for lint and the Builder pre-flight.
     b. "Push guard" — "Block pushing straight to main?" [Yes (Recommended for a repo with
        commits) / No]. Skipped when settings.json already wires guard-protected-push.py. Script
        missing (--no-hooks install) → record the answer and say: "Run ./install.sh --no-hooks
@@ -383,13 +390,16 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    ├─ .claude/super-board/configs/<slug>.json (committed): description, project, target
    │    │    {type: repo | repo+url}, repo, base_branch, timezone, columns (the seven), labels,
    │    │    paths, merge_policy, migrations, collect (incl. custom), notifications {channel:
-   │    │    "session", bot_identity}, worker_backend "workflow", host (always: `bash $SB/super-board-host.sh`;
-   │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks), model defaults
-   │    │    `lane_models_by_tier: {"red": {"build": "sonnet", "qa": "sonnet"}}` and
+   │    │    "session", bot_identity, owner_name}, worker_backend "workflow", host (always: `bash $SB/super-board-host.sh`;
+   │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks, or
+   │    │    `[]` for a new app mid-Define), `card_max_lines: 600`, wave width `ramp: {"stage": 3}`,
+   │    │    model defaults `lane_models: {"review": "sonnet"}`,
+   │    │    `lane_models_by_tier: {"red": {"build": "sonnet", "qa": "sonnet", "review": "session"}}` and
    │    │    `lane_models_judgement: {"build": "sonnet", "qa": "sonnet"}`, and report targets
     │    `targets: {"days_per_app": 2, "first_pass_pct": 70, "rework_pct": 10,
     │    "rounds_per_merge": 1.5, "demo_first_try": true, "exam_pass": true, "screens_match": 100,
-    │    "walk_pass": 100}` (kept when already set). No `variant`.
+    │    "walk_pass": 100}`. Each default here (merge cap, card cap, ramp, models, targets) is
+    │    for a new config only: a value already set is kept on re-run. No `variant`.
    │    ├─ .claude/super-board/active ← <slug>
    │    ├─ .gitignore += .claude/super-board/active, onboard-answers.json, onboard-staged/,
    │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/super-board/)
@@ -405,6 +415,8 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
 
 DONE — run `python3 $SB/super-board-verification-ready.py --config <saved config>`;
       exit 9 reports setup incomplete (repair checks before run; do not reinstall/rebase).
+      A new app mid-Define expects exit 9 here: no failure, just the one-line note that
+      checks are set at /to-board.
       Then self-check, then the ONE place that names the next command:
       ⏺ Bash(self-check)  ⎿  all good
       ⏺ 🎉 Onboard complete.
@@ -636,13 +648,13 @@ remove a pending recovery record; use its saved state to reconcile a conflict be
 ## Worker self-check (mandatory before the 🎉 screen)
 
 1. **Config validates** — `.claude/super-board/configs/<slug>.json` parses, has every required
-   field from `config-schema.json` (incl. `notifications.bot_identity`, `merge_policy`,
+   field from `config-schema.json` (incl. `notifications.bot_identity`, `notifications.owner_name`, `merge_policy`,
    `migrations`), has no `variant`, and `columns` is the seven.
 2. **Active pointer** — `.claude/super-board/active` holds exactly the slug + `\n`.
 3. **Board columns and labels** — `gh project field-list <n> --owner <o>` returns Backlog, Ready,
    Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature.
 4. **Setup green** — `python3 .claude/bin/super-board-setup.py check` exits 0 (or only `needs`
-   the user declined).
+   the user declined, or only the `verify_commands` line on a new app mid-Define).
 5. **Workflow runtime** — the step-1 `node --check` passes.
 
 When step 5 wrote files: `super-board-agents-md.py check --file AGENTS.md` passes and `detect`

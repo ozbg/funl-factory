@@ -99,9 +99,9 @@ MAX_WORKERS=$(echo "$CONFIG_JSON" | jq -r '.max_workers // 0')
 # The run's goal (factory #40): a milestone title. Set, only its Ready cards run;
 # in-flight cards always finish. Empty = no goal filter (old behaviour).
 GOAL=$(echo "$CONFIG_JSON" | jq -r '.goal.milestone // ""')
-# Ramp: lanes never exceed ramp.stage (1–3); a foundation goal runs one at a time.
+# Ramp: lanes never exceed ramp.stage (1–6, the owner's call); a foundation goal runs one at a time.
 STAGE=$(echo "$CONFIG_JSON" | jq -r 'if .goal.foundation == true then 1 else (.ramp.stage // 1) end')
-case "$STAGE" in 1|2|3) ;; *) echo "invalid ramp.stage in config: ${STAGE} (1, 2 or 3)" >&2; exit 65 ;; esac
+case "$STAGE" in 1|2|3|4|5|6) ;; *) echo "invalid ramp.stage in config: ${STAGE} (1 to 6)" >&2; exit 65 ;; esac
 CAP=$STAGE
 [ "$MAX_WORKERS" -gt 0 ] && [ "$MAX_WORKERS" -lt "$CAP" ] && CAP=$MAX_WORKERS
 # Must-have numbers from the north star; null when the file is missing.

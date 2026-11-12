@@ -212,17 +212,23 @@ echo "$OUT21" | jq -e '[.cards[].number] == [40,42] and ([.deferred[] | [.number
   || fail "overlap: expected cards [40,42], deferred 41 43 44, got: $OUT21"
 
 # 22 — ramp. Lanes never exceed ramp.stage or max_workers, whichever is lower;
-#      goal.foundation forces 1; no ramp key means stage 1; a bad stage exits 65.
-R_ITEMS=$(jq -n '{items: [range(50;55) as $n | {status:"Ready", content:{type:"Issue", number:$n, title:"c\($n)", assignees:[]}}]}')
-R_DEPS=$(jq -n '[range(50;55)] | map({(tostring): {runnable:true, parseable:true, blockers:[], acs:1, mustHave:[1], files:["r\(.)/"]}}) | add')
+#      goal.foundation forces 1; no ramp key means stage 1; stages 4–6 widen (factory #92);
+#      a stage above the ceiling of 6 exits 65.
+R_ITEMS=$(jq -n '{items: [range(50;58) as $n | {status:"Ready", content:{type:"Issue", number:$n, title:"c\($n)", assignees:[]}}]}')
+R_DEPS=$(jq -n '[range(50;58)] | map({(tostring): {runnable:true, parseable:true, blockers:[], acs:1, mustHave:[1], files:["r\(.)/"]}}) | add')
 width() { "$PLAN" --config <(echo "$NOCAP" | jq "$1") --items <(echo "$R_ITEMS") --deps <(echo "$R_DEPS") | jq '.cards | length'; }
 [ "$(width '.ramp.stage = 2')" = 2 ] || fail "stage 2 must cap at 2"
 [ "$(width '.ramp.stage = 3')" = 3 ] || fail "stage 3 must cap at 3"
 [ "$(width '.ramp.stage = 3 | .max_workers = 2')" = 2 ] || fail "max_workers below the stage must win"
 [ "$(width '.ramp.stage = 3 | .goal.foundation = true')" = 1 ] || fail "foundation must force 1"
 [ "$(width 'del(.ramp)')" = 1 ] || fail "no ramp key must mean stage 1"
-RC=0; "$PLAN" --config <(echo "$NOCAP" | jq '.ramp.stage = 4') --items <(echo "$R_ITEMS") --deps <(echo "$R_DEPS") >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 65 ] || fail "ramp.stage 4 should exit 65, got $RC"
+[ "$(width '.ramp.stage = 4')" = 4 ] || fail "stage 4 must plan 4 free, non-overlapping cards"
+[ "$(width '.ramp.stage = 6')" = 6 ] || fail "stage 6 must cap at 6"
+[ "$(width '.ramp.stage = 6 | .max_workers = 4')" = 4 ] || fail "max_workers below stage 6 must win"
+for bad in 7 0; do
+  RC=0; "$PLAN" --config <(echo "$NOCAP" | jq ".ramp.stage = $bad") --items <(echo "$R_ITEMS") --deps <(echo "$R_DEPS") >/dev/null 2>&1 || RC=$?
+  [ "$RC" -eq 65 ] || fail "ramp.stage $bad should exit 65, got $RC"
+done
 
 # 23 — each picked card carries judgement from the dependency graph; absent = false.
 J_ITEMS=$(jq -n '{items: [range(60;62) as $n | {status:"Ready", content:{type:"Issue", number:$n, title:"c\($n)", assignees:[]}}]}')

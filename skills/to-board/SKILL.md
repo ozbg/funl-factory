@@ -90,7 +90,7 @@ A signed file already there → leave it. List the paths your cards add that it 
 
 Use [references/card-template.md](references/card-template.md). Cut in this order:
 
-1. **Foundation card**, first: skeleton, stack, folders, the data model, the test command running green, seed data copied from the mock-up's sample data, and **one finished example of each pattern** the other cards copy (one screen, one read, one write, one test). Every other card is Blocked by it.
+1. **Foundation card**, first: skeleton, stack, folders, the data model, the test command running green, seed data copied from the mock-up's sample data, and **one finished example of each pattern** the other cards copy (one screen, one read, one write, one test). Every other card is Blocked by it. Its ACs name the real check commands for the stack spec.md picked (typecheck, lint, test). Onboard left `verify_commands: []` on a new app, so before the first `/super-board run` the orchestrator sets `verify_commands` in the board config to those same commands.
 2. **Slice cards**: one per step of the core loop, then one per must-have not yet covered. Each is a thin vertical slice: data, logic, screen and test for one thing the user does. Demoable alone.
 3. **Demo card**, last: walks the whole core loop end to end against the mock-up screens. Blocked by every other card.
 

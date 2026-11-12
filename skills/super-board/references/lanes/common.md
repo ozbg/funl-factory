@@ -189,7 +189,7 @@ Every lane writes BOTH on every exit, in the comment format of writing-standard.
 Did: <one line>
 ✅ Done: <what passed or landed, with sha / file:line / command>
 ❌ Not done: <what failed or was skipped, and why>   (omit when nothing)
-Next: <builder | qa | reviewer | Eric | none>
+Next: <builder | qa | reviewer | owner | none>
 ```
 
 - Role = who writes it: `builder` · `qa` · `reviewer` · `collect` · `orchestrator`. Label for a

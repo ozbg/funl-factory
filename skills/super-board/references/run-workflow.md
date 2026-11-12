@@ -99,6 +99,9 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
    with the check's error — a broken URL caught here costs nothing; caught at merge time it
    strands a wave of reviewed PRs. An env with a command and no check: say so once, then go on.
    The URL resolves from the project's `.env`, never the session (config-schema → `migrations`).
+8. Permission mode: lanes are designed for **Accept edits**. Check the session's permission
+   mode; in Auto mode, say once: "Switch this session to Accept edits; Auto can refuse
+   allow-listed lane commands like the merge gate." Then go on; it never halts the run.
 
 ## The wave loop
 
@@ -192,7 +195,7 @@ Repeat until a done condition, a halt or a stop:
    reports those as `preflight:blocked`; `preflight:failed` means pre-flight was blind and the card
    stays in Ready for the next wave. Sequenced cards carry a `blocked-by:` line, so this same sweep
    frees them when the overlapping PR's issue closes.
-   Wave width is the ramp stage (`ramp.stage`, 1–3; a foundation goal runs 1),
+   Wave width is the ramp stage (`ramp.stage`, 1–6, onboard writes 3; a foundation goal runs 1),
    counted after the planner drops overlapping cards and cards the ticket gate
    refuses, in flight first (Review → QA → Ready), and never above `max_workers`
    when that is set. `max_workers` is the GitHub-limit valve: step 5 lowers it
@@ -221,7 +224,7 @@ Repeat until a done condition, a halt or a stop:
    (or /loop re-entries) against the same board without bot_identity.
 4. **Launch** — Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
-   `args: { configPath, cards, humanApprovesMerge, tier, laneModels }` (`cards` hydrated after the planner: each
+   `args: { configPath, cards, humanApprovesMerge, tier, laneModels, laneModelsByTier, laneModelsJudgement, truthGate }` (`cards` hydrated after the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config. Review lanes run in
    parallel: the merge mutex sits in `super-board-merge-gate.sh`, not in the workflow.
@@ -268,7 +271,8 @@ Repeat until a done condition, a halt or a stop:
    **Health** — right after `record`, run
    `python3 .claude/bin/super-board-scorecard.py health --config <config-path> --wave <date>-<N> --goal-done <closed> --goal-total <total>`
    (the goal milestone's issue counts). Four metrics act: a card round-capped this wave,
-   rolling rounds per merged card above 2, budget burn (80% of `goal.budget_usd`
+   rolling rounds per merged card above 2 (only once 3 cards have merged; a review that only
+   re-checks an approved, unchanged head is not a round), budget burn (80% of `goal.budget_usd`
    in API-equivalent dollars with under 60% of the goal merged), and over 2
    failed/halted lane exits today. A breach has already written `ramp.stage` one
    lower (floor 1). Act on `action`:
@@ -301,7 +305,7 @@ Repeat until a done condition, a halt or a stop:
    ```
    🎯 M1 · Ben can test funl · 3/5 done · next: #78, #65 · 2 off-goal waiting
    Wave 3 · 5 cards → 2 merged · 1 bounced · 1 blocked · 1 failed · usage 5h 62%
-     🛡 #15 Blocked 🔐 missing STRIPE_TEST_KEY — owner: Eric
+     🛡 #15 Blocked 🔐 missing STRIPE_TEST_KEY — owner: <owner_name>
      ❌ #18 failed: build lane returned no result — retried next wave
    Next: wave 4 (3 cards)   |   ⏸ paused until 14:05   |   ✅ board drained
    ```
