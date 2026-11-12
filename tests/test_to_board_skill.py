@@ -8,6 +8,9 @@ SKILL = ROOT / "skills" / "to-board" / "SKILL.md"
 REF = ROOT / "skills" / "to-board" / "references" / "blind-review.md"
 TEXT = SKILL.read_text()
 REF_TEXT = REF.read_text()
+PROMPT = ("List every question you would need answered before building this card. "
+          "Ask only where a wrong guess would fail an AC or break another card; "
+          "a small choice you can state in the PR does not count. If none, answer exactly: none.")
 
 
 class ToBoardSkill(unittest.TestCase):
@@ -95,8 +98,27 @@ class ToBoardSkill(unittest.TestCase):
         for t in (TEXT, REF_TEXT):
             self.assertIn("one sub-agent per card", t.lower())
             self.assertIn("model haiku", t)
-            self.assertIn("List every question you would need answered before building this card. If none, answer exactly: none.", t)
+            self.assertIn(PROMPT, t)
             self.assertIn("Any answer other than `none` fails the card", t)
+
+    def test_haiku_reader_gets_what_a_builder_gets(self):
+        # factory #85: the full spec, the listed files, the mock-up, Blocked-by merged.
+        sec = REF_TEXT.split("## 2. Haiku read-through")[1].split("## 3.")[0]
+        self.assertIn("the full `docs/shape/spec.md`", sec)
+        self.assertIn("the current contents of the files the card lists", sec)
+        self.assertIn("`docs/shape/mockup.html`", sec)
+        self.assertIn("Every card in this card's Blocked by is merged, and its files exist as described.", sec)
+        self.assertNotIn("Contracts section", sec)
+        self.assertIn("the full `spec.md`", TEXT)
+        self.assertIn("cards in its Blocked by count as merged", TEXT)
+
+    def test_haiku_readers_run_in_batches(self):
+        # factory #86: Claude Code caps concurrent sub-agents at 20.
+        sec = REF_TEXT.split("## 2. Haiku read-through")[1].split("## 3.")[0]
+        self.assertIn("batches of at most 19, alongside the blind reviewer", sec)
+        self.assertIn("Start the next batch as readers finish", sec)
+        self.assertIn("A refused spawn is retried in the next batch, never dropped.", sec)
+        self.assertIn("in batches of at most 19", TEXT)
 
     def test_one_fix_round(self):
         self.assertIn("One fix round", TEXT)

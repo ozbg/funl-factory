@@ -74,6 +74,23 @@ out=$($PY report --config "$CFG" --repo-path "$APP")
 echo "$out" | grep -q '^Done: .* · milestone done' || fail "accepted findings close the milestone: $out"
 echo "$out" | grep -q 'walk pass: 80% · screens 1/2 · questions 3/3 · findings accepted' || fail "accepted walk line: $out"
 
+# merges outside the lane (factory #101): a card left in Review counts once `merged` runs
+APP2="$T/outside"; mkdir -p "$APP2/docs/super-board/runs"
+SC2="$APP2/docs/super-board/runs/scorecard.jsonl"
+cat > "$SC2" <<'J'
+{"card":1,"milestone":"M1","at":"2026-11-01T10:00:00Z","column":"Done","lanesRun":"review:advanced","score":{"verdict":"clean","round":1}}
+{"card":2,"milestone":"M1","at":"2026-11-01T11:00:00Z","column":"Review","lanesRun":"review:blocked","score":{"verdict":"clean","round":1}}
+J
+out=$($PY report --config "$CFG" --repo-path "$APP2")
+echo "$out" | grep -q '^Build: .* · 1/2 merged' || fail "before merged: $out"
+$PY merged --card 2 --sha abc123 --by owner --scorecard "$SC2" >/dev/null
+out=$($PY report --config "$CFG" --repo-path "$APP2")
+echo "$out" | grep -q '^Build: .* · 2/2 merged' || fail "after merged: $out"
+# --board-json all Done: N/N merged, even for a card the scorecard never saw merge
+echo '[{"number":1,"status":"Done"},{"number":2,"status":"Done"},{"number":3,"status":"Done"},{"number":9,"status":"Done","milestone":"M2"}]' > "$T/board.json"
+out=$($PY report --config "$CFG" --repo-path "$APP2" --board-json "$T/board.json")
+echo "$out" | grep -q '^Build: .* · 3/3 merged' || fail "board json merged: $out"
+
 # config targets override defaults
 echo '{"goal":{"milestone":"M1","budget_usd":60},"targets":{"first_pass_pct":60,"days_per_app":1}}' > "$T/cfg2.json"
 out=$($PY report --config "$T/cfg2.json" --repo-path "$APP")

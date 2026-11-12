@@ -14,7 +14,7 @@ Print the stdout as is. Do not rewrite it.
 | Line | Source |
 |---|---|
 | Define | last line of `docs/shape/north-star-log.jsonl` (minutes, questions, blind match); the `Mock-up:` line under `Signed:` in `docs/shape/north-star.md` |
-| Build | scorecard records (`docs/super-board/runs/scorecard.jsonl`): days from first card started to last merged, merged/total, first pass, rework, rounds per merge, k tokens and minutes per card. Models by rule counts `modelRules` on records; `n/a` when absent |
+| Build | scorecard records (`docs/super-board/runs/scorecard.jsonl`): days from first card started to last merged, merged/total, first pass, rework, rounds per merge, k tokens and minutes per card. Merged/total comes from `--board-json` when given. A review that only re-checks an approved, unchanged head (after a human gate) is not a round. Models by rule counts `modelRules` on records; `n/a` when absent |
 | Cost | API-equivalent USD from the records, against `goal.budget_usd` |
 | Done | `super-board-coverage.py status --json`: done/total per must-have, demo state, and whether the milestone is done (cards, demo and the agent walk; `walk.md`). Board state is the Done cards in the scorecard, or `--board-json <file>` (`[{number, status}]`) |
 | AI exams | `exam` rows in the scorecard, written by QA (`super-board-scorecard.py exam --card N --score S --total T --pass-mark P --model <id>`). The latest run per card counts: score, pass mark, model |
@@ -23,6 +23,9 @@ Print the stdout as is. Do not rewrite it.
 | Mock-up cuts | the features in coverage.md's `Cut from mock-up:` list, counted by `super-board-coverage.py status` |
 
 Any input that is missing prints `n/a` on its line. Nothing crashes.
+
+When the owner or orchestrator merges a card outside the lane, record it so the count stays right:
+`super-board-scorecard.py merged --card N --sha <merge sha> --by owner|orchestrator`.
 
 ## Targets
 

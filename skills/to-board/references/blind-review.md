@@ -16,9 +16,11 @@ Prompt: "You have the north star and a list of build cards. Could a team that bu
 
 ## 2. Haiku read-through
 
-One sub-agent per card, all in parallel, model haiku. Give each ONLY the card, the current contents of the files it lists (those that exist) and spec.md's Contracts section.
+One sub-agent per card, model haiku. It reads what a builder reads: the card, the full `docs/shape/spec.md` and the current contents of the files the card lists (those that exist). It may open `docs/shape/mockup.html`, where the card's Mock-up anchors point. Tell it: "Every card in this card's Blocked by is merged, and its files exist as described."
 
-Prompt: "List every question you would need answered before building this card. If none, answer exactly: none."
+Start the readers in batches of at most 19, alongside the blind reviewer, so no more than 20 sub-agents run at once. Start the next batch as readers finish. A refused spawn is retried in the next batch, never dropped.
+
+Prompt: "List every question you would need answered before building this card. Ask only where a wrong guess would fail an AC or break another card; a small choice you can state in the PR does not count. If none, answer exactly: none."
 
 Any answer other than `none` fails the card. Count cards that answered `none` for the `Haiku read: n/N clear` figure.
 
