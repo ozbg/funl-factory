@@ -434,6 +434,7 @@ don't stall on prompts:
     "Bash(mkdir:*)", "Bash(pgrep:*)", "Bash(node --check:*)",
     "Bash(bash .claude/bin/super-board-wave-plan.sh:*)",
     "Bash(bash .claude/bin/super-board-preflight.sh:*)",
+    "Bash(bash .claude/bin/super-board-fresh-worktree.sh:*)",
     "Bash(python3 .claude/bin/super-board-github-read.py:*)",
     "Bash(.claude/bin/super-board-github-read.py:*)",
     "Bash(python3 .claude/bin/super-board-verification-ready.py:*)",
