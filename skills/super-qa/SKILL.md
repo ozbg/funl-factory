@@ -140,10 +140,12 @@ Evidence adds 0 lines to the PR. Only tests the Tester writes, and a screen card
 
 The steps are in `../super-board/references/lanes/qa.md` → "Tester". Card types:
 
-- **Built card (`feature`, `bug`, no label):** worktree `.claude/worktrees/issue-<N>-qa/` at the
-  Builder's branch tip.
-- **`qa` card:** move it Ready → QA yourself, create `issue-<N>-<slug>` from the base branch,
-  test what is already there (lanes/qa.md → "qa cards").
+- **Built card (`feature`, `bug`, no label), or any card with an open PR:** worktree
+  `.claude/worktrees/issue-<N>-qa/` at the tip of the card's own PR branch. Resolve it from the open
+  PR or the builder's handoff `branch`; never create a branch of your own for it. Refuse to record a
+  bounce when the head you tested differs from the PR head.
+- **`qa` card with no open PR:** move it Ready → QA yourself, create `issue-<N>-<slug>` from the base
+  branch, test what is already there (lanes/qa.md → "qa cards").
 - **A live URL with no repo** is not a board card: `/super-qa <url>` runs standalone.
 
 GitHub budget: every card move is `.claude/bin/super-board-card.sh --config <cfg> move <N> <Status>`.

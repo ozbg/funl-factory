@@ -6,7 +6,7 @@ The rules behind each step are in `../../super-qa/SKILL.md` (zone checks, citati
 ## `qa` cards
 
 **`qa` cards.** The Tester moves the card Ready → QA itself, creates `issue-<N>-<slug>` from the
-base branch, and tests what is already there against the ACs. Tests it writes are committed to
+base branch (only when the card has no open PR; one that has a PR is tested on that PR's branch), and tests what is already there against the ACs. Tests it writes are committed to
 that branch; a PR opens only when there are tests to merge. A failure it cannot fix with tests
 alone is filed as a Backlog card (`super-qa-file-bug.sh --column Backlog`) and named in the
 handoff. The `qa` card still moves on to Review with the findings.
@@ -24,8 +24,11 @@ No key for the real model → Blocked, 🙋, `blocked-by: model key`. Never run 
 
 ## Tester (first pass — repo-backed)
 
-1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree `.claude/worktrees/issue-<N>-qa/`.
-   A `qa` card has no branch yet: move it Ready → QA, then create the branch from the base.
+1. Pull latest of base; checkout the card's own branch into worktree `.claude/worktrees/issue-<N>-qa/`.
+   Resolve it from the card's open PR (`--kind json -- pr list --state open --search "#<N>" --json number,url,headRefName,headRefOid`),
+   or the builder's handoff `branch` the wave passes in. Never derive a slug of your own: a second
+   `issue-<N>-*` branch from base tests nothing the builder built (factory #136). Record the PR head SHA you checked out.
+   Only a `qa` card with no open PR has no branch: move it Ready → QA, then create the branch from the base.
 2. `target.url` set → health-check it first. Unhealthy → Block.
 3. Read issue + PR + Builder's handoff comment.
 4. **Zone.** Run `python3 .claude/bin/super-board-zone.py` on the diff's files (super-qa → "Zone first").
@@ -57,7 +60,9 @@ No key for the real model → Blocked, 🙋, `blocked-by: model key`. Never run 
    rewrite `status` → `[qa] [report] ✅` PR comment with the AC table (text) and any 7b pair →
    issue comment → move QA → Review. Result
    `citation: "none"`. Clean up worktree.
-10. **Fail** → read `loop:rebuild-N` (none = 0). N + 1 ≥ the zone's `max_rounds`, at least 2 for a screen or exam card (this was the last allowed round) → Blocked with the
+10. **Fail** → first confirm the head you tested (`git rev-parse HEAD`) equals the PR's current `headRefOid`. A
+   different head means you tested the wrong branch: record no bounce, report `status=failed`, detail
+   "tested head differs from PR head", and stop. Then read `loop:rebuild-N` (none = 0). N + 1 ≥ the zone's `max_rounds`, at least 2 for a screen or exam card (this was the last allowed round) → Blocked with the
     block template, reason 🛡, line `ruling or split: <what keeps failing>`. Otherwise leave the
     failing ACs unchecked with the reason, append a `history` row, rewrite `status` →
     `[qa] [report] ❌` PR comment with the AC table, expected/actual per cited fail and any 7b pair → issue
