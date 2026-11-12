@@ -43,9 +43,12 @@
   // Defaults green 1, amber 2, red 3. A zone's `max_rounds` in zones.yaml wins.
   "max_rounds": { "green": 1, "amber": 2, "red": 3 },
 
-  // v2 ramp. stage: 1 | 2 | 3 (default 1). How much autonomy the factory has
-  // earned on this project; later tickets define what each stage unlocks.
-  "ramp": { "stage": 1 },
+  // v2 ramp. stage: 1 to 6. Wave width: at most this many free cards per wave,
+  // still capped by max_workers and the planner's overlap check (cards that touch
+  // the same files never share a wave). Above 6 the planner exits 65. Health steps
+  // it down one on a breach; raising it is the owner's call. Onboard writes 3 for
+  // a new config; a config with no ramp key runs 1.
+  "ramp": { "stage": 3 },
 
   // v2 owner report. "merge-breach-ask" (default): report only on a merge, a
   // breach of a red invariant or budget, or a question for the owner.
@@ -106,18 +109,21 @@
   // or {"low","medium","high"} picked by the card's complexity (a card that
   // enters past Ready uses "medium"). A lane left out keeps model_tier's choice.
   // Codex runs ignore it. Moving a lane to a stronger model is the owner's call.
+  // Onboard writes {"review": "sonnet"} for a new config: Sonnet reviews green and
+  // amber cards, and `lane_models_by_tier.red.review` puts red cards back on the session
+  // model. With no `review` key the Reviewer runs on the session model.
   "lane_models": {
     "classify": "haiku",
     "preflight": "haiku",
     "build": "haiku",
     "qa": "haiku",
-    "review": "session"
+    "review": "sonnet"
   },
 
   // Optional (v2): per zone tier, then per lane. Wins over `lane_models` for that tier,
   // e.g. {"red": {"build": "opus", "review": "opus"}}. Omit to keep `lane_models`.
-  // Onboard writes {"red": {"build": "sonnet", "qa": "sonnet"}} for new apps.
-  "lane_models_by_tier": {"red": {"build": "sonnet", "qa": "sonnet"}},
+  // Onboard writes {"red": {"build": "sonnet", "qa": "sonnet", "review": "session"}} for new apps.
+  "lane_models_by_tier": {"red": {"build": "sonnet", "qa": "sonnet", "review": "session"}},
 
   // Optional: lanes build|qa|review -> model name or "session", for a card whose ticket
   // has `**Needs judgement:** yes` under Context. Wins over `lane_models_by_tier`.
@@ -198,6 +204,13 @@
   // and nothing lands. See references/run-workflow.md → "Mid-run permission prompts".
   "human_approves_merge": false,
 
+  // Card size (one job: how big a card may be). The yardstick for lint criterion 15,
+  // the Builder pre-flight's "too big?" row and the ticket format's Size line: a card
+  // likely over this many source lines (tests, lockfiles, generated files, snapshots
+  // and migration SQL not counted) is split with /to-board. Default 600. It never
+  // decides who merges; `merge_policy.auto_max_lines` does that.
+  "card_max_lines": 600,
+
   // Who merges what (v2.6.0). Evaluated by super-board-merge-gate.sh (via
   // super-board-merge-policy.py) on every merge; `human_approves_merge: true`
   // still overrides it and makes the Reviewer stop before the gate.
@@ -212,13 +225,15 @@
     // A human can merge it or approve the pinned request for the next wave.
     // Onboard recommends "human" when base_branch is production-detected.
     "default": "auto",
-    // Source lines only (additions + deletions). A PR over this gets a deeper
-    // Opus review, not a human (merge-policy outcome "deep-review"); a red-tier
-    // PR over it waits for a human: Blocked 🙋 "big PR — please review".
-    // Default 600; 0 = no size cap. Files matching size_exclude (tests
-    // included) and migration files (migrations.globs) do not count; migration
-    // lines are reported separately.
-    "auto_max_lines": 600,
+    // One job: who merges a PR, by size. Never the card-size yardstick (that is
+    // `card_max_lines`). Source lines only (additions + deletions). A PR over this
+    // gets a deeper Opus review, not a human (merge-policy outcome "deep-review");
+    // a red-tier PR over it waits for a human: Blocked 🙋 "big PR — please review".
+    // Onboard writes 5000 for a new config (small business apps: size alone never
+    // sends a PR to the owner). Absent → 600; 0 = no size cap. Files matching
+    // size_exclude (tests included) and migration files (migrations.globs) do not
+    // count; migration lines are reported separately.
+    "auto_max_lines": 5000,
     // Globs left out of the size count. Setting this replaces the defaults
     // below; [] counts every file.
     "size_exclude": [
@@ -521,6 +536,12 @@
     // step 11 as either `super-board-bot[bot]` (when a GitHub App is
     // installed on the repo) or the user's own GitHub login (solo projects).
     // Pick during step 2 based on what `gh auth status` returned.
-    "bot_identity": "auto"
+    "bot_identity": "auto",
+
+    // The person lanes name when a card needs a human: `Owner: <owner_name>` in the
+    // Block template and the 🙋 request. Onboard fills it from the repo owner's
+    // GitHub name (`gh api users/<owner> --jq '.name // .login'`). Lanes never
+    // hard-code a person's name; with no value they write "owner".
+    "owner_name": "<repo owner's GitHub name>"
   }
 }

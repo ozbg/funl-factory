@@ -27,7 +27,7 @@ The script asks four questions and the agent adds a fifth; the agent owns the ju
 | 2 | Already in progress? | open PR on another branch closes `#N` or has the same title; a card in Building/QA/Review (or a lower-numbered Ready peer) with the same title | same feature, different words — not merely the same files |
 | 3 | File overlap? | open PR touches files in the card's `**Files:**` list; a lower-numbered card in the same `--issues` batch lists the same files | the same overlap with a Ready peer in another batch. Only `**Files:**` lists count: `Pattern:` and `Mock-up:` paths are read-only references, never overlap (#95). `--files` passes a Files list, never a Pattern or Mock-up path |
 | 4 | Unclear? | no `## Acceptance Criteria` bullets | AC that contradicts the current code (cite `file:line`) |
-| 5 | Too big? | — | likely far over ~600 source lines (`merge_policy.auto_max_lines`; tests, lockfiles, generated, snapshots, migration SQL excluded) or spans many areas (UI + API + DB + jobs …) — lint.md criterion 15 |
+| 5 | Too big? | — | likely far over ~600 source lines (`card_max_lines`; tests, lockfiles, generated, snapshots, migration SQL excluded) or spans many areas (UI + API + DB + jobs …) — lint.md criterion 15 |
 
 **Two Ready cards that overlap each other, neither with an open PR, go one at a time.** The
 lower-numbered card proceeds; only the other is sequenced, with `blocked-by: #<lower>`, and the
@@ -43,7 +43,7 @@ The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanic
 | Verdict | Action | Block template (`block-template.md`) |
 |---|---|---|
 | `proceed` | nothing; the Builder starts | — |
-| `hold` — done | move card to Blocked | `👯` · names the merged PR / closed issue · Owner: Eric (close as duplicate) · `blocked-by: -` |
+| `hold` — done | move card to Blocked | `👯` · names the merged PR / closed issue · Owner: <owner_name> (close as duplicate) · `blocked-by: -` |
 | `hold` — in progress | move card to Blocked | `👯` · names the open PR / card · `blocked-by: <the issue that PR or card closes>` — the sweep returns it when that closes, and pre-flight then finds it done |
 | `hold` — unclear | move card to Blocked | `❓` · the missing AC or the contradiction with `file:line` · `blocked-by: -` |
 | `hold` — too big | move card to Blocked | `❓` · "too big — likely over <cap> source lines / spans <areas>" · suggests splitting with `/to-board` into vertical slices, each under the cap · `blocked-by: -` |

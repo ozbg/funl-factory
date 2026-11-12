@@ -154,7 +154,7 @@ remembers"); R-ids never change.
 Did: <scope reviewed · base · verification command + result>
 ✅ Done: <prior findings fixed, hypotheses that held — each with file:line or command>
 ❌ Not done: <open findings by id, or what you could not verify and why>   (omit when nothing)
-Next: <builder | qa | Eric | none>
+Next: <builder | qa | owner | none>
 
 | ID | Owner | Class | Where | Finding | Status |
 |---|---|---|---|---|---|
@@ -165,17 +165,17 @@ Next: <builder | qa | Eric | none>
 ```
 
 - Owner: `builder` (Super Build) · `qa` (Super QA) · `ui` (UI ticket; a human runs
-  `/ui-refine-loop`) · `Eric` (human gate).
+  `/ui-refine-loop`) · `owner` (human gate; named by `notifications.owner_name`).
 - Mark `blocker` plus its citation, or `note`, in the Finding cell. Over-engineering is always `note`.
 - Backlog items get a row with Status `filed #<issue>`.
-- Human gates: the header says `🙋 human-gated` and `Next: Eric`; the decision goes in a row.
+- Human gates: the header says `🙋 human-gated` and `Next: owner`; the decision goes in a row.
 
 For short summaries (wave reports), keep it phone-friendly:
 
 ```markdown
 [reviewer] [report] 🛑 blocked · PR #123
 Did: `npm test -- --run imports` green
-❌ Not done: R1 functional bug → qa · R2 schema decision → Eric
+❌ Not done: R1 functional bug → qa · R2 schema decision → owner
 Next: qa
 ```
 
