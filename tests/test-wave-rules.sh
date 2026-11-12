@@ -27,6 +27,7 @@ const run = async (args, replies = {}) => {
     if (l.startsWith('preflight')) return { verdicts: args.cards.map((c) => ({ number: c.number, verdict: 'proceed', detail: 'clean' })) }
     if (l.startsWith('classify')) return { kind: 'feature', complexity: 'medium' }
     if (replies[l]) return replies[l]
+    if (l.startsWith('truth-')) return { status: 'ok', confidence: 90, findings: [], detail: 'claims hold' }
     if (l.startsWith('enforce')) return { status: 'advanced', column: 'Review', detail: 'note posted', citation: 'none' }
     return { status: 'advanced', column: l.startsWith('review') ? 'Done' : 'next', detail: 'ok', citation: 'none' }
   }

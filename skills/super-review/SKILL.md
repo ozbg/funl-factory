@@ -435,6 +435,10 @@ When activated, spawn 2 sub-agents in parallel:
 - **Code-grounder.** Verify cited file:line still exists and matches claims.
 - **Historian.** `git blame` the changed lines; check for ADRs / prior incidents.
 
+In a super-board wave the workflow runs these two itself, before the Reviewer lane, with this
+same brief, and hands the Reviewer the score and findings; the lane spawns nothing. A red card
+whose check did not run never reaches the Reviewer (lanes/review.md step 6).
+
 **Use this brief verbatim.** Fill the `<…>` slots; do not reword, add or drop lines. A
 reviewer that wrote its own brief once told the sub-agents over-engineering was blocking,
 and a correct PR was held for it.

@@ -24,6 +24,9 @@
 #     ids                     print {projectId, fieldId, options:{name:id}} (cached)
 #     items                   the whole board in `gh project item-list --format json` shape
 #                             ({items:[{id,status,labels,milestone,title,content:{type,number,title,url,repository}}],totalCount})
+#     close-merged <issue> <pr>  after a merge: close the issue if it is still open, with a
+#                             comment naming the merge commit. Prints `closed-by-reconcile #<issue> <sha>`
+#                             or `already-closed #<issue>`. A PR that is not merged → exit 2, issue untouched.
 #
 # Owner/number/repo come from --config (project.owner, project.number,
 # repo.remote), else $BUILD_LOOP_OWNER / $BUILD_LOOP_PROJECT and the origin remote.
@@ -35,7 +38,7 @@
 #
 # Exit: 0 ok · 64 usage · 66 config · 69 GitHub read/mutation failed ·
 #       79 reads halted (super-board-github-read.py) · 3 issue not on this board /
-#       Status option missing.
+#       Status option missing · 2 close-merged: the PR is not merged.
 set -euo pipefail
 # Fixed read commands: a malformed payload is GitHub's, so it halts (#32).
 export SB_GITHUB_READ_STRICT=1
@@ -48,13 +51,13 @@ while [ $# -gt 0 ]; do
     --owner)  OWNER="$2"; shift 2 ;;
     --number) NUMBER="$2"; shift 2 ;;
     --repo)   REPO="$2"; shift 2 ;;
-    -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,41p' "$0"; exit 0 ;;
     --) shift; break ;;
     -*) echo "unknown flag: $1" >&2; exit 64 ;;
     *) break ;;
   esac
 done
-VERB="${1:-}"; [ -n "$VERB" ] || { echo "usage: super-board-card.sh <move|status|item-id|ids|items> …" >&2; exit 64; }
+VERB="${1:-}"; [ -n "$VERB" ] || { echo "usage: super-board-card.sh <move|status|item-id|ids|items|close-merged> …" >&2; exit 64; }
 shift
 
 if [ -n "$CONFIG" ]; then
@@ -205,7 +208,25 @@ items() {  # whole board, gh item-list shape, ~1 point per 100 cards
     || { echo "board read incomplete" >&2; return 69; }
 }
 
+# Wave reconcile (factory #98): a merge whose PR body lacks `Closes #N` leaves the
+# issue open, and its dependants wait for a wave that never comes (funl M1, #23).
+close_merged() {  # $1 = issue, $2 = PR
+  [ -n "$REPO" ] || { echo "repo unknown: pass --repo or a config with repo.remote" >&2; return 66; }
+  local pr sha state
+  pr=$(gh_read pr view "$2" --repo "$REPO" --json state,mergeCommit) || return $?
+  sha=$(echo "$pr" | jq -r 'if .state == "MERGED" then (.mergeCommit.oid // "") else "" end')
+  [ -n "$sha" ] || { echo "PR #$2 is not merged ($(echo "$pr" | jq -r '.state // "unknown"')); issue #$1 left as is" >&2; return 2; }
+  state=$(gh_read issue view "$1" --repo "$REPO" --json state | jq -r '.state // ""') || return $?
+  if [ "$state" = CLOSED ]; then echo "already-closed #$1"; return 0; fi
+  [ "$state" = OPEN ] || { echo "issue #$1 state unreadable" >&2; return 69; }
+  gh issue close "$1" --repo "$REPO" --reason completed --comment "[orchestrator] [report] ✅ closed · PR #$2 merged as ${sha:0:7}
+Did: the merge left this issue open, so reconcile closed it.
+Next: dependants are free on the next wave." >/dev/null || { echo "closing #$1 failed" >&2; return 69; }
+  echo "closed-by-reconcile #$1 $sha"
+}
+
 case "$VERB" in
+  close-merged) [ $# -eq 2 ] || { echo "usage: close-merged <issue> <pr>" >&2; exit 64; }; close_merged "$1" "$2" ;;
   move)    [ $# -eq 2 ] || { echo "usage: move <issue> <Status>" >&2; exit 64; }; move "$1" "$2" ;;
   status)  [ $# -eq 1 ] || { echo "usage: status <issue>" >&2; exit 64; }; read_card "$1"; echo "$STATUS_NAME" ;;
   item-id) [ $# -eq 1 ] || { echo "usage: item-id <issue>" >&2; exit 64; }; item_id "$1"; echo "$ITEM_ID" ;;

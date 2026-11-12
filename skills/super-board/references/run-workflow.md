@@ -241,6 +241,8 @@ Repeat until a done condition, a halt or a stop:
    `laneModelsJudgement` is the config's `lane_models_judgement` (omit when unset): per lane, for
    cards the planner flags `judgement: true` (`**Needs judgement:** yes`); wins over the tier map.
    Each lane's history entry records `modelRule`: `judgement`, `tier` or `default`.
+   `truthGate` is the config's `truth_gate` (omit when unset; default `red`): which cards get
+   the truth-check step before Review (lanes/review.md step 6).
 5. **Reconcile** (when the run completes) — read the returned `cards`
    summary. If `halted: true`, any card is `halted`, or the GitHub helper's `--check`
    fails, preserve claims and stop. For verification-readiness (exit 9), repair
@@ -248,9 +250,17 @@ Repeat until a done condition, a halt or a stop:
    For a GitHub read halt, follow "Required GitHub evidence" above. Otherwise,
    for EVERY card in the wave, release the assignee
    (`gh issue edit <n> --remove-assignee <bot_identity>`, idempotent).
+   For every card that ended in `Done`, make sure its issue closed: a merge whose PR body
+   has no `Closes #N` leaves it open, and its dependants wait for a wave that never comes.
+   One plain call per card, the PR number from its `prUrl`:
+   `.claude/bin/super-board-card.sh --config <config-path> close-merged <n> <pr>`.
+   It closes the issue with a comment naming the merge commit and prints `closed-by-reconcile`,
+   or prints `already-closed`. Exit 2 = the PR is not merged: leave it, the card goes back
+   through Review next wave.
    Append one line per card to the run manifest
    `docs/super-board/runs/<date>-<slug>.md`:
-   `| #N | <lanesRun> | <finalStatus> | <column> | <detail> |`.
+   `| #N | <lanesRun> | <finalStatus> | <column> | <detail> |`. When `close-merged` printed
+   `closed-by-reconcile`, end that row's detail with ` · reconcile closed the issue`.
    Then the scorecard: save the returned `cards` to a temp file and run
    `python3 .claude/bin/super-board-scorecard.py record --results <file> --logs <the wave's transcript folder> --scorecard docs/super-board/runs/scorecard.jsonl --wave <date>-<N>`.
    The transcript folder is the one the Workflow result names; agent logs inside it

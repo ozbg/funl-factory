@@ -499,7 +499,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td><span class="cmd">/to-board</span></td><td>Each must-never becomes a numbered rule (<code>I1</code>…) with a test. Files that could break one go in the red zone of <code>zones.yaml</code>, which you sign.</td></tr>
     <tr><td>Build</td><td>Red cards run on Sonnet and write a test for each rule they touch first. Auth, billing, upgrades and third-party APIs: the builder reads the official docs before writing code.</td></tr>
     <tr><td>QA</td><td>On red and boundary amber cards, <span class="cmd">/pr-security-review</span> checks the diff for injection, auth bypass, secrets, code execution and data exposure. A finding fails the card. Red cards also get one deliberate break per guarded line, to prove the test catches it.</td></tr>
-    <tr><td>Review</td><td>Red cards get an adversarial check: the reviewer tries to prove the code wrong.</td></tr>
+    <tr><td>Review</td><td>Red cards get an adversarial check before review: two checkers try to prove the code wrong, and the reviewer weighs their score. A red card whose check did not run is blocked, never merged.</td></tr>
     <tr><td>Merge</td><td>Money, auth and destructive schema changes (drop, truncate, rename) wait for you. Additive migrations run only on databases you allowed. A live database is always yours.</td></tr>
   </table></div>
   <p>Not covered: a whole-system penetration test. The security pass reads each change, not the whole repo.</p>
