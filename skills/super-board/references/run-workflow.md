@@ -165,15 +165,17 @@ Repeat until a done condition, a halt or a stop:
    request) to `Review`; `needs-you:done` is display-only. Move `refreshApproval`
    cards to `Review` solely to review the changed head and post a fresh human request;
    clear their stale `needs-you:done` display labels. They have no approval to merge.
-   Comment on flagged cards asking for their
-   `## Blocked by` line to be fixed, and return every stranded Building card to
+   Comment on flagged cards asking for the fix their `why` names (an unparseable
+   `## Blocked by` line, an AC test path the runner never runs, or an open blocker not on
+   the board) and leave each card where it is; a flagged Ready card is not in `cards`. Return every stranded Building card to
    `Ready` (below). Swept, resumed, approval-refresh and stranded cards are NOT in this pass's
    `cards`; they join the next wave.
 
    **Refused cards.** The planner also returns `refused` (`{number, reason}`) and
    `deferred` (`reason: "overlap"`). Before launching, move each refused card to
-   `Backlog` with one comment naming the missing field from its `reason`; never
-   dispatch it. Deferred cards stay in Ready and join a later wave.
+   `Backlog` with one comment naming the missing field from its `reason` (no ACs,
+   no `Files:` line, no or unlisted `Must-have served:`); never dispatch it. A card
+   with no `Files:` line is refused, not deferred: unknown files overlap everything. Deferred cards stay in Ready and join a later wave.
 
    **Stranded Building cards.** A card in Building with no assignee between
    waves has no live worker — a stopped or crashed wave left it mid-build. For

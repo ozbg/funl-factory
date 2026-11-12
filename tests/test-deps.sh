@@ -140,4 +140,13 @@ get 5 '.judgement == false' || fail "judgement no"
 get 6 '.judgement == false' || fail "judgement yesterday is not yes"
 get 7 '.judgement == false' || fail "judgement absent"
 
-echo "PASS: test-deps.sh (22 scenarios)"
+# 22b — `acTests`: the `— test: <path>` on each AC line (backticks, `::name` and a
+#      trailing dot stripped); prose like `test: manual` and lines outside the
+#      Acceptance Criteria section are ignored.
+jq -n '[{number:8,title:"a",state:"OPEN",body:"## Acceptance Criteria\n- [ ] a — test: `tests/ai-tier.test.ts`\n- [ ] b — test: tests/x.test.ts::case one\n- [x] c - test: tests/api/y.test.ts.\n- [ ] d — test: manual\n\n## Risk\n- [ ] e — test: tests/nope.test.ts\n\n## Blocked by\n- None."},
+        {number:9,title:"b",state:"OPEN",body:"## Acceptance Criteria\n- [ ] no path\n\n## Blocked by\n- None."}]' > "$CARD"
+OUT=$("$DEPS" --from "$CARD")
+get 8 '.acTests == ["tests/ai-tier.test.ts","tests/api/y.test.ts","tests/x.test.ts"]' || fail "acTests: $(echo "$OUT" | jq -c '.["8"].acTests')"
+get 9 '.acTests == []' || fail "acTests absent must be []"
+
+echo "PASS: test-deps.sh (23 scenarios)"
