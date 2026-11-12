@@ -45,6 +45,7 @@ the tool result. Required reads go through `.claude/bin/super-board-github-read.
 | Card column | `bash .claude/bin/super-board-card.sh --config <cfg> status <N>` |
 | Move card | `bash .claude/bin/super-board-card.sh --config <cfg> move <N> <Column>` |
 | Whole board | `bash .claude/bin/super-board-card.sh --config <cfg> items` |
+| Close an issue a merge left open | `bash .claude/bin/super-board-card.sh --config <cfg> close-merged <N> <PR>` |
 
 ## Not required evidence (plain `gh`)
 
