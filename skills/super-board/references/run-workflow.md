@@ -224,7 +224,7 @@ Repeat until a done condition, a halt or a stop:
    (or /loop re-entries) against the same board without bot_identity.
 4. **Launch** — Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
-   `args: { configPath, cards, humanApprovesMerge, tier, laneModels }` (`cards` hydrated after the planner: each
+   `args: { configPath, cards, humanApprovesMerge, tier, laneModels, laneModelsByTier, laneModelsJudgement, truthGate }` (`cards` hydrated after the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config. Review lanes run in
    parallel: the merge mutex sits in `super-board-merge-gate.sh`, not in the workflow.
