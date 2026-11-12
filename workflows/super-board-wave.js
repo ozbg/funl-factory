@@ -264,7 +264,7 @@ const BOUNCE_RULES = [
   `A pass returns citation "none". Return tier and maxRounds from super-board-zone.py when you ran it.`,
 ]
 
-const lanePrompt = (lane, card, { greenEntry = false, truth = null } = {}) => [
+const lanePrompt = (lane, card, { greenEntry = false, truth = null, handoff = null } = {}) => [
   SKILLS_CHECK([atEntry(card)], lane),
   READ_FAILURE,
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
@@ -284,8 +284,15 @@ const lanePrompt = (lane, card, { greenEntry = false, truth = null } = {}) => [
   ...(greenEntry
     ? [`Green card: it skips QA and comes straight from Building. If the board still shows it in Building or QA, move it to Review first; there is no Tester report — check the builder's AC proof, rerun its tests, and tick each AC whose test passed with its proof line before the gate (lanes/review.md step 4).`]
     : []),
+  // QA tests the card's own PR branch, never one it makes itself (factory #136).
+  ...(lane === 'qa' && handoff && (handoff.branch || handoff.prUrl)
+    ? [`The builder's PR${handoff.prUrl ? ` is ${handoff.prUrl}` : ''}${handoff.branch ? ` on branch ${handoff.branch}` : ''}. Check out that branch for your worktree; do NOT create another issue-${card.number}-* branch. Before you record a bounce, confirm the head you tested equals the PR's current head (headRefOid); if it differs, record no bounce and return status=failed, detail "tested head differs from PR head".`]
+    : []),
+  ...(lane === 'qa' && !(handoff && (handoff.branch || handoff.prUrl))
+    ? [`Resolve the card's branch from its open PR (pr list --state open --search "#${card.number}") and check that out; create an issue branch yourself only for a qa card with no open PR. Never derive a second issue-${card.number}-* branch. Before you record a bounce, confirm the head you tested equals the PR's current head; if it differs, record no bounce and return status=failed.`]
+    : []),
   ...(lane === 'qa' && card.status === 'Ready'
-    ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (lanes/qa.md → "qa cards").`]
+    ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself; if it has no open PR, create the issue branch from the base branch and test what is already there (lanes/qa.md → "qa cards").`]
     : []),
   ``,
   `Report your exit via structured output:`,
@@ -387,6 +394,8 @@ const enforce = async (card, lines, history, mark) => {
 //     a screen or exam card gets at least 2.
 // Returns true when the chain may go on to the Review lane.
 const judgeBounce = async (lane, card, r, history) => {
+  // Tier and rounds any lane reported for this card so far (the builder's zone step included), not this verdict alone (#137).
+  const reported = [...history, r].filter((h) => TIERS.includes(h.tier))
   const n = rebuildsOf(card)
   const before = n ? `loop:rebuild-${n}` : 'no loop:rebuild label'
   const citation = String(r.citation || '').trim()
@@ -401,8 +410,9 @@ const judgeBounce = async (lane, card, r, history) => {
     ], history, { uncitedBounce: true })
     return lane === 'qa' && e.status === 'advanced'
   }
-  const tier = highest(r.tier, zoneOfLabels(card), zoneOfBody(card)) || 'amber'
-  const zmax = r.tier === tier && Number.isInteger(r.maxRounds) && r.maxRounds > 0 ? r.maxRounds : DEFAULT_ROUNDS[tier]
+  const tier = highest(...reported.map((h) => h.tier), zoneOfLabels(card), zoneOfBody(card)) || 'amber'
+  const rounds = reported.filter((h) => h.tier === tier && Number.isInteger(h.maxRounds) && h.maxRounds > 0).map((h) => h.maxRounds)
+  const zmax = rounds.length ? Math.max(...rounds) : DEFAULT_ROUNDS[tier]
   // A screen or exam card gets at least 2 rounds: one difference goes back to Build, not to Blocked.
   const max = needsQa(card) ? Math.max(2, zmax) : zmax
   if (n + 1 >= max) {
@@ -451,6 +461,11 @@ const TRUTH_SCHEMA = {
   required: ['status', 'detail'],
 }
 const needsTruth = (zone) => truthGate === 'always' || (truthGate !== 'off' && zone === 'red')
+// The builder's (or any earlier lane's) latest branch and PR, for the lane that follows.
+const handoffOf = (history) => {
+  const last = (k) => ([...history].reverse().find((h) => h[k]) || {})[k]
+  return { branch: last('branch') || null, prUrl: last('prUrl') || null }
+}
 const prOf = (history) => ([...history].reverse().find((h) => h.prUrl) || {}).prUrl || null
 const truthPrompt = (role, card, prUrl) => [
   READ_FAILURE,
@@ -658,7 +673,7 @@ const results = await pipeline(
     const qaEntry = at === 'Ready' && readyLane(card) === 'qa'
     if (qaEntry) at = 'QA'
     if (at === 'QA') {
-      const q = await runLane('qa', qaEntry ? card : now(), modelFor('qa', cls, zone, card), history)
+      const q = await runLane('qa', qaEntry ? card : now(), modelFor('qa', cls, zone, card), history, { handoff: handoffOf(history) })
       if (q.status === 'bounced') {
         if (!(await judgeBounce('qa', card, q, history))) return done()
       } else if (q.status !== 'advanced') return done()

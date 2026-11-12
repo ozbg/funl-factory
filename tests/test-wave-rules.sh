@@ -227,6 +227,36 @@ const amber = '## Context\n- **Zone:** amber\n'
     await run({ laneModelsJudgement: bad, cards: [card(19)] }).catch(() => { threw = true })
     threw || fail(`laneModelsJudgement ${JSON.stringify(bad)} must throw`)
   }
+
+  // 8 — QA tests the card's own PR branch, never a branch it makes (factory #136).
+  const green = '## Context\n- **Zone:** green\n'
+  const built = { status: 'advanced', column: 'QA', detail: 'built', tier: 'amber', maxRounds: 2,
+    branch: 'issue-164-npm-test-hermetic', prUrl: 'https://github.com/o/r/pull/165' }
+  const h = await run({ cards: [card(30, { body: green })] }, { 'build:#30': built })
+  const qp = h.prompts['qa:#30']
+  ;/branch issue-164-npm-test-hermetic/.test(qp) || fail('QA prompt names the builder branch')
+  ;/pull\/165/.test(qp) || fail('QA prompt names the PR url')
+  ;/do NOT create another issue-30-\* branch/.test(qp) || fail('QA prompt forbids a branch of its own')
+  ;/tested head differs from PR head/.test(qp) || fail('QA prompt refuses a bounce on a head mismatch')
+  // No handoff (a card already in QA): QA resolves the branch from the open PR itself.
+  const nh = await run({ cards: [card(31, { status: 'QA', lane: 'qa' })] })
+  ;/Resolve the card's branch from its open PR/.test(nh.prompts['qa:#31']) || fail('QA without handoff resolves the open PR')
+  ;/only for a qa card with no open PR/.test(nh.prompts['qa:#31']) || fail('branch creation only for a qa card with no PR')
+  ;/do NOT create another issue/.test(h.prompts['review:#30'] || '') && fail('review prompt has no QA branch rule')
+
+  // 9 — round cap takes the higher of ticket Zone, zone:<tier> label and the reported tier (#137).
+  // Green ticket, builder reports amber (2 rounds): first bounce is round 1 of 2, the second is the last.
+  const cap = async (n, labels, bounce) => run({ cards: [card(n, { body: green, labels })] }, {
+    [`build:#${n}`]: { ...built },
+    [`qa:#${n}`]: { status: 'bounced', column: 'Ready', detail: 'fail', citation: 'AC1', ...bounce },
+    [`enforce:#${n}`]: { status: 'blocked', column: 'Blocked', detail: 'round cap: needs a ruling or split' },
+  })
+  eq((await cap(32, ['feature'], { tier: 'green' })).card.roundCapped, false, 'green ticket + amber builder: round 1 of 2 not capped')
+  eq((await cap(33, ['feature', 'loop:rebuild-1'], { tier: 'green' })).card.roundCapped, true, 'green ticket + amber builder: round 2 of 2 capped')
+  eq((await cap(34, ['feature'], {})).card.roundCapped, false, 'QA reporting no tier: amber from the builder, round 1 of 2')
+  // A zone:red label still wins over a green ticket line and an amber builder: 3 rounds.
+  eq((await cap(35, ['feature', 'loop:rebuild-1', 'zone:red'], { tier: 'green' })).card.roundCapped, false, 'zone:red label: round 2 of 3 not capped')
+  eq((await cap(36, ['feature', 'loop:rebuild-2', 'zone:red'], { tier: 'green' })).card.roundCapped, true, 'zone:red label: round 3 of 3 capped')
 })().catch((e) => fail(e.stack))
 JS
-echo "PASS: test-wave-rules.sh (citation, round cap, green skip, classify skip, tier + judgement models)"
+echo "PASS: test-wave-rules.sh (citation, round cap, green skip, classify skip, tier + judgement models, QA PR branch, higher-zone cap)"
