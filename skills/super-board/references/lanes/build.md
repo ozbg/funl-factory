@@ -60,6 +60,16 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
 2. Create branch `issue-<N>-<slug>` from `config.base_branch` — unless one already exists
    (the card came back from Building after a stopped run): then check it out, keep its
    commits and open PR, and continue from where it stopped.
+2b. **Fresh base before building.** A worktree cut before a dependency merged reads stale code.
+    For each `Blocked by` card that has merged, read its PR's merge commit
+    (`super-board-github-read.py --kind merge-state -- pr view <P> --json state,headRefOid,mergeCommit`),
+    then run `bash .claude/bin/super-board-fresh-worktree.sh --base <config.base_branch> <sha>…`
+    in the worktree. It fetches the base and, when a sha is missing from HEAD, rebases an
+    unpushed branch onto it or merges the base into a pushed one (never a force push).
+    Exit 0: every dependency is in the worktree. Exit 5: the `not-merged` shas are not on the
+    base. Exit 3 (uncommitted changes) or 4 (conflict): the worktree is untouched; commit or resolve by hand, then rerun.
+    **A block that names a dependency is refused** when this script reports it `present`: the
+    code is there, so build against it. Only a `not-merged` dependency can be `blocked-by:`.
 3. Read issue body + ALL comments + PROJECT.md. A card with a `Feedback: fb-…` line in Context:
    run `python3 .claude/skills/super-collect/scripts/collect_feedback.py show <ref>` and look at
    the screenshot, its markup and the item before working. Never copy them into the repo or the PR.

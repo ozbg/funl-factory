@@ -457,7 +457,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><th>Column</th><th>How a card gets here</th><th>What happens</th></tr>
     <tr><td>Backlog</td><td>super-collect findings, proposals waiting for you, splits, refused cards</td><td>Waits. Not part of a run until it moves to Ready: triage moves its fixes, you move accepted work.</td></tr>
     <tr><td>Ready</td><td><span class="cmd">/to-board</span> after your scope review, or triage after the first build</td><td>Lint checks it. The planner admits it if it has ACs, a must-have and no file clash.</td></tr>
-    <tr><td>Building</td><td>A wave picks it up</td><td>Its own worktree. Test first, smallest change, draft PR.</td></tr>
+    <tr><td>Building</td><td>A wave picks it up</td><td>Its own worktree, brought up to date with the base first, so a merged dependency is never blocked on. Test first, smallest change, draft PR.</td></tr>
     <tr><td>QA</td><td>Amber and red cards after Build</td><td>Every AC proven by a test; screens checked side by side with the mock-up; red adds invariant tests and a security pass.</td></tr>
     <tr><td>Review</td><td>After QA, or straight from Build for green</td><td>Sonnet reviews (Opus on red), then the merge gate re-proves the branch and merges.</td></tr>
     <tr><td>Blocked</td><td>Round cap hit, or a step only you can do (🙋)</td><td>Last comment line says <code>blocked-by:</code> and what's needed.</td></tr>

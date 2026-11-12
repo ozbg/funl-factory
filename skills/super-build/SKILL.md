@@ -23,6 +23,8 @@ Inside `super-board run`, Super Build is a lane agent in the wave workflow. It a
 
 - Worktree `.claude/worktrees/issue-<N>-build/` off `config.base_branch`, as super-board hands it. Don't make your own.
 - Branch `issue-<N>-<slug>`. If it exists (a stopped run), check it out and continue; keep its commits and PR.
+- Before building, bring the worktree up to date with the base: `super-board-fresh-worktree.sh`
+  with each merged `Blocked by` card's merge commit (lanes/build.md step 2b).
 - One card, one worktree, one branch, one PR. Context comes from the issue body, all comments,
   the PR body, PR comments and review threads — never local state files.
 - Commit + push always. Open the PR as draft, title in commit-subject format, body from
@@ -108,6 +110,9 @@ Triggered when the card comes back with `loop:rebuild-N`.
 
 - A failure handoff comment carries `root-cause-hash: <12 hex>` (lane `build` | error class |
   first 3 normalised file:line frames; `lanes/common.md` → Root-cause hash).
+- Never block on a dependency before `super-board-fresh-worktree.sh` has refreshed the
+  worktree (lanes/build.md step 2b). A dependency it reports `present` is on the base: build
+  against it. Only a `not-merged` one may go in `blocked-by:`.
 - Moving a card to Blocked fills the full template in
   `.claude/skills/super-board/references/block-template.md`. A one-line comment is a violation.
 - Salvageable work blocked by a gate: draft PR with `Refs #N` (not `Closes`), label `human-gated`.
