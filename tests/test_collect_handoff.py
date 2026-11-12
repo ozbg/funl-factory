@@ -212,7 +212,7 @@ class IterationProtocol(unittest.TestCase):
         lint = (self.REFS / "lint.md").read_text()
         self.assertIn("| 25 | Body of work without a signed brief", lint)
         self.assertIn("super-board-coverage.py briefs", lint)
-        self.assertIn("passes all 25 criteria", lint)
+        self.assertIn("passes all 26 criteria", lint)
         rescope = (KIT / "skills/to-board/SKILL.md").read_text()
         self.assertIn("- **Brief:** docs/shape/briefs/<date>-<slug>.md", rescope)
 
