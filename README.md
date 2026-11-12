@@ -8,7 +8,7 @@
 
 <p>Stop babysitting coding agents: cards you drop in Ready come back as tested, reviewed PRs.</p>
 
-<p>10 skills (6 you type, 4 the board runs) · 9 commands · 6 guard hooks</p>
+<p>10 skills (6 you type, 4 the board runs) · 9 commands · 7 guard hooks</p>
 
 <p>
 <img alt="Version" src="https://img.shields.io/badge/version-3.3.0-1f883d?style=flat-square">
@@ -177,6 +177,7 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 | [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files; key names via `super-board-env-check.sh` |
 | [guard-key-literals](hooks/guard-key-literals.py) | Blocks a live-looking API key written into a file; flags one already there |
 | [guard-delete-outside](hooks/guard-delete-outside.py) | Blocks `rm`, `find -delete` and `git clean` aimed outside the project, `~` or `/` |
+| [permission-decider](hooks/permission-decider.py) | Lets a wave run in Accept edits with no prompt: allows a command when every part is known-safe and `.claude/bin` scripts come from the main checkout; denies a direct merge, a worktree copy of a script, a lane's inline code and lane edits to scripts, hooks and settings |
 | [guard-protected-push](hooks/guard-protected-push.py) | Opt-in (`onboard` asks, or `install.sh --protect-main`): blocks direct and force pushes to main/master/base |
 | [README sync](scripts/super-board-readme-sync.py) | Regenerates the skill table; pre-commit and PostToolUse hooks keep it fresh |
 | [cleanup-wt](hooks/cleanup-wt.py) | Removes merged worktrees and branches after each merge and at session start, with a recovery file |

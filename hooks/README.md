@@ -2,13 +2,14 @@
 
 Claude Code hook scripts. Python 3 standard library only (no jq, no node). Each reads the
 hook JSON on stdin, prints a decision only when it blocks, and exits 0 on its own errors
-so a broken guard never stops unrelated work. All of the below are on by default except the
+so a broken guard never stops unrelated work (and a broken decider never approves anything). All of the below are on by default except the
 protected-push guard (opt-in) and the dev-only skill-eval gate.
 
 - `guard-worktree-path.py` — PreToolUse `Bash`: denies `git worktree add|move` whose target resolves outside `<repo>/.claude/worktrees/` (honours `cd X &&`, `git -C X`).
 - `guard-secrets.py` — PreToolUse `Bash|Read|Grep`: denies reading or piping dotenv files, SSH keys, `.npmrc`, `credentials(.json)`, service-account JSON and `.pem`; `.env.example` stays readable. One plain call to `super-board-env-check.sh KEY…` is allowed: it prints present / empty / missing per key and never a value (no pipe, chain or redirect may ride along).
 - `guard-key-literals.py` — PreToolUse `Edit|MultiEdit|Write|NotebookEdit|Bash`: denies writing a live-looking API key into a file; PostToolUse `Edit|MultiEdit|Write|NotebookEdit`: flags one already on disk. Reports line numbers, never the value.
 - `guard-delete-outside.py` — PreToolUse `Bash`: denies `rm`, `rmdir`, `unlink`, `find … -delete` / `-exec rm` and `git clean` whose target resolves outside `$CLAUDE_PROJECT_DIR`, and always `/` or `~` itself (honours `cd X &&`, `git -C X`, `~`, `$HOME`). Inside `/tmp`, `/private/tmp`, `/var/folders` and `$TMPDIR` stays allowed. A path whose value is only known at run time (`$(…)`, a variable set earlier in the same command) is allowed.
+- `permission-decider.py` — PreToolUse `Bash|Edit|MultiEdit|Write|NotebookEdit`: the one hook that **allows**, so a wave runs in Accept edits with no prompt (#131). It splits a command on `&&`, `||`, `;`, `|` and newlines (a leading `cd <dir in the project>` included) and allows it only when every segment is on its known-safe list: read-only tools on project paths, `sed -n` print-only scripts, `find` with no action, git reads anywhere in the project and git writes inside `.claude/worktrees/` (never a push to `main`, `master` or a configured base), the lanes' `gh` calls on the board's own repo, the project's test runners, `curl` to localhost, and `.claude/bin` / `.claude/hooks` scripts however invoked (`bash x`, `./x`, `x`, absolute path) but only the **main checkout's** copy. It denies: a direct merge in any spelling (`gh pr merge`, `gh api …/pulls/N/merge`, `mergePullRequest` / `enablePullRequestAutoMerge`, inside `bash -c` or an alias too; merges go through `super-board-merge-gate.sh` only); a worktree copy of a `.claude/bin` script (a builder could have edited it), naming the main copy to run instead; inline code from a lane (`python3 -c`, `python3 - <<EOF`, `node -e`), naming the allowed way; a lane's Edit/Write to `.claude/{bin,hooks,workflows}`, `.agents/{bin,hooks,workflows}` or `.claude/settings*.json` in any checkout. Anything else prints nothing, so Claude Code's own rules and mode decide as before. Another hook's deny, and settings deny/ask rules, still win over its allow. The snippet also adds `permissions.deny` lines for a direct merge, so the gate holds even if a hook is off.
 - `cleanup-wt.py` — SessionStart (`--auto`): when a base branch tip moved since the last session, removes worktrees and local branches already merged into it. The merge gate also runs it with `--post-merge` after every merge. Never deletes unmerged work (a dirty worktree on a merged branch is wip-committed and its branch kept), never touches bases or the worktree it runs in, and writes a recovery TSV to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before acting. Restore with `git branch <name> <sha>`. A manual dry run (`python3 .claude/hooks/cleanup-wt.py`, then `--apply`) still works.
 
 ## Enable
@@ -20,6 +21,14 @@ project and merges the block below (kept in `settings-snippet.json`) into
 
 ```json
 {
+  "permissions": {
+    "deny": [
+      "Bash(gh pr merge *)",
+      "Bash(gh api *pulls/*/merge*)",
+      "Bash(gh api graphql *mergePullRequest*)",
+      "Bash(gh api graphql *enablePullRequestAutoMerge*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -50,6 +59,15 @@ project and merges the block below (kept in `settings-snippet.json`) into
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-key-literals.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Edit|MultiEdit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/permission-decider.py"
           }
         ]
       }
@@ -127,7 +145,7 @@ Wired in this pack's `.claude/settings.json`. For EricOS, add to its `.claude/se
 
 Adapted from `gate-skill-evals.sh` in Eric Tech's ai-builder-starter-kit.
 
-Tests: `tests/test-guard-hooks.sh` (all guards and the eval gate), `tests/test-cleanup-wt.sh`.
+Tests: `tests/test-guard-hooks.sh` (all guards and the eval gate), `tests/test_decider.py` (the decider and a simulated 3-card wave), `tests/test-cleanup-wt.sh`.
 
 ## Credit
 

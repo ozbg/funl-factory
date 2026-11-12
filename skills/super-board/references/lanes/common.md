@@ -32,6 +32,21 @@ edits mode prompts the owner on every call (#94).
   wave (#88). Write the JSON or body to a file with the Write tool and pass the path
   (`--cards <file>`, `--body-file <file>`).
 
+- **Scripts exactly as written.** Call a `.claude/bin` script the way the docs spell it
+  (`bash .claude/bin/super-board-preflight.sh …`, `python3 .claude/bin/super-board-config.py …`),
+  from the main checkout: never a worktree's copy, which the permission decider denies.
+  When your shell sits in a worktree, use the main checkout's absolute path
+  (`bash <main>/.claude/bin/<script> …`), never a `cd` into the worktree first.
+- **Read files with the Read tool**: lane docs, skills, configs, code. Not `cat`, `sed -n` or
+  `grep` to pull a section out; Read the file and find the section.
+- **Config values come from one helper**: `python3 .claude/bin/super-board-config.py get
+  <key> --config <cfg>` (`base_branch`, `repo`, `merge_policy.default`, `verify_commands`).
+  Never `python3 -c`, `python3 - <<EOF` or `node -e`: inline code is denied for lanes.
+- **Change files with the Edit and Write tools**, never a Python or `sed -i` script. Never
+  edit `.claude/bin`, `.claude/hooks`, `.claude/workflows` or `.claude/settings*.json` in any
+  checkout (denied): a fix there goes on the `❌ Not done:` line for the owner.
+- **Merge only through the gate** (`review.md` → "Merge protocol"). `gh pr merge`, a REST
+  `pulls/<N>/merge` call and the merge GraphQL mutations are denied in every spelling.
 - `gh`, `.claude/bin/…` and board commands run as one plain command: no `cd … &&` in front,
   no shell loop, no `;` or `&&` chain. Name the repo with `-R <owner>/<repo>` (or
   `--repo`, or `--config` for board scripts), never by changing directory. Ten threads to
