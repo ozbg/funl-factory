@@ -261,7 +261,8 @@ Repeat until a done condition, a halt or a stop:
    **Health** — right after `record`, run
    `python3 .claude/bin/super-board-scorecard.py health --config <config-path> --wave <date>-<N> --goal-done <closed> --goal-total <total>`
    (the goal milestone's issue counts). Four metrics act: a card round-capped this wave,
-   rolling rounds per merged card above 2, budget burn (80% of `goal.budget_usd`
+   rolling rounds per merged card above 2 (only once 3 cards have merged; a review that only
+   re-checks an approved, unchanged head is not a round), budget burn (80% of `goal.budget_usd`
    in API-equivalent dollars with under 60% of the goal merged), and over 2
    failed/halted lane exits today. A breach has already written `ramp.stage` one
    lower (floor 1). Act on `action`:
