@@ -7,6 +7,7 @@ export const meta = {
     { title: 'Classify', detail: 'haiku router: kind (feature | bug | qa) + complexity per Ready card; skipped when the ticket has a Zone: line' },
     { title: 'Build', detail: 'Builder lifecycle (lanes/build.md): worktree, branch, draft PR' },
     { title: 'QA', detail: 'Tester lifecycle (lanes/qa.md): zone checks, cited fails, evidence; green cards skip it' },
+    { title: 'Truth-check', detail: 'red cards (truth_gate): Code-grounder + Historian, read-only, before Review (lanes/review.md step 6)' },
     { title: 'Review', detail: 'Reviewer lifecycle (lanes/review.md): gates, rerun tests, merge' },
     { title: 'Enforce', detail: 'uncited bounce → pass with a note; bounce past the zone round cap → Blocked' },
   ],
@@ -28,6 +29,8 @@ export const meta = {
 //   laneModelsJudgement: config `lane_models_judgement` (optional) — { build, qa, review }
 //     → a model name or 'session', for a card with `judgement: true` (the planner's
 //     read of `**Needs judgement:** yes`). Wins over laneModelsByTier.
+//   truthGate: config `truth_gate` (optional, default 'red') — 'off' | 'red' | 'always'
+//     ('non-trivial', deprecated, acts as 'red'). Which cards get the truth-check step.
 // }
 // The harness can deliver `args` as a JSON-encoded string (the tool param is
 // untyped) — normalize before validating.
@@ -48,6 +51,12 @@ const labelsOf = (card) => (card.labels || []).map((l) => String(l).toLowerCase(
 const readyLane = (card) => card.lane || (labelsOf(card).includes('qa') ? 'qa' : 'build')
 if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
   throw new Error(`super-board-wave: unknown tier "${input.tier}" — use low | medium | high`)
+}
+
+const TRUTH_GATES = ['off', 'red', 'always', 'non-trivial']
+const truthGate = input.truthGate === undefined ? 'red' : input.truthGate
+if (!TRUTH_GATES.includes(truthGate)) {
+  throw new Error(`super-board-wave: unknown truthGate "${truthGate}" — use off | red | always`)
 }
 
 // Per-lane models (config `lane_models`, factory #25). Validated up front so a
@@ -255,7 +264,7 @@ const BOUNCE_RULES = [
   `A pass returns citation "none". Return tier and maxRounds from super-board-zone.py when you ran it.`,
 ]
 
-const lanePrompt = (lane, card, { greenEntry = false } = {}) => [
+const lanePrompt = (lane, card, { greenEntry = false, truth = null } = {}) => [
   SKILLS_CHECK([atEntry(card)], lane),
   READ_FAILURE,
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
@@ -265,6 +274,7 @@ const lanePrompt = (lane, card, { greenEntry = false } = {}) => [
   BOARD_IO(),
   `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
+  ...(lane === 'review' ? truthLines(truth) : []),
   ...(lane === 'qa' || lane === 'review' ? BOUNCE_RULES : []),
   ...(lane === 'build' && !labelsOf(card).includes('qa')
     ? [needsQa(card)
@@ -406,6 +416,98 @@ const judgeBounce = async (lane, card, r, history) => {
     ], history, { roundCapped: true, citation })
   }
   return false
+}
+
+// Truth-check (lanes/review.md step 6), run here as its own step before the
+// Reviewer (factory #87). The Reviewer lane is an agent without a sub-agent
+// tool, so on funl wave 1 it skipped the check on a red card and said so. Two
+// read-only agents, in parallel; the score is the minimum of the two. A red card
+// whose check did not run never reaches the Reviewer, so never the merge gate.
+const TRUTH_ROLES = {
+  'code-grounder': { name: 'Code-grounder', job: 'verify every file:line the PR cites still exists and does what the PR claims' },
+  historian: { name: 'Historian', job: 'git blame the changed lines; look for ADRs, prior incidents, reverted attempts' },
+}
+const TRUTH_SCHEMA = {
+  type: 'object',
+  properties: {
+    status: { type: 'string', enum: ['ok', 'failed', 'halted'] },
+    confidence: { type: 'integer' },
+    insufficientData: { type: 'boolean' },
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          class: { type: 'string' },
+          severity: { type: 'string' },
+          where: { type: 'string' },
+          finding: { type: 'string' },
+          citation: { type: 'string' },
+        },
+      },
+    },
+    detail: { type: 'string' },
+  },
+  required: ['status', 'detail'],
+}
+const needsTruth = (zone) => truthGate === 'always' || (truthGate !== 'off' && zone === 'red')
+const prOf = (history) => ([...history].reverse().find((h) => h.prUrl) || {}).prUrl || null
+const truthPrompt = (role, card, prUrl) => [
+  READ_FAILURE,
+  `You are the ${TRUTH_ROLES[role].name} in an adversarial truth-check of the PR for issue #${card.number} ("${card.title}"), for a super-board workflow wave.`,
+  `This is lanes/review.md step 6, run as its own step before the Reviewer. Your job: ${TRUTH_ROLES[role].job}.`,
+  `PR: ${prUrl || `the open PR for issue #${card.number} (--kind json -- pr list --state open --search "#${card.number}" --json number,url,headRefName)`}.`,
+  `Read .claude/skills/super-review/SKILL.md → "Adversarial mode" and follow its fixed brief verbatim in your role. Fill its slots yourself:`,
+  `ACs from the issue (--kind issue), the merge-base diff (git fetch origin <base> <branch>; git diff origin/<base>...origin/<branch>), the builder's summary from the PR body (--kind body).`,
+  `Read only: no worktree, commits, comments, labels or board moves. Budget: at most 50 gh calls; prefer local git.`,
+  `Return status=ok, confidence 0-100 and findings [{class, severity, where (file:line), finding (one line), citation}]; citation is AC<n> | I<n> | bar: <line> | bug: <repro>, or "none".`,
+  `Over budget or no verdict: insufficientData true. PR or diff unreadable: status=failed. detail = one line.`,
+].join('\n')
+const runTruth = async (card, chosen, history) => {
+  const { model } = chosen || {}
+  const prUrl = prOf(history)
+  const out = await Promise.all(Object.keys(TRUTH_ROLES).map(async (role) => {
+    if (halted) return { role, status: 'halted', detail: 'run halted' }
+    const r = await agent(truthPrompt(role, card, prUrl), {
+      label: `truth-${role}:#${card.number}`,
+      phase: 'Truth-check',
+      schema: TRUTH_SCHEMA,
+      ...(model ? { model } : {}),
+    })
+    if (r && r.status === 'halted') halted = true
+    return { role, ...(r || { status: 'failed', detail: 'truth-check agent returned no result' }) }
+  }))
+  const ok = out.every((o) => o.status === 'ok' && !o.insufficientData &&
+    Number.isInteger(o.confidence) && o.confidence >= 0 && o.confidence <= 100)
+  const score = ok ? Math.min(...out.map((o) => o.confidence)) : null
+  const why = out.filter((o) => !(o.status === 'ok' && !o.insufficientData && Number.isInteger(o.confidence)))
+    .map((o) => `${TRUTH_ROLES[o.role].name}: ${o.insufficientData ? 'insufficient data' : o.status} — ${o.detail || ''}`).join('; ')
+  const result = {
+    lane: 'truth',
+    model: model || 'session',
+    status: halted ? 'halted' : ok ? 'advanced' : 'failed',
+    column: 'Review',
+    detail: ok ? `truth ${score}/100` : `truth-check did not run: ${why}`,
+    truth: { ran: ok, score, checks: out },
+    ...(prUrl ? { prUrl } : {}),
+  }
+  history.push(result)
+  return result
+}
+// What the Reviewer is told about the truth-check (lanes/review.md step 6).
+const truthLines = (t) => {
+  if (t && t.ran) {
+    return [
+      `Truth-check: it already ran as its own workflow step (lanes/review.md step 6). Do not spawn truth-check sub-agents; use this result.`,
+      `Score: ${t.score}/100 (minimum of ${t.checks.map((c) => `${TRUTH_ROLES[c.role].name} ${c.confidence}`).join(', ')}). Findings: ${JSON.stringify(t.checks.map((c) => ({ by: TRUTH_ROLES[c.role].name, findings: c.findings || [] })))}`,
+      `Compare the score with truth_threshold (step 6) and apply the Note rule to each finding (step 7). Your Reviewer report carries it: "truth ${t.score}/100" on the Did line, one row per Blocker finding.`,
+    ]
+  }
+  if (truthGate === 'off') return []
+  return [
+    `Truth-check: none ran before this review. If your zone step (3c) finds tier red, do not merge and do not spawn sub-agents: add the zone:red label, leave the card in Review,`,
+    `post a [reviewer] comment "truth-check needed before merge", return status=failed, tier red, detail "truth-check needed: red tier". The next wave runs the truth-check first.`,
+  ]
 }
 
 // Builder pre-flight (lanes/build.md → "Builder pre-flight"). Before ANY Ready card
@@ -564,11 +666,32 @@ const results = await pipeline(
       at = 'Review'
     }
     if (at === 'Review') {
+      const reviewModel = pickRule('review', cls, undefined, zone, card.judgement)
+      // Red card (truth_gate): the truth-check runs first. Not run → Blocked 🛡,
+      // and the Reviewer never starts, so the card cannot reach the merge gate.
+      let truth = null
+      if (needsTruth(zone)) {
+        const t = await runTruth(card, reviewModel, history)
+        if (t.status === 'halted') return done()
+        if (!t.truth.ran) {
+          log(`truth-check-missing: #${card.number} — ${t.detail}`)
+          await enforce(card, [
+            `Issue #${card.number} ("${card.title}"): a ${zone} card, and its truth-check did not run (${t.detail}). It must not merge without it (lanes/review.md step 6).`,
+            `Move the card to Blocked with the block template (.claude/skills/super-board/references/block-template.md): reason 🛡,`,
+            `Why blocked: "truth-check did not run — ${t.detail}", To unblock: move the card back to Review and the next wave re-runs the check, last line "blocked-by: -".`,
+            `Post the same as a [reviewer] [blocker] PR comment citing "bar: truth-check before merge". Return status=blocked, column=Blocked, citation "bar: truth-check before merge".`,
+          ], history, { truthMissing: true })
+          return done()
+        }
+        truth = t.truth
+      }
       // Reviewer on the session model unless lane_models.review says otherwise.
       // No lane-level serialisation: the merge gate holds the mutex for the
       // merge alone (see the note above).
-      const r = await runLane('review', now(), pickRule('review', cls, undefined, zone, card.judgement), history, { greenEntry })
+      const r = await runLane('review', now(), reviewModel, history, { greenEntry, truth })
       if (r.status === 'bounced') await judgeBounce('review', card, r, history)
+      // The Reviewer was told not to merge a red card with no truth-check; say so loudly if it did.
+      if (r.status === 'advanced' && r.tier === 'red' && !truth && truthGate !== 'off') log(`truth-check-skipped: #${card.number} merged red with no truth-check`)
       zone = highest(zone, r.tier)
     }
     return done()
@@ -589,6 +712,10 @@ const summary = results.filter(Boolean).map((r) => {
     tier: r.zone || null,
     citation,
     uncitedBounce: r.history.some((h) => h.uncitedBounce),
+    // Truth-check: null = not needed; else ran (score) or missing (card Blocked).
+    truthCheck: r.history.some((h) => h.lane === 'truth')
+      ? { ran: r.history.some((h) => h.truth && h.truth.ran), score: ((r.history.find((h) => h.truth && h.truth.ran) || {}).truth || {}).score ?? null }
+      : null,
     roundCapped: r.history.some((h) => h.roundCapped || (h.status === 'blocked' && /round cap/i.test(h.detail || ''))),
     buildModel: modelOf('build'),
     qaModel: modelOf('qa'),

@@ -18,6 +18,9 @@ cat > "$TMP/bin/gh" <<'EOF'
 # Fake gh: logs one line per call, answers by query shape.
 q=""; for a in "$@"; do case "$a" in query=*) q="${a#query=}" ;; esac; done
 kind=other
+case "$1 $2" in
+  'pr view') kind=prview ;; 'issue view') kind=issueview ;; 'issue close') kind=issueclose ;;
+esac
 case "$q" in
   *mutation*) kind=mutation ;;
   *'field(name:"Status")'*) kind=ids ;;
@@ -37,6 +40,9 @@ case "$kind" in
       *) echo '{"data":{"repository":{"issueOrPullRequest":{"projectItems":{"nodes":[{"id":"PVTI_other","project":{"number":7,"owner":{"login":"acme"}},"fieldValueByName":null},{"id":"PVTI_232","project":{"number":15,"owner":{"login":"Acme"}},"fieldValueByName":{"name":"Building"}}]}}}}}' ;;
     esac ;;
   items) cat "$FAKE_DIR/items.json" ;;
+  prview) cat "$FAKE_DIR/pr.json" ;;
+  issueview) cat "$FAKE_DIR/issue.json" ;;
+  issueclose) echo '{"state":"CLOSED"}' > "$FAKE_DIR/issue.json" ;;
   *) echo "unexpected gh call: $*" >&2; exit 1 ;;
 esac
 EOF
@@ -124,5 +130,25 @@ G -C "$TMP/super" submodule add -q "$TMP/origin" projects/a
 [ -f "$TMP/super/.git/modules/projects/a/super-board/cache/board-acme-15.json" ] || fail "submodule cache not in its own git dir"
 [ ! -e "$TMP/super/.git/modules/.claude" ] || fail "submodule cache leaked into shared .git/modules"
 ok "cache stays inside its own repo (normal + submodule)"
+
+# 11 — wave reconcile (#98): a merge whose PR body had no `Closes #N` left the
+# issue open. close-merged closes it, naming the merge commit; a second run is a no-op.
+echo '{"state":"MERGED","mergeCommit":{"oid":"abc1234def5678"}}' > "$TMP/pr.json"
+echo '{"state":"OPEN"}' > "$TMP/issue.json"
+reset_log
+OUT=$(card close-merged 23 41) || fail "close-merged on an open issue"
+[ "$OUT" = "closed-by-reconcile #23 abc1234def5678" ] || fail "close-merged output: $OUT"
+grep '^issueclose ' "$FAKE_LOG" | grep -q 'issue close 23 --repo acme/app --reason completed' || fail "issue not closed: $(cat "$FAKE_LOG")"
+grep '^issueclose ' "$FAKE_LOG" | grep -q 'PR #41 merged as abc1234' || fail "close comment must name the merge commit: $(cat "$FAKE_LOG")"
+[ "$(jq -r .state "$TMP/issue.json")" = CLOSED ] || fail "issue still open"
+reset_log
+[ "$(card close-merged 23 41)" = "already-closed #23" ] && [ "$(calls issueclose)" = 0 ] || fail "closed issue must be left alone"
+ok "close-merged closes an issue the merge left open, once"
+
+# 12 — a PR that is not merged: exit 2, the issue is never touched.
+echo '{"state":"OPEN","mergeCommit":null}' > "$TMP/pr.json"; echo '{"state":"OPEN"}' > "$TMP/issue.json"
+reset_log; RC=0; card close-merged 23 41 >/dev/null 2>&1 || RC=$?
+[ "$RC" = 2 ] && [ "$(calls issueclose)" = 0 ] && [ "$(calls issueview)" = 0 ] || fail "unmerged PR must exit 2 untouched (rc=$RC): $(cat "$FAKE_LOG")"
+ok "close-merged refuses an unmerged PR"
 
 echo "PASS: $pass card-helper checks"
