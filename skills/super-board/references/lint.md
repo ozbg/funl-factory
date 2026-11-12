@@ -301,7 +301,7 @@ Before declaring lint complete, the worker MUST verify all three:
 
 - [ ] `docs/super-board/pre-flight.md` exists and lists every credential / tool / env signal encountered while scanning issues + PROJECT.md.
 - [ ] Every issue in active-pipeline columns (Ready, Building, QA, Review) either:
-  - has a populated `## Acceptance Criteria` section that passes all 25 criteria (conditional #19 only when triggered), OR
+  - has a populated `## Acceptance Criteria` section that passes all 26 criteria (conditional #19 only when triggered), OR
   - was dropped on purpose (closed as not planned, Done, `🤷 dropped` comment), OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
 - [ ] `super-board-coverage.py lint` exits 0 (or warns that coverage.md is missing).
