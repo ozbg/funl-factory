@@ -30,7 +30,7 @@ import sys
 DENY_EDIT_DIRS = (".claude/bin", ".claude/hooks", ".claude/workflows",
                   ".agents/bin", ".agents/hooks", ".agents/workflows")
 SAFE_ENV = re.compile(r"^(CI|NODE_ENV|FORCE_COLOR|NO_COLOR|TZ|LANG|LC_[A-Z]+|DEBUG|PORT|"
-                      r"PWDEBUG|PLAYWRIGHT_[A-Z_]+|VITEST_[A-Z_]+|GH_PAGER|PAGER|SB_[A-Z_]+)$")
+                      r"PWDEBUG|PLAYWRIGHT_[A-Z_]+|VITEST_[A-Z_]+|SB_[A-Z_]+)$")  # never PAGER/GH_PAGER: their value runs
 WRAPPERS = {"time", "nohup"}
 TMP_ROOTS = ("/tmp", "/private/tmp", "/var/folders", "/private/var/folders")
 MERGE_TEXT = re.compile(r"\bgh\b[^\n]*?\bpr\s+merge\b|pulls/[^/\s'\"]+/merge\b|"
@@ -39,7 +39,7 @@ SEARCH_ONLY = {"grep", "egrep", "fgrep", "rg"}
 SECRET = re.compile(r"(^|/)\.env(\.(?!example\b)[\w.-]+)?$|(^|/)\.npmrc$|(^|/)id_(rsa|ed25519|ecdsa)|\.pem$")
 
 READ_TOOLS = {"ls", "cat", "head", "tail", "wc", "stat", "file", "basename", "dirname",
-              "realpath", "pwd", "diff", "uniq", "cut", "tr", "nl", "tac", "comm", "column"}
+              "realpath", "pwd", "diff", "cut", "tr", "nl", "tac", "comm", "column"}
 PATTERN_FIRST = {"grep", "egrep", "fgrep", "rg", "jq"}
 NO_PATH_TOOLS = {"echo", "printf", "true", "false", "test", "[", "date", "sleep", "which"}
 NPX_TOOLS = {"playwright", "vitest", "jest", "tsc", "eslint", "prettier", "vite"}
@@ -366,15 +366,23 @@ def judge_git(args, ctx):
 def judge_push(rest, ctx):
     pos = []
     for a in rest:
-        if a in ("--all", "--mirror", "--delete", "-d", "--tags", "--prune"):
+        if a in ("--all", "--mirror", "--delete", "-d", "--tags", "--prune", "--force"):
             return SKIP
+        if a == "--force-with-lease" or a.startswith("--force-with-lease="):
+            continue  # a lane's rebased issue branch; refuses if the remote moved under it
+        if re.match(r"^-[A-Za-z]*[fd]", a):
+            return SKIP  # -f, -uf, -d …: a force push or a delete
         if a.startswith("-"):
             continue
         pos.append(a)
     if len(pos) < 2:
         return SKIP  # bare `git push` pushes whatever is checked out
     for ref in pos[1:]:
-        dst = ref.lstrip("+").split(":")[-1]
+        if ref.startswith("+"):
+            return SKIP  # +src:dst is a force push
+        if ":" in ref and not ref.split(":", 1)[0]:
+            return SKIP  # :dst deletes the remote branch
+        dst = ref.split(":")[-1]
         dst = re.sub(r"^refs/heads/", "", dst)
         if not dst or dst == "HEAD" or dst in ctx.protected:
             return SKIP
@@ -393,16 +401,46 @@ def gh_positionals(args):
     return pos
 
 
+def repo_ok(val, ctx):
+    return not ctx.repos or val.lower() in ctx.repos
+
+
 def gh_repo_ok(args, ctx):
     for k, a in enumerate(args):
-        val = None
+        val, host = None, None
         if a in ("-R", "--repo") and k + 1 < len(args):
             val = args[k + 1]
         elif a.startswith("--repo="):
             val = a.split("=", 1)[1]
-        if val is not None and ctx.repos and val.lower() not in ctx.repos:
+        elif a == "--hostname":
+            host = args[k + 1] if k + 1 < len(args) else ""
+        elif a.startswith("--hostname="):
+            host = a.split("=", 1)[1]
+        if host is not None and host.lower() != "github.com":
             return False
+        if val is not None:
+            if val.count("/") == 2 and val.split("/", 1)[0].lower() == "github.com":
+                val = val.split("/", 1)[1]
+            elif "/" not in val or val.count("/") != 1:
+                return False  # HOST/OWNER/REPO for another host, or a bare name
+            if not repo_ok(val, ctx):
+                return False
     return True
+
+
+def api_repo_ok(endpoint, ctx):
+    """repos/OWNER/REPO/… must name the board's repo; {owner}/{repo} is the cwd's repo."""
+    e = endpoint.split("?")[0].lstrip("/")
+    if re.match(r"^https?://", e):
+        return False  # a full URL can point at any host
+    m = re.match(r"^repos/([^/]+)/([^/]+)", e)
+    if not m or (m.group(1), m.group(2)) == ("{owner}", "{repo}"):
+        return True
+    return repo_ok("%s/%s" % (m.group(1), m.group(2)), ctx)
+
+
+GH_API_VALUE = {"-H", "--header", "--jq", "-q", "-t", "--template", "--cache", "-p", "--preview"}
+GH_API_BOOL = {"--paginate", "--slurp", "--silent", "-i", "--include", "--verbose"}
 
 
 def judge_gh_api(args, ctx):
@@ -413,6 +451,8 @@ def judge_gh_api(args, ctx):
             method = (next(it, "") or "").upper()
         elif a.startswith("--method="):
             method = a.split("=", 1)[1].upper()
+        elif a.startswith("-X"):
+            method = a[2:].lstrip("=").upper()  # -XDELETE, -X=DELETE
         elif a in ("-f", "-F", "--field", "--raw-field"):
             fields = True
             v = next(it, "") or ""
@@ -420,21 +460,33 @@ def judge_gh_api(args, ctx):
                 query = v[6:]
             elif "=@" in v:
                 return SKIP  # body from a file: not judged here
-        elif a in ("--input",):
-            return SKIP
-        elif a in ("-H", "--header", "--jq", "-q", "-t", "--template", "--cache", "--hostname"):
+        elif a == "--hostname" or a.startswith("--hostname="):
+            host = (next(it, "") or "") if a == "--hostname" else a.split("=", 1)[1]
+            if host.lower() != "github.com":
+                return SKIP
+        elif a in GH_API_VALUE:
             next(it, None)
-        elif a.startswith("-"):
+        elif "=" in a and a.split("=", 1)[0] in GH_API_VALUE and a.startswith("--"):
             continue
+        elif a in GH_API_BOOL:
+            continue
+        elif a.startswith("-"):
+            return SKIP  # --input, -fkey=v, anything not known: not judged here
         elif endpoint is None:
             endpoint = a
-    if endpoint is None:
+        else:
+            return SKIP  # a second positional: not a shape the lanes use
+    if endpoint is None or not method:
         return SKIP
     if endpoint == "graphql":
+        if method != "POST" and method != "GET":
+            return SKIP
         if not re.search(r"\bmutation\b", query):
             return ALLOW
         names = set(re.findall(r"\b([a-z][A-Za-z0-9]*)\s*\(", query)) - {"mutation", "query"}
         return ALLOW if names and names <= SAFE_MUTATIONS else SKIP
+    if not api_repo_ok(endpoint, ctx):
+        return SKIP
     if not fields and method == "GET":
         return ALLOW
     if method in ("GET", "POST", "PATCH") and REST_WRITE.match(endpoint.split("?")[0]):
@@ -509,7 +561,7 @@ SED_LINK_REASON = ("Blocked for lanes: `sed` with a /regex/ address on a file re
                    "symlink (.claude/skills → .agents/skills) asks for a person every time. Read the "
                    "file with the Read tool and find the section there.")
 LOCAL_URL = re.compile(r"^(https?://)?(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(/\S*)?$")
-CURL_SAFE_FLAGS = {"-s", "-S", "-sS", "-f", "-fsS", "-sf", "-L", "-I", "-i", "-v", "--silent",
+CURL_SAFE_FLAGS = {"-s", "-S", "-sS", "-f", "-fsS", "-sf", "-I", "-i", "-v", "--silent",
                    "--show-error", "--fail", "--head", "--include", "-k"}
 
 
@@ -608,11 +660,17 @@ def decide_bash(command, cwd, root, agent=False):
     return verdict, ("every segment is on super-board's known-safe list" if verdict else None)
 
 
+# Never allowed by this hook, never denied either: a new app's first cards may set up CI or
+# git hooks, so these fall through to Claude Code's own rules (which ask in Accept edits).
+EDIT_FALL_THROUGH = re.compile(r"/\.github/workflows/|/\.git/hooks/|/\.claude/|/CLAUDE\.md$")
+
+
 def decide_edit(tool_input, root):
     p = tool_input.get("file_path") or tool_input.get("notebook_path")
     if not isinstance(p, str) or not p:
         return SKIP, None
-    for cand in {os.path.normpath(p), os.path.realpath(p)}:
+    cands = {os.path.normpath(p), os.path.realpath(p)}
+    for cand in cands:
         parts = cand.replace(os.sep, "/")
         hit = any(("/" + d + "/") in parts for d in DENY_EDIT_DIRS) or \
             re.search(r"/\.claude/settings(\.local)?\.json$", parts)
@@ -620,7 +678,9 @@ def decide_edit(tool_input, root):
             return DENY, ("Blocked: %s is factory machinery (scripts, hooks, workflows, settings). "
                           "A lane never edits it, in any checkout. If it needs a change, say so in "
                           "your handoff (❌ Not done) and the owner changes it." % p)
-    return SKIP, None
+    if any(EDIT_FALL_THROUGH.search(c.replace(os.sep, "/")) for c in cands):
+        return SKIP, None
+    return SKIP, None  # the decider never allows an edit; Accept edits decides the rest
 
 
 def decide(payload):

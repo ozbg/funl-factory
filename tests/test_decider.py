@@ -183,6 +183,39 @@ if got != "ask":
 got, _ = decide({"file_path": f"{APP}/.claude/settings.json", "content": "x"}, tool="Write", agent=False)
 if got != "ask":
     failures.append(f"the owner's own session editing settings is left to the mode, got {got}")
+# CI, git hooks, other .claude files and CLAUDE.md: never allowed, never denied (setup cards need them).
+for path in (f"{wt(11)}/.github/workflows/ci.yml", f"{wt(11)}/.git/hooks/pre-commit",
+             f"{wt(11)}/.claude/agents/x.md", f"{wt(11)}/CLAUDE.md", f"{wt(11)}/package.json"):
+    for tool in ("Write", "Edit"):
+        got, _ = decide({"file_path": path, "content": "x", "old_string": "a", "new_string": "b"}, tool=tool)
+        if got != "ask":
+            failures.append(f"lane {tool} to {path} should fall through, got {got}")
+
+# ---- review of PR #132: each bypass it found now falls through ---------------------------
+expect("ask", "PAGER='sh -c id' git log")                              # a pager value runs
+expect("ask", "GH_PAGER='sh -c id' gh pr view 21 --repo acme/app")
+expect("ask", f"uniq {APP}/README.md {APP}/.claude/bin/super-board-card.sh")  # uniq writes its 2nd file
+expect("allow", f"cat {APP}/README.md")
+for m in ("-XDELETE", "-X=DELETE", "-XPUT", "--method=DELETE"):          # attached method
+    expect("ask", f"gh api {m} repos/acme/app/git/refs/heads/staging")
+expect("allow", "gh api -XGET repos/acme/app/pulls/21/comments")
+expect("ask", "gh api --input body.json repos/acme/app/issues/11/comments")
+expect("ask", "gh api -fbody=x repos/acme/app/issues/11/comments")     # unknown flag shape
+expect("ask", "gh api --unknown-flag repos/acme/app/pulls/21")
+expect("allow", "gh api --paginate --jq '.[].id' repos/acme/app/pulls/21/comments")
+expect("ask", "gh api repos/someone/else/pulls/21")                   # endpoint repo checked
+expect("ask", "gh api https://evil.example/repos/acme/app/pulls")
+expect("ask", "gh api --hostname ghe.example.com repos/acme/app/pulls/21")
+expect("ask", "gh issue view 11 --repo ghe.example.com/acme/app")
+expect("ask", "gh pr view 21 --repo app")
+for push in ("push --force origin issue-11", "push -f origin issue-11", "push -uf origin issue-11",
+             "push origin +issue-11", "push origin +HEAD:issue-11", "push origin :issue-11",
+             "push --force-with-lease origin +issue-11"):
+    expect("ask", f"git -C {wt(11)} {push}")
+expect("allow", f"git -C {wt(11)} push --force-with-lease=issue-11 origin issue-11")
+expect("allow", f"git -C {wt(11)} push origin HEAD:issue-11")
+expect("ask", "curl -sSL http://localhost:5173/")
+expect("ask", "curl -L http://localhost:5173/")                        # a redirect can leave localhost
 
 # ---- fails open, never closed ------------------------------------------------------------
 out = subprocess.run([sys.executable, str(HOOK)], input="not json", text=True, capture_output=True)
