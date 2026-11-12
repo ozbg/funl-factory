@@ -128,7 +128,7 @@ Every card, without exception:
 Two independent checks, then one fix round. Full prompts and rules: [references/blind-review.md](references/blind-review.md).
 
 1. **Blind reviewer:** one fresh sub-agent. Inputs only `north-star.md`, the mock-up screen index (if a mock-up exists) and the card list (title, Must-have served, Zone, ACs, Fix). Never `spec.md`, never your drafting reasoning. It returns `missing`, `unguarded`, `extra` and `verdict: builds the postcard: yes | gaps`.
-2. **Haiku read-through:** one sub-agent per card, in parallel, model haiku. Each gets only that card, the current contents of the files it lists (if they exist) and spec.md's Contracts. Prompt: "List every question you would need answered before building this card. If none, answer exactly: none." Any answer other than `none` fails the card.
+2. **Haiku read-through:** one sub-agent per card, model haiku, in batches of at most 19 beside the blind reviewer. Each gets what a builder gets: that card, the full `spec.md`, the current contents of the files it lists (if they exist) and `mockup.html`; cards in its Blocked by count as merged. Prompt: "List every question you would need answered before building this card. Ask only where a wrong guess would fail an AC or break another card; a small choice you can state in the PR does not count. If none, answer exactly: none." Any answer other than `none` fails the card.
 3. **One fix round:** fix every finding (decide in spec.md, split, add or cut a card). Cutting or adding scope is not decided silently: it goes to step 8 as a flagged line. Re-run the Haiku read only on changed or new cards. Findings still open are shown, not looped.
 
 ### 8. One review, for scope

@@ -33,6 +33,8 @@ is a list of {number, title, body}. Exit 1 when a screen card lacks the
 `## Mock-up` block, its anchor, the markup excerpt, the class list, the
 `Cut from mock-up:` line or the match AC; when the anchor is not in mockup.html;
 or when coverage.md's cut list leaves out a card that cuts something.
+It also warns (exit unchanged) on a Demo card with no `Decided:` line saying
+it runs its own app instance (own port, temp data, fake AI, fixed date).
 briefs: the body-of-work gate (references/iteration.md). Issues JSON may carry
 `labels` (names or {name}). A card labelled `body-of-work`, or with a `Brief:`
 line in Context, fails (exit 1) when the line is missing, the brief file is not
@@ -360,6 +362,20 @@ def card_problems(card: dict, screens: set[str] | None, cov: dict | None) -> lis
     return out
 
 
+DEMO_TITLE_RE = re.compile(r"\[test\]\s*demo:", re.IGNORECASE)
+OWN_INSTANCE_RE = re.compile(r"^\s*[-*]?\s*\**Decided:\**.*\bown app instance\b", re.IGNORECASE | re.M)
+
+
+def demo_warning(card: dict) -> str | None:
+    """The Demo card must run its own app instance, never the shared e2e server."""
+    if not DEMO_TITLE_RE.search(card.get("title") or ""):
+        return None
+    if OWN_INSTANCE_RE.search(card.get("body") or ""):
+        return None
+    return ("Demo card has no `Decided:` line saying it runs its own app instance "
+            "(own port, temp data folder, fake AI, fixed date; never the shared e2e server)")
+
+
 def load_issues(src: str) -> list[dict]:
     raw = sys.stdin.read() if src == "-" else Path(src).read_text(encoding="utf-8")
     data = json.loads(raw)
@@ -390,6 +406,9 @@ def cmd_cards(args) -> int:
         for p in probs:
             print(f"error: #{card.get('number')}: {p}")
         bad += bool(probs)
+        w = demo_warning(card)
+        if w:
+            print(f"warning: #{card.get('number')}: {w}")
     if bad:
         print(f"{bad} screen card(s) fail the mock-up block check")
         return 1
@@ -458,6 +477,9 @@ def cmd_briefs(args) -> int:
         for p in probs:
             print(f"error: #{card.get('number')}: {p}")
         bad += bool(probs)
+        w = demo_warning(card)
+        if w:
+            print(f"warning: #{card.get('number')}: {w}")
     if bad:
         print(f"{bad} card(s) fail the body-of-work gate")
         return 1

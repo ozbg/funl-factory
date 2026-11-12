@@ -116,6 +116,9 @@ Same sections. Differences:
 - **Mock-up:** the first screen; Where lists every screen of the loop as lettered steps. No
   mock-up block: the Demo card builds no screen, and lint skips it by its title.
 - **Must-have served:** every must-have number.
+- **Decided:** the demo runs its own app instance: its own port, a fresh temp data folder, the
+  fake AI and a fixed date. It never uses the shared e2e server or its data. Lint warns on a
+  Demo card without this line.
 - ACs: one per core-loop step, each `— test: <the e2e file>`, each checked against its mock-up screen.
 - `## Blocked by`: every other card, one bullet each.
 

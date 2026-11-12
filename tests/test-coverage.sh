@@ -140,6 +140,16 @@ out=$(cards cuts "$(J $'40=## Context\n- **Files:** a.ts\n\n## Acceptance Criter
 # the Demo card is skipped by its title
 DEMO=$(python3 -c 'import json; print(json.dumps([{"number":20,"title":"🧪 [test] demo: core loop end to end","body":"## Context\n- **Mock-up:** docs/shape/mockup.html#screen-today\n"}]))')
 out=$(cards cuts "$DEMO") || fail "demo card must be skipped: $out"
+# the Demo card without its own-instance line warns, never fails (factory #100, criterion 26)
+echo "$out" | grep -qF 'warning: #20: Demo card has no `Decided:` line' || fail "demo without own instance should warn: $out"
+DEMO_OK=$(python3 -c 'import json; print(json.dumps([{"number":20,"title":"🧪 [test] demo: core loop end to end","body":"## Context\n- **Mock-up:** docs/shape/mockup.html#screen-today\n- **Decided:** the demo runs its own app instance: its own port, a fresh temp data folder, the fake AI and a fixed date.\n"}]))')
+out=$(cards cuts "$DEMO_OK") || fail "demo with own instance must pass: $out"
+echo "$out" | grep -q 'warning' && fail "demo with own instance must not warn: $out"
+# a non-demo card never gets the demo warning
+out=$(cards cuts "$(J "13=$GOOD")")
+echo "$out" | grep -q 'Decided' && fail "non-demo card must not get the demo warning: $out"
+# the template carries the line, so a fresh Demo card passes
+grep -q '^- \*\*Decided:\*\* the demo runs its own app instance' skills/to-board/references/card-template.md || fail "demo template lacks the own-instance line"
 
 # each missing piece fails, with its own message
 expect_fail() { # expect_fail <label> <message> <body>

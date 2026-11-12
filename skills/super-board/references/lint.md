@@ -68,6 +68,7 @@ PHASE 3c — Mock-up blocks (factory #104)
   └─ Write the active-pipeline issues from Phase 2 as JSON `[{number, title, body}]` to a temp
      file, then run `python3 .claude/bin/super-board-coverage.py cards --repo-path . --issues-json <file>`.
      Each `error: #N:` line is criterion 24 on that card. Exit 1 is a lint failure, like 3b.
+     Each `warning: #N:` line is criterion 26 on that Demo card: show it, but it never fails lint.
 
 PHASE 3d — Body-of-work gate (factory #102)
   └─ Write the same issues with their labels, `[{number, title, body, labels}]`, then run
@@ -98,7 +99,7 @@ PHASE 7 — Final summary + session-reset nudge
 
 ---
 
-## Lint criteria — 25-criterion table
+## Lint criteria — 26-criterion table
 
 An issue is flagged if any of these apply. An issue can fail multiple criteria; all firing criteria are surfaced in Phase 4.
 
@@ -129,6 +130,7 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 23 | Body names a file the secrets guard blocks (factory #88): `python3 .claude/hooks/guard-secrets.py --scan <body file>` exits 1 | Fix line "load SUPABASE keys from the env file", spelled as its file name | Reword to name it in words ("the env file") or by key name; a lane carrying the text in a command would halt |
 | 24 | Screen card (a `Mock-up:` line in Context; the Demo card is exempt) without its `## Mock-up` block: the anchor, a markup excerpt (an `html` block), a `Classes:` list, a `Cut from mock-up:` line (`none` if nothing), and the AC ``screen matches mock-up `#screen-<name>` (screenshot side by side)``. A card that cuts features must also be in coverage.md's `Cut from mock-up:` list. Checked by `super-board-coverage.py cards` (Phase 3c) | Card says "styled per the mock-up" and drops the source filter without saying so | Fill the block from that `<section>` of `docs/shape/mockup.html` ([card-template.md](../../to-board/references/card-template.md#the-mock-up-block)); list each cut and add it to coverage.md |
 | 25 | Body of work without a signed brief ([iteration.md](iteration.md)): a card labelled `body-of-work`, or with a `Brief:` line in Context, whose brief is missing, not in the repo, or has no `Signed:` line (`Signed: no` is unsigned); or a card still labelled `proposal`. Checked by `super-board-coverage.py briefs` (Phase 3d) | A data-model change cut from a brief the owner hasn't signed | Move it to Backlog until the brief is signed; a `proposal` waits in Backlog for the owner's accept |
+| 26 | Demo card (titled `[test] demo:`) with no `Decided:` line saying it runs its own app instance: its own port, a fresh temp data folder, the fake AI and a fixed date, never the shared e2e server. A warning, not a failure. Checked by `super-board-coverage.py cards` (Phase 3c) | The demo shares the e2e server's data and trips over rows other tests left | Add the `Decided:` line from [card-template.md](../../to-board/references/card-template.md#the-demo-card) under Context |
 
 Criterion 19 is conditional. Read the current flow, owners/callers and applicable specs/ADRs
 before flagging it. Labels alone do not trigger it. Ordinary bugs, mechanical refactors and
