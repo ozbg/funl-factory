@@ -80,11 +80,11 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
     the zone's invariants and edge cases, and one `code-review` self-pass — red only.
 4. Implement the smallest safe change covering ACs. Name domain things exactly as `docs/shape/spec.md`
    names them (data model, contracts). If the card changes a contract or the data model, update
-   `docs/shape/spec.md` in the same PR so the spec stays true for the cards after it. A `/to-board` card aims under ~200 source lines; 600 is the cap (tests don't
+   `docs/shape/spec.md` in the same PR so the spec stays true for the cards after it. A `/to-board` card aims under ~200 source lines; `card_max_lines` (600) is the cap (tests don't
    count). File writes, DB writes and model calls stay in red paths: fix a lint failure by
    moving code, never by editing the lint config or `zones.yaml`. A `foundation` card runs alone.
-   Over `merge_policy.auto_max_lines` (600) → deeper review, the owner only if red. Far past it
-   mid-build → stop, push, propose the split (`/to-board`) in a PR comment, Blocked `❓`.
+   A PR over `merge_policy.auto_max_lines` → deeper review, the owner only if red. Far past
+   `card_max_lines` mid-build → stop, push, propose the split (`/to-board`) in a PR comment, Blocked `❓`.
 4b. **No partial merge.** Every AC is built, or split off (common.md → "No partial merge"): file a linked Backlog card with that AC, remove it here, note `AC<n> moved to #<N>`. Never leave one unticked for the gate to find.
 5. Commit + push (always). Commits follow writing-standard.md § 1 (`✨ [feat] chat: stream replies` + short bullets).
 6. Open draft PR linked to the issue with the PR description template (title in commit-subject format, every block filled).
