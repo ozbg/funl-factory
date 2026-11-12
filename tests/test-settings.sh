@@ -40,4 +40,19 @@ printf '%s\n' "$OUT" | grep -qxF 'Bash(npm test:*)' && fail "pnpm project should
 printf '%s\n' "$OUT" | grep -qxF 'Bash(make test:*)' || fail "Makefile test target missed"
 [ -z "$(python3 "$S" runner-rules "$T/new")" ] || fail "a folder with no runner should print nothing"
 
-echo "PASS: test-settings.sh (4 scenarios)"
+# 5 — risky lists allow rules that run any code or merge around the gate; remove drops them (#131).
+echo '{"permissions":{"allow":["Bash(ls:*)","Bash(node:*)","Bash(gh pr merge:*)","Bash(bash .claude/bin/:*)","Bash(python3 -c:*)","Bash(node --check:*)","Bash(bash .claude/bin/super-board-gh-guard.sh:*)"]}}' > "$F"
+OUT=$(python3 "$S" risky "$F")
+[ "$OUT" = $'Bash(node:*)\nBash(gh pr merge:*)\nBash(bash .claude/bin/:*)\nBash(python3 -c:*)' ] || fail "risky should list exactly the four wide rules, got: $OUT"
+OUT=$(python3 "$S" remove "$F" 'Bash(node:*)' 'Bash(gh pr merge:*)' --dry-run)
+[ "$OUT" = $'- Bash(node:*)\n- Bash(gh pr merge:*)' ] || fail "remove --dry-run should list the removals, got: $OUT"
+python3 "$S" remove "$F" 'Bash(node:*)' 'Bash(gh pr merge:*)' >/dev/null
+jq -e '(.permissions.allow | index("Bash(node:*)")) == null and (.permissions.allow | index("Bash(ls:*)")) != null' "$F" >/dev/null || fail "remove dropped the wrong rules: $(cat "$F")"
+
+# 6 — hooks merges the snippet's deny rules once (the direct-merge deny lines, #131).
+echo '{}' > "$F"
+python3 "$S" hooks "$F" ../hooks/settings-snippet.json >/dev/null
+jq -e '.permissions.deny | index("Bash(gh pr merge *)") != null' "$F" >/dev/null || fail "snippet deny rules not merged: $(cat "$F")"
+python3 "$S" hooks "$F" ../hooks/settings-snippet.json | grep -q "already present" || fail "second hooks merge should change nothing"
+
+echo "PASS: test-settings.sh (6 scenarios)"

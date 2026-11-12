@@ -65,8 +65,20 @@ for rule in ("Bash(bash .claude/bin/super-board-gh-guard.sh:*)", "Bash(git statu
              "Bash(gh pr list:*)", "Bash(gh issue list:*)", "Bash(ls:*)", "Bash(cat:*)",
              "Bash(grep:*)", "Bash(jq:*)"):
     check(rule in base_rules, f"base allowlist misses {rule}")
-for rule in ("Bash(find:*)", "Bash(sed:*)", "Bash(node:*)", "Bash(bash .claude/bin/:*)"):
+for rule in ("Bash(find:*)", "Bash(sed:*)", "Bash(node:*)", "Bash(bash .claude/bin/:*)",
+             "Bash(gh pr merge:*)", "Bash(python3 -c:*)", "Bash(python3:*)", "Bash(python3 .claude/bin/:*)"):
     check(rule not in rules, f"allowlist must not pre-approve {rule}")
+# The gate merges inside its own script; nothing offers a direct merge (#131).
+check('"Bash(gh pr merge:*)"' not in text, "onboard must never offer Bash(gh pr merge:*)")
+check("Bash(python3 .claude/bin/super-board-config.py:*)" in base_rules,
+      "base allowlist misses the config helper lanes use instead of python3 -c")
+check("Does the app apply its own" in text and '`migrations.commands[env] = "-"`' in text,
+      "onboard must ask whether the app migrates itself and write \"-\" (no false 🙋)")
+check("## GitHub-side gates" in text and "Administration: no access" in text,
+      "onboard must document the GitHub ruleset and the one-repo token")
+snippet = (ROOT / "hooks/settings-snippet.json").read_text()
+check("permission-decider.py" in snippet and "Bash(gh pr merge *)" in snippet,
+      "the hook snippet must wire the decider and deny a direct merge")
 check(text.count("super-board-settings.py runner-rules .") >= 2,
       "onboard must add the project's test runners from super-board-settings.py runner-rules (base list and step 6)")
 

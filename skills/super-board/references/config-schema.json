@@ -294,7 +294,9 @@
     // base_branch is main/master, else "staging".
     "target_env": "staging",
     // Run from the root of the verified scratch worktree. "-" = the deploy
-    // pipeline applies it, nothing to run. Secrets never go in this file. Nor
+    // pipeline or the app itself (on startup, e.g. a local SQLite app) applies
+    // it, nothing to run; onboard writes "-" when the owner says the app
+    // migrates itself. Secrets never go in this file. Nor
     // can they come from the session's environment: every lane agent's Bash
     // call is a fresh shell and nothing loads .env. Resolve the URL from the
     // project's own .env, with an absolute path (the gate runs in a scratch

@@ -4,9 +4,12 @@
     super-board-settings.py hooks <settings.json> <snippet.json> [...] [--dry-run]
     super-board-settings.py allow <settings.json> <rule> [<rule> ...]  [--dry-run]
     super-board-settings.py runner-rules <project-dir>
+    super-board-settings.py risky <settings.json>
+    super-board-settings.py remove <settings.json> <rule> [<rule> ...] [--dry-run]
 
 `hooks` adds each hook command from the snippets once per event + matcher
-(install.sh and onboard's protect-main step). `allow` adds permission rules to
+(install.sh and onboard's protect-main step), and each `permissions.deny` rule a
+snippet carries (the direct-merge deny lines, #131). `allow` adds permission rules to
 `permissions.allow` once each (onboard's Permissions step, after the user
 approved the printed diff). Both keep every existing key, back the file up
 (`settings.json.bak-<ts>`) before writing, write atomically, and leave an
@@ -14,7 +17,10 @@ invalid settings.json untouched. `--dry-run` prints what would be added
 (`+ <line>`) and writes nothing. `runner-rules` prints, one per line, the allow
 rules for the project's own test runners, read from its files (package.json and
 its lockfile, pyproject/pytest config, Makefile, go.mod, Cargo.toml), so lane
-test commands run without a prompt (#94). It writes nothing.
+test commands run without a prompt (#94). It writes nothing. `risky` prints, one
+per line, the allow rules that let a lane run any code or merge around the gate
+(`node:*`, `python3 -c`, `bash:*`, `gh pr merge`, a wildcard over `.claude/bin/` …);
+onboard shows them and `remove` drops the ones the owner approves (#131).
 
 Exit: 0 ok (including "already present"), 2 settings.json invalid, 64 usage.
 """
@@ -22,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -76,6 +83,35 @@ def merge_hooks(settings: dict, snippets: list[dict]) -> list[str]:
                     have.add(h["command"])
                     added.append(f"{event} {matcher or '*'}: {h['command']}")
     return added
+
+
+def merge_deny(settings: dict, snippets: list[dict]) -> list[str]:
+    deny = None
+    added = []
+    for rule in [r for s in snippets for r in (s.get("permissions") or {}).get("deny", [])]:
+        deny = settings.setdefault("permissions", {}).setdefault("deny", [])
+        if rule not in deny:
+            deny.append(rule)
+            added.append(f"deny: {rule}")
+    return added
+
+
+# Allow rules that hand a lane arbitrary code or a merge that skips the gate. The
+# permission decider allows the safe forms of these commands without them.
+RISKY = [
+    re.compile(r"^Bash$"), re.compile(r"^Bash\(\*\)$"),
+    re.compile(r"^Bash\((node|python3?|bash|sh|zsh|eval|env|xargs|npx|deno|bun|ruby|perl)( \*|:\*)\)$"),
+    re.compile(r"^Bash\((python3?|node) (-c|-e|-)\b.*\)$"),
+    re.compile(r"^Bash\(gh pr merge\b.*\)$"),
+    re.compile(r"^Bash\(gh api\b.*merge.*\)$"),
+    re.compile(r"^Bash\((bash |python3 |sh )?\.claude/bin/(:\*| \*|\*)\)$"),
+    re.compile(r"^Bash\((sed|find|awk)(:\*| \*)\)$"),
+]
+
+
+def risky(settings: dict) -> list[str]:
+    allow = (settings.get("permissions") or {}).get("allow") or []
+    return [r for r in allow if isinstance(r, str) and any(p.match(r) for p in RISKY)]
 
 
 def merge_allow(settings: dict, rules: list[str]) -> list[str]:
@@ -142,14 +178,25 @@ def main(argv: list[str]) -> int:
         for r in runner_rules(args[1]):
             print(r)
         return 0
-    if len(args) < 3 or args[0] not in ("hooks", "allow"):
+    if len(args) == 2 and args[0] == "risky":
+        for r in risky(load(args[1])):
+            print(r)
+        return 0
+    if len(args) < 3 or args[0] not in ("hooks", "allow", "remove"):
         print(__doc__, file=sys.stderr)
         return 64
     verb, path, rest = args[0], args[1], args[2:]
     settings = load(path)
     if verb == "hooks":
-        added = merge_hooks(settings, [json.load(open(p)) for p in rest])
-        noun = "hook command(s)"
+        snippets = [json.load(open(p)) for p in rest]
+        added = merge_hooks(settings, snippets) + merge_deny(settings, snippets)
+        noun = "hook command(s) / deny rule(s)"
+    elif verb == "remove":
+        allow = (settings.get("permissions") or {}).get("allow") or []
+        added = [f"- {r}" for r in rest if r in allow]
+        if added:
+            settings["permissions"]["allow"] = [r for r in allow if r not in rest]
+        noun = "permission rule(s) removed:"
     else:
         added = merge_allow(settings, rest)
         noun = "permission rule(s)"
@@ -158,10 +205,10 @@ def main(argv: list[str]) -> int:
         return 0
     if dry:
         for a in added:
-            print(f"+ {a}")
+            print(a if a.startswith("- ") else f"+ {a}")
         return 0
     save(path, settings)
-    print(f"    ✓ {len(added)} {noun} added")
+    print(f"    ✓ {len(added)} {noun}" + ("" if verb == "remove" else " added"))
     return 0
 
 

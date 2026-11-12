@@ -48,7 +48,7 @@ checkout, then re-run onboard.`
 | `python3 $SB/super-board-setup.py board-rank / board-migrate / names` | 1 (upgrade), 3 Board |
 | `python3 $SB/super-board-setup.py branch` | 4 Branch |
 | `python3 $SB/super-board-agents-md.py …` | 5 AGENTS.md |
-| `python3 $SB/super-board-settings.py allow … --dry-run` | 6 Policies |
+| `python3 $SB/super-board-settings.py allow … --dry-run` · `risky` · `remove … --dry-run` | 6 Policies |
 | `python3 .claude/skills/super-collect/scripts/collect_custom.py classify / ping / add` | 7 Bug sources |
 
 ---
@@ -312,6 +312,17 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       merge_policy.default auto · always_human: money, auth, schema · push guard on (main, master,
       <base>) · migrations.allowed_envs: test, staging
       + Bash(gh project:*) + Bash(gh issue:*) + Bash(gh pr:*) + … (the --dry-run output, joined)
+   Wide lines already in settings.json (`super-board-settings.py risky .claude/settings.json`
+   prints them: `node:*`, `python3 -c`, `gh pr merge`, a wildcard over `.claude/bin/` …) → Q2's
+   Yes description adds "and remove <K> lines that let the robot run any code or merge around
+   the gate", listed in the dim line with a `-`; Yes runs `remove` with them at step 8. The
+   permission decider (hooks/README.md) allows the safe forms of those commands without them.
+   Self-migrating app — migration dirs exist and the manifest has no migrate script — ONE
+   question, even on safe defaults, header "Migrations": "Does the app apply its own
+   migrations (on startup, or its deploy does)?" [Yes, it migrates itself (Recommended when
+   the app opens a local database such as SQLite) / No, the robot runs a command].
+   Yes → `migrations.commands[env] = "-"` for every env in allowed_envs and target_env, no
+   `checks`: the gate then has nothing to run and raises no false 🙋 for a migration PR.
    Review each → ONE more AskUserQuestion call, up to three questions:
     a. "Merge" — "Who merges a change that passes review?" [Robot merges normal changes
        (Recommended) / I merge everything]; production base: the order flips, and robot-merges
@@ -336,8 +347,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
        Session pooler string (port 5432) with special characters in the password URL-encoded,
        and a just-reset password takes ~20 s to reach the pooler — retry once before calling it wrong.
    Permission lines: the base list in "Mid-run permission prompts" below, plus the
-   merge lines when merge_policy.default is "auto" ("Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
-   "Bash(gh pr merge:*)"), one "Bash(<migrate command>)" per allowed env, "Bash(bash
+   merge line when merge_policy.default is "auto" ("Bash(bash .claude/bin/super-board-merge-gate.sh:*)";
+   never a `gh pr merge` line: the gate merges inside its own script, and a direct merge is
+   denied), one "Bash(<migrate command>)" per allowed env that is not "-", "Bash(bash
    .claude/bin/super-board-env-check.sh:*)" and the test-runner lines that
    `python3 $SB/super-board-settings.py runner-rules .` prints (npm/pnpm/yarn/bun scripts,
    npx playwright, vitest, jest, tsc, eslint, prettier, vite; pytest; make test; go and cargo
@@ -403,7 +415,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    ├─ .claude/super-board/active ← <slug>
    │    ├─ .gitignore += .claude/super-board/active, onboard-answers.json, onboard-staged/,
    │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/super-board/)
-   │    ├─ settings.json: super-board-settings.py allow … ; protect main →
+   │    ├─ settings.json: super-board-settings.py allow … ; remove <approved risky lines> ; protect main →
    │    │    super-board-settings.py hooks .claude/settings.json <pack>/hooks/settings-protect-main.json
    │    ├─ AGENTS.md / CLAUDE.md: super-board-agents-md.py backup, then write --src <staged>
    │    │    --dest AGENTS.md, pointer --tail <staged tail> --force, block, check
@@ -411,6 +423,11 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    │    inspect the saved map and resolve the local skill for the actual host.
    │    └─ docs/agents/issue-tracker.md; docs/super-board/PROJECT.md (a sub-agent drafts it from
    │       manifests + README + tree, no question; listed in the table as "PROJECT.md drafted")
+   ├─ GitHub-side gates (own step, after the files): AskUserQuestion header "GitHub gates",
+   │    "Make GitHub itself refuse pushes to <base> and main?" [Yes (Recommended) / Not now].
+   │    Yes → the ruleset command in "GitHub-side gates" below, once per branch, run by the
+   │    owner's own session (the robot's token cannot change rulesets). Then print the
+   │    token guidance from the same section as one dim line. Never applied without the yes.
    └─ Delete onboard-staged/; keep the answers file (re-runs use it).
 
 DONE — run `python3 $SB/super-board-verification-ready.py --config <saved config>`;
@@ -432,9 +449,10 @@ DONE — run `python3 $SB/super-board-verification-ready.py --config <saved conf
 
 ## Mid-run permission prompts
 
-Lane agents inherit the session allowlist and run in acceptEdits. Add these
-to your project's `.claude/settings.json` → `permissions.allow` so waves
-don't stall on prompts:
+Lane agents inherit the session allowlist and run in acceptEdits. Two things keep a
+wave from stalling on prompts: these lines in `.claude/settings.json` →
+`permissions.allow`, and the permission decider hook (`.claude/hooks/permission-decider.py`,
+wired by install.sh), which allows the shapes a rule cannot match. Add:
 
     "Bash(gh issue view:*)", "Bash(gh issue edit:*)", "Bash(gh issue comment:*)",
     "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)", "Bash(gh pr comment:*)",
@@ -456,6 +474,7 @@ don't stall on prompts:
     "Bash(python3 .claude/bin/super-board-scorecard.py:*)",
     "Bash(python3 .claude/bin/super-board-zone.py:*)",
     "Bash(python3 .claude/bin/super-board-coverage.py:*)",
+    "Bash(python3 .claude/bin/super-board-config.py:*)",
     "Bash(.claude/bin/super-qa-file-bug.sh:*)", "Bash(.claude/bin/super-review-file-refactor.sh:*)",
     "Bash(bash .claude/bin/super-board-host.sh:*)",
     "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",
@@ -477,12 +496,33 @@ don't stall on prompts:
 The read-only lines are safe to pre-approve because the guard-secrets hook still denies any
 of them that touches a secrets file. `git -C` is how lanes run git in their worktree
 (`lanes/common.md`); `git push` is already allowed, and guard-protected-push still blocks pushes
-to protected branches. Not in the list on purpose: `find` (`-delete`, `-exec`),
-`sed` (`-i`), `node` and wildcards over `.claude/bin/` (they would cover the merge gate).
+to protected branches.
+
+Not in the list on purpose, because a rule cannot limit them: `find` (`-delete`, `-exec`),
+`sed` (`-i`, `w`), `node`, `python3 -c` and wildcards over `.claude/bin/` (they would also
+run a worktree copy a builder edited). The decider allows their safe forms instead:
+`sed -n` print-only scripts, `find` with no action, and a `.claude/bin` script however it is
+spelled (`bash x`, `./x`, `x`, an absolute path) when it resolves to the main checkout's copy.
+It denies the worktree copy, a lane's inline code (`python3 -c`, `python3 - <<EOF`, `node -e`,
+with the allowed way in the reason), and every direct merge.
 
 A rule matches one plain command only. A lane command behind `cd … &&`, in a
-shell loop or chained with `;` misses every rule and goes to the permission
-checker, which denies GitHub writes (`lanes/common.md` → "Command shape").
+shell loop or chained with `;` misses every rule; the decider allows it only when every
+segment is known-safe, else it goes to the permission checker, which denies GitHub writes
+(`lanes/common.md` → "Command shape").
+
+**Why allow-listed commands still prompted (#131).** Reproduced headless with funl's
+allowlist: a rule matches the command text, so `.claude/bin/super-board-preflight.sh` (no
+`bash`), `bash /abs/path/.claude/bin/…` and `python3 -c` miss `Bash(bash .claude/bin/…:*)`
+and `Bash(python3 .claude/bin/:*)`; a regex `sed -n '/A/,/^## /p'` on a file reached
+through the `.claude/skills` → `.agents/skills` symlink is checked as a possible write
+through a symlink and prompts despite `Bash(sed -n:*)`. A PreToolUse hook's `allow` is
+honoured inside subagents (the hook input carries `agent_id` and `permission_mode`).
+
+**Sandbox** (`sandbox.enabled` with `autoAllowBashIfSandboxed`) would approve every command
+inside an OS sandbox instead of judging each one. Worth a later trial on a throwaway app:
+it limits writes to the project and network to an allowlist, but lanes need `gh`, the
+package registry and the dev server, so the network list has to be right first.
 `"Bash(gh api graphql:*)"` is the lanes' one route to resolve a review thread, and
 `"Bash(gh api:*)"` covers editing their own comment (`lanes/common.md` → "Thread and
 comment writes"). `"Bash(gh label create:*)"` lets the Reviewer create the
@@ -507,12 +547,18 @@ Pick one:
   an isolated container or VM. `--permission-mode acceptEdits` stops at the wave lock.
 
 Merging is NOT in the base list. On a board whose `merge_policy.default` is
-`"auto"`, `super-board onboard` offers the merge lines as a diff to approve
+`"auto"`, `super-board onboard` offers the merge line as a diff to approve
 up front (onboard → Permissions), so the first overnight run does not stall:
 
-    "Bash(bash .claude/bin/super-board-merge-gate.sh:*)", "Bash(gh pr merge:*)",
+    "Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
     plus one line per configured migrate command in `migrations.commands`
-    for the envs in `migrations.allowed_envs`.
+    for the envs in `migrations.allowed_envs` (none for a `"-"`).
+
+`gh pr merge` is never allow-listed: the gate runs it inside its own script, which no
+permission rule sees. A direct merge is denied three ways: the decider hook, the
+`permissions.deny` lines install.sh merges from `hooks/settings-snippet.json`
+(`gh pr merge *`, `gh api *pulls/*/merge*`, the two merge GraphQL mutations), and the
+GitHub ruleset below.
 
 Without them every Reviewer merge pauses for one interactive approval, so the
 backend is **attended-only**. With them, the gate still enforces
@@ -524,14 +570,14 @@ the policy. Pair auto-merge with a non-production `base_branch`.
 > **Read this before starting an overnight wave (issue #9).** The two settings
 > interact, and the failure is silent. A board configured
 > `"human_approves_merge": false` and `merge_policy.default: "auto"`, processing
-> otherwise ungated PRs **without** `"Bash(gh pr merge:*)"` allowed, will build,
+> otherwise ungated PRs **without** the merge gate allowed, will build,
 > test and review cards all night and land **nothing** —
 > each Reviewer stalls on an approval prompt nobody is there to click, and the
 > card returns to Review to be re-reviewed on the next wave.
 >
 > Pick one deliberately:
 >
-> | Intent | Configuration | Allowlist `gh pr merge` | Reviewer's terminal state |
+> | Intent | Configuration | Allowlist the merge gate | Reviewer's terminal state |
 > | --- | --- | --- | --- |
 > | Attended — approve each merge command | `human_approves_merge: false`, `merge_policy.default: "auto"` | no | pauses on a tool permission prompt |
 > | Unattended auto-merge | `human_approves_merge: false`, `merge_policy.default: "auto"` | **yes** | card → Done after confirmed merge; configured human gates → 🙋 Blocked |
@@ -549,6 +595,42 @@ the policy. Pair auto-merge with a non-production `base_branch`.
 > ready, merge, **verify the merge commit is an ancestor of the base branch**,
 > and only then move the card to Done. A merge-blocked PR goes to Blocked, not
 > back to Review.
+
+## GitHub-side gates
+
+The hooks stop a lane on this machine. GitHub stops everything else, including a lane that
+found a way round a hook. Onboard asks once, after writing the files (step 8 → "GitHub gates"),
+and the owner's own session runs it; the robot never changes a ruleset.
+
+**Ruleset, once per branch** (`<base>`, and `main` when it is not the base):
+
+    gh api -X POST repos/<owner>/<repo>/rulesets --input <file>
+
+with `<file>` written by the Write tool:
+
+    {"name": "super-board: <branch>", "target": "branch", "enforcement": "active",
+     "conditions": {"ref_name": {"include": ["refs/heads/<branch>"], "exclude": []}},
+     "rules": [{"type": "deletion"}, {"type": "non_fast_forward"},
+               {"type": "pull_request", "parameters": {"required_approving_review_count": 0,
+                "dismiss_stale_reviews_on_push": false, "require_code_owner_review": false,
+                "require_last_push_approval": false, "required_review_thread_resolution": false}}]}
+
+No direct push, no force push, no delete, every change through a PR. Zero required
+approvals: the gate merges the robot's own PR, and GitHub never lets an account approve
+its own. No bypass list, so the owner merges through a PR too. A ruleset needs a public
+repo or a paid plan for a private one; GitHub's error says so, and onboard prints that line
+and moves on (the hooks still hold).
+
+**Token** — the robot's `gh` should reach this one repo and its board, nothing else:
+- A second account (references/second-account.md) sees only what it is invited to: invite it to
+  this repo as a collaborator with Write, and to the board.
+- On the owner's own account, a fine-grained personal access token: Repository access →
+  Only select repositories → this repo. Permissions: Contents, Pull requests, Issues read and
+  write; Metadata, Actions, Commit statuses read. **Administration: no access**, so the
+  robot can't lift the ruleset. Projects: read and write for the board's owner where GitHub
+  offers it; where it doesn't (some user-owned boards), a classic token with `repo` and
+  `project` is the fallback, and the ruleset is what still holds. The owner installs it with
+  `gh auth login --with-token` typed at their own prompt; an agent never types a token.
 
 ## AGENTS.md source of truth
 

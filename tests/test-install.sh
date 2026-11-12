@@ -173,7 +173,7 @@ T=$(mktemp -d)
 for s in super-board-stop.sh super-board-wave-plan.sh \
          super-board-card.sh super-board-throttle.sh super-board-scorecard.py super-board-zone.py super-board-coverage.py super-board-host.sh \
          super-board-deps.sh super-board-fresh-worktree.sh super-board-preflight.sh super-board-merge-gate.sh super-board-usage.sh super-board-pr-body.sh \
-         super-review-file-refactor.sh super-qa-file-bug.sh; do
+         super-review-file-refactor.sh super-qa-file-bug.sh super-board-config.py; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
 done
 # The retired lane and codex launchers are not installed.
@@ -191,7 +191,7 @@ cat > "$T/.claude/settings.json" <<'JSON'
 {"permissions":{"allow":["Bash(ls:*)"]},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"echo mine"}]}],"Stop":[{"hooks":[{"type":"command","command":"echo stop"}]}]}}
 JSON
 "$INSTALL" "$T" >/dev/null 2>&1
-for h in guard-worktree-path.py guard-secrets.py guard-key-literals.py guard-delete-outside.py guard-protected-push.py cleanup-wt.py; do
+for h in guard-worktree-path.py guard-secrets.py guard-key-literals.py guard-delete-outside.py guard-protected-push.py permission-decider.py cleanup-wt.py; do
   [ -f "$T/.claude/hooks/$h" ] || fail "hook $h was not installed"
 done
 [ ! -e "$T/.claude/skills/cleanup-wt" ] || fail "cleanup-wt is a hook now, not a skill"
@@ -205,7 +205,7 @@ jq -e '[.hooks.SessionStart[].hooks[].command | select(contains("cleanup-wt.py -
   || fail "the cleanup-wt SessionStart hook is not wired by default"
 jq -e '[.hooks[][].hooks[].command | select(contains("guard-protected-push"))] | length == 0' "$S" >/dev/null \
   || fail "the protected-push guard is opt-in: it must not be wired without --protect-main"
-for h in guard-worktree-path guard-secrets guard-key-literals guard-delete-outside; do
+for h in guard-worktree-path guard-secrets guard-key-literals guard-delete-outside permission-decider; do
   jq -e --arg h "$h" '[.hooks[][].hooks[].command | select(contains($h))] | length > 0' "$S" >/dev/null || fail "$h not wired in settings"
 done
 ls "$T/.claude/" | grep -q '^settings.json.bak-' || fail "no backup written before changing settings.json"
@@ -274,7 +274,7 @@ OUT=$(SUPER_BOARD_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
 [ "$(echo "$OUT" | head -1)" = "🔧 installing" ] || fail "quiet mode should start at the installing group, got: $OUT"
 echo "$OUT" | grep -q "next:" && fail "quiet mode must not print the next step"
 echo "$OUT" | grep -q "✓ skills, scripts and workflows → .agents/" || fail "quiet mode should print the grouped files line"
-echo "$OUT" | grep -q "🛡️  6 guard hooks → .claude/settings.json (new file)" || fail "guard line should count hooks, got: $OUT"
+echo "$OUT" | grep -q "🛡️  7 guard hooks → .claude/settings.json (new file)" || fail "guard line should count hooks, got: $OUT"
 [ "$(echo "$OUT" | wc -l | tr -d ' ')" -le 3 ] || fail "grouped output should be ≤ 3 lines here, got: $OUT"
 rm -rf "$T"
 

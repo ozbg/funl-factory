@@ -53,9 +53,9 @@ left alone; where no symlink can be made the file is copied. Settings and run st
 ```
 .agents/
 ├── skills/<the eight pack skills>/...
-├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
+├── hooks/guard-*.py, permission-decider.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
 ├── workflows/super-board-wave.js
-└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, agents-md, settings, setup), super-board-manifest.json, super-qa-file-bug.sh, super-review-file-refactor.sh
+└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, agents-md, settings, config, setup), super-board-manifest.json, super-qa-file-bug.sh, super-review-file-refactor.sh
 ```
 
 It also refreshes the managed `<!-- super-board:begin … -->` block in the target's AGENTS.md when

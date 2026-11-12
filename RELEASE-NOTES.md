@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+Waves run in Accept edits with no permission prompts, and the merge gate can't be skipped (#131).
+
+- 🔒 **Permission decider hook.** `permission-decider.py` allows a lane command when every part
+  of it is known-safe and `.claude/bin` scripts come from the main checkout, however they are
+  spelled. It denies a direct merge in any spelling, a worktree copy of a script, a lane's inline
+  code and lane edits to scripts, hooks and settings, with the allowed way in the reason.
+  install.sh wires it and adds `permissions.deny` lines for a direct merge.
+- 🔒 **Onboard never offers `gh pr merge:*`.** It lists wide allow lines already in settings
+  (`node:*`, `python3 -c`, `bash .claude/bin/:*` …) and removes the ones you approve, asks
+  whether the app migrates itself (writes `"-"`, no false 🙋), and offers a GitHub ruleset on
+  main and the base plus a one-repo token.
+- 🔧 **`super-board-config.py get <key>`.** Lanes read config values with it instead of `python3 -c`.
+
 The pack now ships `/to-board` and `/mockup`; `/to-spec` and `/to-tickets` are retired.
 
 - ✨ **`/to-board` and `/mockup` install into apps.** Both join the pack (10 skills). Install prunes
