@@ -185,14 +185,45 @@ class Scorecard(unittest.TestCase):
         cfg = self.cfg(stage=3, budget=None)
         self.rows({"wave": "w1", "card": 1, "column": "Done", "score": {"round": 3}, "lanesRun": "review:advanced"},
                   {"wave": "w1", "card": 2, "column": "Done", "score": {"round": 2}, "lanesRun": "review:advanced"},
+                  {"wave": "w1", "card": 6, "column": "Done", "score": {"round": 3}, "lanesRun": "review:advanced"},
                   {"wave": "w2", "card": 3, "column": "Ready", "lanesRun": "build:failed"},
                   {"wave": "w2", "card": 4, "column": "Ready", "lanesRun": "build:advanced → qa:failed"},
                   {"wave": "w2", "card": 5, "column": "QA", "lanesRun": "none", "finalStatus": "halted"})
         h = self.health(cfg)
-        self.assertEqual(h["metrics"]["roundsPerMerge"], 2.5)
+        self.assertEqual(h["metrics"]["roundsPerMerge"], 2.67)
         self.assertEqual(h["metrics"]["failuresToday"], 3)
         self.assertEqual(sorted(b["metric"] for b in h["breaches"]), ["factory-failures", "rounds-per-merge"])
         self.assertEqual(h["action"], "pause-new")
+
+    def test_approval_only_review_after_a_human_gate_is_not_a_round(self):
+        # funl #1: round 1 bounced, round 2 clean but human-gated, round 3 only re-checked it to merge.
+        cfg = self.cfg(stage=2, budget=None)
+        self.rows({"wave": "w1", "card": 1, "column": "Ready", "lanesRun": "review:bounced",
+                   "score": {"verdict": "rework", "blockers": 1, "round": 1}},
+                  {"wave": "w2", "card": 1, "column": "Blocked", "lanesRun": "review:blocked",
+                   "score": {"verdict": "clean", "blockers": 0, "round": 2}},
+                  {"wave": "w3", "card": 1, "column": "Done", "lanesRun": "review:advanced",
+                   "score": {"verdict": "clean", "blockers": 0, "round": 3}})
+        h = self.health(cfg)
+        self.assertEqual(h["metrics"]["roundsPerMerge"], 2)
+        self.assertEqual(h["action"], "continue")
+
+    def test_rounds_per_merge_never_acts_under_three_merges(self):
+        cfg = self.cfg(stage=2, budget=None)
+        self.rows({"wave": "w1", "card": 1, "column": "Done", "score": {"verdict": "clean", "round": 4}},
+                  {"wave": "w1", "card": 2, "column": "Done", "score": {"verdict": "clean", "round": 3}})
+        h = self.health(cfg)
+        self.assertEqual(h["metrics"]["roundsPerMerge"], 3.5)
+        self.assertEqual((h["action"], h["breaches"]), ("continue", []))
+
+    def test_merged_outside_the_lane_counts_as_merged(self):
+        self.rows({"wave": "w1", "card": 2, "column": "Review", "lanesRun": "review:blocked", "milestone": "M2"})
+        out = json.loads(run("merged", "--card", "2", "--sha", "abc123", "--by", "owner", "--scorecard", str(self.sc)))
+        self.assertEqual(out, {"recorded": "merged", "card": 2, "by": "owner"})
+        row = json.loads(self.sc.read_text().splitlines()[-1])
+        self.assertEqual((row["column"], row["mergedBy"], row["sha"], row["milestone"]), ("Done", "owner", "abc123", "M2"))
+        h = self.health(self.cfg(stage=1, budget=None))
+        self.assertEqual(h["report"]["merges"], 1)
 
     def test_warns_when_wave_wrote_no_rows_and_reports_after_ten_merges(self):
         cfg = self.cfg(stage=1, budget=None)

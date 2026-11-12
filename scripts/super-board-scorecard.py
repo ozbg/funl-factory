@@ -11,6 +11,8 @@ exam    — record one AI exam score on the real model (an event row; the latest
 screen  — record one QA screen match, passed or failed (an event row; the latest per card counts).
 walk    — record the milestone-end agent walk (screens and day-one questions passed), or
           --accepted when the owner accepts its findings. Needs a screenshot per screen.
+merged  — record a merge made outside the lane (owner or orchestrator), so report and
+          health count the card as merged.
 digest  — short plain-text owner digest; prints only on a merge, breach or ask
           (every wave when the config's `digest` is "every-wave").
 
@@ -19,6 +21,7 @@ digest  — short plain-text owner digest; prints only on a merge, breach or ask
   super-board-scorecard.py summary --scorecard docs/super-board/runs/scorecard.jsonl
   super-board-scorecard.py health --config <cfg> [--wave <label>] [--goal-done N --goal-total N]
   super-board-scorecard.py demo --accepted
+  super-board-scorecard.py merged --card N --sha <merge sha> --by owner|orchestrator [--milestone M1]
   super-board-scorecard.py exam --card N --score 9 --total 10 --pass-mark 8 --model <model id> [--milestone M1]
   super-board-scorecard.py screen --card N --screen screen-<name> --passed|--failed [--milestone M1]
   super-board-scorecard.py walk --screens N --passed N --questions N --answered N \
@@ -235,6 +238,20 @@ def record(a):
     print(json.dumps({"recorded": len(out), "agentsMatched": sum(len(r["agents"]) for r in out), "cardsWithoutLogs": unmatched}))
 
 
+def card_rounds(rs):
+    """Review rounds that found rework on one card's rows.
+
+    A review after a pass (verdict clean or fixes, no blockers) only re-checks an
+    approved, unchanged head, for example after a human gate. It is not a round.
+    """
+    scored = [r["score"] for r in rs if r.get("score")]
+    top = max([s.get("round", 1) for s in scored] or [1])
+    approvals = sum(1 for prev, cur in zip(scored, scored[1:])
+                    if prev.get("verdict") != "rework" and not prev.get("blockers")
+                    and cur.get("round", 1) > prev.get("round", 1))
+    return max(1, top - approvals)
+
+
 def light(first_pass, rework):
     # First guess at the cut-offs; the owner tunes them once there is data.
     if first_pass >= 70 and rework <= 10:
@@ -261,7 +278,7 @@ def summary(a):
         merged = [rs for rs in cards if any(r.get("column") == "Done" for r in rs)]
         scores = [r["score"] for rs in cards for r in rs if r.get("score")]
         first = [rs for rs in merged if not any("bounced" in (r.get("lanesRun") or "") for r in rs)]
-        rounds = [max([r["score"].get("round", 1) for r in rs if r.get("score")] or [1]) for rs in merged]
+        rounds = [card_rounds(rs) for rs in merged]
         rework = [s for s in scores if s.get("verdict") == "rework"]
         causes = {}
         for s in scores:
@@ -283,6 +300,7 @@ def summary(a):
 # Only these four act. Limits are first guesses; the owner tunes them with data.
 ROUNDS_LIMIT = 2          # rolling rounds per merged card, above this breaches
 ROLLING = 10              # merged cards in the rolling window
+ROUNDS_MIN_MERGES = 3     # rounds per merge only acts once this many cards merged
 BURN_PCT = 80             # budget used at or above this ...
 MERGED_PCT = 60           # ... with under this share of the goal merged breaches
 FAILURES_LIMIT = 2        # failed/halted lane exits today, above this breaches
@@ -328,7 +346,7 @@ def compute_health(all_rows, cfg, wave=None, goal_done=None, goal_total=None, to
     for r in rows:
         by_card.setdefault(r["card"], []).append(r)
     window = merged[-ROLLING:]
-    rounds = [max([(r.get("score") or {}).get("round", 1) for r in by_card[c]] or [1]) for c in window]
+    rounds = [card_rounds(by_card[c]) for c in window]
     rpm = round(sum(rounds) / len(rounds), 2) if rounds else 0
     capped = sorted({r["card"] for r in this_wave if r.get("roundCapped")})
     failures = sum(1 for r in rows if str(r.get("at", "")).startswith(today)
@@ -339,7 +357,7 @@ def compute_health(all_rows, cfg, wave=None, goal_done=None, goal_total=None, to
     breaches = []
     if capped:
         breaches.append({"metric": "round-capped", "detail": "cards hit the round cap: " + ", ".join("#%s" % c for c in capped)})
-    if rpm > ROUNDS_LIMIT:
+    if rpm > ROUNDS_LIMIT and len(window) >= ROUNDS_MIN_MERGES:
         breaches.append({"metric": "rounds-per-merge", "detail": "{} rounds per merged card (last {}) > {}".format(rpm, len(window), ROUNDS_LIMIT)})
     if budget and burn >= BURN_PCT and done_pct < MERGED_PCT:
         breaches.append({"metric": "budget-burn", "detail": "${} of ${} ({}%) with {}/{} merged ({}%)".format(
@@ -399,6 +417,17 @@ def health(a):
     append(sc, [{"event": "health", "at": now_iso(), "wave": h["wave"], "action": h["action"],
                  "breaches": [b["metric"] for b in h["breaches"]]}])
     print(json.dumps(h, sort_keys=True))
+
+
+def merged(a):
+    """A merge made outside the lane: the card's rows still say Review, so add a Done row."""
+    sc = Path(a.scorecard)
+    mine = [r for r in load_rows(sc) if r.get("card") == a.card]
+    milestone = a.milestone or next((r.get("milestone") for r in reversed(mine) if r.get("milestone")), None)
+    append(sc, [{"card": a.card, "column": "Done", "finalStatus": "merged", "lanesRun": "merged:" + a.by,
+                 "mergedBy": a.by, "sha": a.sha, "milestone": milestone, "wave": a.wave or "outside-lane",
+                 "at": now_iso(), "tokens": 0, "usd": 0, "minutes": 0, "agents": []}])
+    print(json.dumps({"recorded": "merged", "card": a.card, "by": a.by}))
 
 
 def demo(a):
@@ -574,6 +603,19 @@ def _coverage(repo, rows, board_json, milestone=None, scorecard=None):
             Path(tmp.name).unlink(missing_ok=True)
 
 
+def _board_counts(board_json, milestone=None):
+    """(done, total) from a [{number, status[, milestone]}] board file, or (None, None)."""
+    if not board_json:
+        return None, None
+    try:
+        items = json.loads(Path(board_json).read_text())
+        items = [i for i in items if not milestone or i.get("milestone") in (None, milestone)]
+        done = sum(1 for i in items if str(i.get("status", "")).lower() == "done")
+        return done, len(items)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None, None
+
+
 def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=None, today=None, scorecard=None):
     goal = cfg.get("goal") or {}
     milestone = goal.get("milestone")
@@ -612,6 +654,11 @@ def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=
         by_card.setdefault(r["card"], []).append(r)
     merged = _merged_cards(rows)
     n = len(merged)
+    board_done, board_total = _board_counts(board_json, milestone)
+    if goal_total is None:
+        goal_total = board_total
+    if goal_done is None:
+        goal_done = board_done
     total = goal_total if goal_total is not None else (len(by_card) or None)
     done = goal_done if goal_done is not None else (n if rows else None)
     merged_rows = [r for c in merged for r in by_card[c]]
@@ -643,7 +690,7 @@ def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=
     if n:
         first = [c for c in merged if not any("bounced" in (r.get("lanesRun") or "") for r in by_card[c])]
         fp = round(100 * len(first) / n)
-        rounds = [max([(r.get("score") or {}).get("round", 1) for r in by_card[c]] or [1]) for c in merged]
+        rounds = [card_rounds(by_card[c]) for c in merged]
         rpm = round(sum(rounds) / n, 2)
         tok = round(sum(r.get("tokens", 0) for r in merged_rows) / n / 1000)
         mins = round(sum(r.get("minutes", 0) for r in merged_rows) / n)
@@ -868,12 +915,19 @@ def main():
     x.add_argument("--config")
     x.add_argument("--repo-path", default=".")
     x.add_argument("--scorecard", help="default <repo>/" + DEFAULT_SC)
-    x.add_argument("--board-json", help="[{number,status}] for coverage; default: Done cards in the scorecard")
+    x.add_argument("--board-json", help="[{number,status}]: merged count and coverage; default: Done cards in the scorecard")
     x.add_argument("--goal-done", type=int)
     x.add_argument("--goal-total", type=int)
     x.add_argument("--log", action="store_true", help="append one line to " + LOG_PATH)
     x.add_argument("--compare", action="store_true", help="print the factory log as a table")
     x.add_argument("--json", action="store_true")
+    m = sub.add_parser("merged")
+    m.add_argument("--card", type=int, required=True)
+    m.add_argument("--sha", required=True, help="the merge commit sha")
+    m.add_argument("--by", required=True, choices=["owner", "orchestrator"])
+    m.add_argument("--milestone", help="default: the card's last recorded milestone")
+    m.add_argument("--wave", help="default: outside-lane")
+    m.add_argument("--scorecard", default=DEFAULT_SC)
     d = sub.add_parser("demo")
     d.add_argument("--accepted", action="store_true")
     d.add_argument("--note")
@@ -906,7 +960,7 @@ def main():
     w.add_argument("--milestone")
     w.add_argument("--scorecard", default=DEFAULT_SC)
     a = p.parse_args()
-    return {"record": record, "summary": summary, "health": health, "demo": demo, "digest": digest, "report": report,
+    return {"record": record, "summary": summary, "health": health, "demo": demo, "merged": merged, "digest": digest, "report": report,
             "exam": exam, "screen": screen, "walk": walk}[a.cmd](a)
 
 
