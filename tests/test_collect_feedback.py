@@ -180,12 +180,13 @@ class FeedbackText(unittest.TestCase):
         self.assertIn('"before" in the before and after', qa)
         self.assertIn("never commit, embed or upload it", qa)
 
-    def test_walk_findings_go_through_triage(self):
+    def test_walk_findings_go_to_the_scope_judge(self):
+        # factory #148: the walk files to Backlog as scope:pending; the judge decides, never the walk.
         findings = self.WALK.split("## Findings", 1)[1].split("## Record", 1)[0]
-        self.assertIn("collect_handoff.py triage --findings <run folder>/triage.json", findings)
-        self.assertIn("--track <track> --decision <decision>", findings)
-        self.assertNotIn("File every ❌ to Backlog", self.WALK)
-        self.assertLess(findings.index("collect_handoff.py triage"), findings.index("super-collect-file.sh"))
+        self.assertIn("`scope:pending`", findings)
+        self.assertIn("--source walk", findings)
+        self.assertNotIn("--decision <decision>", findings)
+        self.assertNotIn("--milestone", findings.split("refuses `--milestone <goal>`", 1)[1])
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ Print the stdout as is. Do not rewrite it.
 | Define | last line of `docs/shape/north-star-log.jsonl` (minutes, questions, blind match); the `Mock-up:` line under `Signed:` in `docs/shape/north-star.md` |
 | Build | scorecard records (`docs/super-board/runs/scorecard.jsonl`): days from first card started to last merged, merged/total, first pass, rework, rounds per merge, k tokens and minutes per card. Merged/total comes from `--board-json` when given. A review that only re-checks an approved, unchanged head (after a human gate) is not a round. Models by rule counts `modelRules` on records; `n/a` when absent |
 | Cost | API-equivalent USD from the records, against `goal.budget_usd` |
+| Scope | the config's `goal.scope` (`super-board-scope.sh`): cards at the freeze, cards admitted after, by the judge or the owner, how many were a frozen card's unfinished AC, and the growth cap. `n/a` when the goal was never frozen |
 | Done | `super-board-coverage.py status --json`: done/total per must-have, demo state, and whether the milestone is done (cards, demo and the agent walk; `walk.md`). Board state is the Done cards in the scorecard, or `--board-json <file>` (`[{number, status}]`) |
 | AI exams | `exam` rows in the scorecard, written by QA (`super-board-scorecard.py exam --card N --score S --total T --pass-mark P --model <id>`). The latest run per card counts: score, pass mark, model |
 | Screens match | `screen` rows in the scorecard, written by QA's screen match (`lanes/qa.md` step 7b: `super-board-scorecard.py screen --card N --screen screen-<name> --passed\|--failed`). The latest per card counts, out of the screen cards QA recorded |
@@ -65,7 +66,7 @@ owner finds after.
 
 `--log` appends exactly one JSON line to `<repo>/docs/super-board/factory-log.jsonl`:
 `{date, app, milestone, days, merged, total, first_pass_pct, rework_pct, rounds_per_merge, usd,
-budget_usd, demo_passed, postcard, targets_met, exams, screens_match_pct, walk_pass_pct, mockup_cuts}`.
+budget_usd, demo_passed, postcard, targets_met, exams, screens_match_pct, walk_pass_pct, mockup_cuts, scope}`.
 Unknown values are `null`.
 
 `--compare` prints that file as a table, one row per line, so app 2 sits beside app 1.

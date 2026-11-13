@@ -67,6 +67,15 @@ config's `goal.milestone`. Before anything else:
    Tell the owner how many there are in one line, and never run them. A card belongs to
    the goal only when its milestone says so: move a card onto the goal only when the
    owner asks, never because it's runnable.
+5. **Freeze the scope** (factory #148), once the goal is confirmed:
+   `bash .claude/bin/super-board-scope.sh freeze --config <config-path>`. It writes the goal's
+   open cards to `goal.scope` in the config; a second run on the same goal keeps the first
+   freeze. From here on the planner refuses any goal card that is not in that list and not
+   admitted. Nobody files onto the goal: walk, lane and collect findings go to Backlog with the
+   `scope:pending` label, and the scope judge decides them ([`scope-judge.md`](scope-judge.md)).
+   A new owner ask after the freeze is a card like any other. File it `scope:pending` for the
+   judge, or put it on the next milestone. The owner can still admit it with their own words:
+   `super-board-scope.sh admit <n> --owner "<their words>"`.
 
 Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 1. Config exists and validates against `config-schema.json`. Run
@@ -176,6 +185,14 @@ Repeat until a done condition, a halt or a stop:
    `Backlog` with one comment naming the missing field from its `reason` (no ACs,
    no `Files:` line, no or unlisted `Must-have served:`); never dispatch it. A card
    with no `Files:` line is refused, not deferred: unknown files overlap everything. Deferred cards stay in Ready and join a later wave.
+   A card refused as `not in the frozen scope; the scope judge has not admitted it` goes to
+   Backlog with the `scope:pending` label, so the judge sees it next wave. Never put it back
+   on the goal by hand.
+
+   **Scope judge, every wave.** Run `bash .claude/bin/super-board-scope.sh pending --config <config-path>`
+   and pass its stdout as `scopePending` at launch (step 4). It lists the `scope:pending` cards
+   with Risk, Recommendation, priority and orchestrator `Decided` lines already stripped. The
+   judge reads only that and the app's own files. Never add your view of a card to it.
 
    **Stranded Building cards.** A card in Building with no assignee between
    waves has no live worker — a stopped or crashed wave left it mid-build. For
@@ -210,7 +227,9 @@ Repeat until a done condition, a halt or a stop:
    left to run, launch the walk before reporting the goal: one Agent task on Sonnet that follows
    [`walk.md`](walk.md), once per run, when `super-board-coverage.py status --json --milestone <goal>`
    shows its `walk` as `not run` or `failed`. It files each failure to Backlog and records the
-   result with `super-board-scorecard.py walk`. A failed walk is one `needs-you` item on the Demo
+   result with `super-board-scorecard.py walk`. Every finding files to Backlog as `scope:pending`;
+   only a broken day-one answer, rubric a or c, or an exam below its pass mark fails the walk.
+   After two failed walks on one goal, the open findings are one `needs-you` item on the Demo
    card (walk.md → "After the walk"), then stop. **Goal reached:** when the goal milestone has no
    open issues and coverage status says `milestone_done` (the walk passed, or the owner accepted
    its findings), stop, fill the retro ([`retro.md`](retro.md)), report `🎯 <title> reached`, and
@@ -226,7 +245,7 @@ Repeat until a done condition, a halt or a stop:
    (or /loop re-entries) against the same board without bot_identity.
 4. **Launch** — Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
-   `args: { configPath, cards, humanApprovesMerge, tier, laneModels, laneModelsByTier, laneModelsJudgement, truthGate }` (`cards` hydrated after the planner: each
+   `args: { configPath, cards, humanApprovesMerge, tier, laneModels, laneModelsByTier, laneModelsJudgement, truthGate, scopePending }` (`cards` hydrated after the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config. Review lanes run in
    parallel: the merge mutex sits in `super-board-merge-gate.sh`, not in the workflow.
@@ -245,6 +264,9 @@ Repeat until a done condition, a halt or a stop:
    Each lane's history entry records `modelRule`: `judgement`, `tier` or `default`.
    `truthGate` is the config's `truth_gate` (omit when unset; default `red`): which cards get
    the truth-check step before Review (lanes/review.md step 6).
+   `scopePending` is the `pending` output from step 2 (omit when it lists no cards). The wave's
+   `Scope judge` phase judges each card on Sonnet, read-only. A wave with no cards to build
+   still launches when cards are pending, with `cards: []`.
 5. **Reconcile** (when the run completes) — read the returned `cards`
    summary. If `halted: true`, any card is `halted`, or the GitHub helper's `--check`
    fails, preserve claims and stop. For verification-readiness (exit 9), repair
@@ -291,6 +313,22 @@ Repeat until a done condition, a halt or a stop:
    It prints goal, merges, health, budget and asks only when there was a merge, a
    breach or an ask (every wave when `digest` is `every-wave`). Non-empty output is
    sent as is with the PushNotification tool.
+   **Scope verdicts.** The result's `scope` block lists one verdict per pending card. For each:
+   - Write it to `docs/super-board/runs/<date>-scope/<n>.json`.
+   - Each card in `gates`: `bash .claude/bin/super-board-scope.sh admit <n> --config <config-path> --verdict-file <that file>`.
+     Exit 0 → put the card on the goal, remove `scope:pending`, move it to Ready. Exit 65 → it
+     stays in Backlog. A refusal past the growth cap or for an `owner_call` goes to the owner.
+   - Past the cap and `ownerCalls`: one `needs-you` item for all of them, one line each,
+     "admit or next" with the judge's reason and `owner_call`. The owner's answer is admitted
+     with their words: `admit <n> --owner "<words>"`.
+   - `next`: remove `scope:pending` and put the card on the next open milestone; with none, it
+     stays in Backlog.
+   - `drops`: one owner digest, one line each with the citation. Never close a card
+     automatically. On the owner's yes, close it as not planned with the reason. A
+     `route: "factory"` drop is ticketed on `ozbg/funl-factory-master` instead.
+   - `missing` (no verdict) stays `scope:pending` for the next wave.
+   The cap is code's, never yours: never admit a gate the script refused, and never hold back
+   one it admits.
    **Owner asks.** Every question for the owner is a `needs-you` item: a comment
    on the card's PR (on the issue when there is no PR) with the `needs-you` label,
    never only a chat line. The wave-start sweep never sends a `needs-you` card back
@@ -311,6 +349,9 @@ Repeat until a done condition, a halt or a stop:
      ❌ #18 failed: build lane returned no result — retried next wave
    Next: wave 4 (3 cards)   |   ⏸ paused until 14:05   |   ✅ board drained
    ```
+   A wave that admitted or refused a card adds one line from
+   `bash .claude/bin/super-board-scope.sh status --config <config-path>`:
+   `🧊 scope M2 · frozen 6 · admitted 2 (judge 2, owner 0) · cap 2, 0 left`.
    Add the scorecard as the block's last line(s):
    `python3 .claude/bin/super-board-scorecard.py summary --scorecard docs/super-board/runs/scorecard.jsonl`
    prints one line per build model (🟢 working · 🟡 watch · 🔴 not working). Review's

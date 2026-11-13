@@ -111,6 +111,9 @@ Signed: <date> · depth: <prototype|product> · questions: <n> · minutes: <n>
 ## North star
 <one line: the business outcome, with a number or a visible behaviour>
 
+## Fit for purpose
+- <Label>: <one fact>, one line each for Users, Runs on, Reach, Holds, Worst case, Matters most, Matters least, Budget, Scale, Stage
+
 ## Who and the core loop
 <who uses it; the one thing they do most, as 3 to 5 plain steps>
 
@@ -135,6 +138,8 @@ Signed: <date> · depth: <prototype|product> · questions: <n> · minutes: <n>
 ```
 
 Put parked details in `<out>/later.md`. Day-one lines go only in `## Day-one questions`, one per line, never in the postcard; the AI exam and the agent walk read them.
+
+`## Fit for purpose` is required: ten lines in the form and order of `super-board/references/scope-judge.md`, shown with the postcard and signed with it. "Matters most" and "Matters least" are the owner's ranking, never yours. Lint fails a north star without them (`super-board-scope.sh profile`).
 
 Then run the **blind test**: start a sub-agent with a fresh context. Give it only the postcard, the core loop and the must list. Ask it to describe the MVP in 10 lines: its screens and what the user does on each. Show the owner the sketch and ask: "How close is this to what's in your head, 1 to 5?" Wait for the number before writing the log. This is the owner's score, never yours.
 
