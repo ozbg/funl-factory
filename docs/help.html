@@ -529,7 +529,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
 <section id="qa">
   <h2>How auto QA works</h2>
   <p class="sub">No single step is trusted. Every card passes a chain of checks, each run by a different agent or script than the one before, and the milestone ends with an agent using the real app. How hard each check looks depends on the zone.</p>
-  <div class="diagram" role="img" aria-label="Auto QA chain. Per card: card check, build self-check, QA lane, enforce, truth check on red cards, review, merge gate, reconcile. A cited bounce from QA or review sends the card back to build. Per milestone: Demo card, agent walk with AI exams, then triage files what failed as new cards, which go back to the card check.">
+  <div class="diagram" role="img" aria-label="Auto QA chain. Per card: card check, build self-check, QA lane, enforce, truth check on red cards, review, merge gate, reconcile. A cited bounce from QA or review sends the card back to build. Per milestone: Demo card, agent walk with AI exams, then the scope judge decides each finding; only admitted gates go back to the card check.">
   <svg viewBox="0 0 980 290" xmlns="http://www.w3.org/2000/svg">
     <defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
     <g font-size="12">
@@ -549,18 +549,18 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
       <text x="10" y="160" fill="var(--muted)" font-family="var(--f-mono)" font-size="11">EVERY MILESTONE</text>
       <rect x="254" y="170" width="150" height="54" rx="6" fill="var(--panel)" stroke="var(--accent)"/><text x="329" y="192" text-anchor="middle" fill="var(--fg)" font-weight="600">Demo card</text><text x="329" y="210" text-anchor="middle" fill="var(--muted)">the whole core loop</text>
       <rect x="434" y="170" width="190" height="54" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="529" y="192" text-anchor="middle" fill="var(--accent)" font-weight="600">agent walk</text><text x="529" y="210" text-anchor="middle" fill="var(--fg)">screens · questions · exams</text>
-      <rect x="654" y="170" width="150" height="54" rx="6" fill="var(--panel)" stroke="var(--accent)"/><text x="729" y="192" text-anchor="middle" fill="var(--fg)" font-weight="600">triage</text><text x="729" y="210" text-anchor="middle" fill="var(--muted)">fix or propose</text>
+      <rect x="654" y="170" width="150" height="54" rx="6" fill="var(--panel)" stroke="var(--accent)"/><text x="729" y="192" text-anchor="middle" fill="var(--fg)" font-weight="600">scope judge</text><text x="729" y="210" text-anchor="middle" fill="var(--muted)">gate · next · drop</text>
       <path d="M404 197H430M624 197H650" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ar5)"/>
       <path d="M918 82 V150 H329 V166" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#ar5)"/>
       <text x="910" y="144" text-anchor="end" fill="var(--muted)" font-size="11">all cards on the goal Done</text>
       <path d="M729 224 C729 262, 64 262, 64 86" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#ar5)"/>
-      <text x="400" y="280" text-anchor="middle" fill="var(--muted)" font-size="11">each failure becomes a card on the goal; the next run walks again</text>
+      <text x="400" y="280" text-anchor="middle" fill="var(--muted)" font-size="11">only an admitted gate joins the goal, within the growth cap; the next run walks again</text>
     </g>
   </svg>
   </div>
   <div class="tablebox"><table>
     <tr><th>Part</th><th>Who runs it</th><th>What it checks</th><th>When it fails</th></tr>
-    <tr><td>Card check</td><td><span class="cmd">/super-board lint</span>, then the wave planner</td><td>Every card has checkboxes, a <code>Files:</code> line and a must-have. Each AC's test sits where the test runner actually looks, and each blocker is on the board. Two cards in one wave never touch the same file.</td><td>Refused or held in Ready with the reason, before any tokens are spent on it</td></tr>
+    <tr><td>Card check</td><td><span class="cmd">/super-board lint</span>, then the wave planner</td><td>Every card has checkboxes, a <code>Files:</code> line and a must-have. Each AC's test sits where the test runner actually looks, and each blocker is on the board. Two cards in one wave never touch the same file. A goal card that is neither in the scope frozen at run start nor admitted by the scope judge never runs.</td><td>Refused or held in Ready with the reason, before any tokens are spent on it</td></tr>
     <tr><td>Build self-check</td><td>The builder</td><td>Writes each AC's test first and watches it fail, makes the change, runs the app's checks (<code>verify_commands</code>). Its worktree is brought up to date first, so it never builds on old code.</td><td>The builder fixes it before it opens the PR</td></tr>
     <tr><td>QA lane</td><td>A separate tester</td><td>Checks out the PR's own branch and records the commit it tested. Then by zone: every AC proven by a passing test, the zone's bar, the card's edge cases; on red, a test per rule and one deliberate break per guarded line; the security pass on red and boundary amber; every screen card's screenshot beside its mock-up.</td><td>Back to Build with the cited AC, rule, bar line or bug. If the commit it tested isn't the PR's current head, it records nothing and the card is re-tested.</td></tr>
     <tr><td>Enforce</td><td>The wave workflow</td><td>Every bounce from QA or review carries a citation. An uncited bounce is undone: the finding becomes a note and the card moves on. The round cap uses the higher of the card's zone label and its files' zone.</td><td>Past the round cap: Blocked with "split, steer or ask"</td></tr>
@@ -569,7 +569,8 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Merge gate</td><td>A script, never a person or a lane</td><td>Merges the latest base into the exact commit that was reviewed, re-runs the app's checks, and refuses any AC that isn't ticked with a file as proof. Only then does it merge.</td><td>Back to Build (an unproven AC), a rebase pass (the base moved), or you (money, auth, destructive schema)</td></tr>
     <tr><td>Reconcile</td><td>The foreman, after each wave</td><td>Closes the issue of every merged card, logs the card in the run manifest and scores it.</td><td>A card that isn't merged stays in Review for the next wave</td></tr>
     <tr><td>Demo card</td><td>The last card on the goal</td><td>Walks the whole core loop end to end against the mock-up.</td><td>A fix card, like any other</td></tr>
-    <tr><td>Agent walk</td><td>Sonnet, on a fresh build with the real AI</td><td>Every screen: it opens, matches the mock-up, does its job, has its empty and error states, and reads well. Every day-one question, asked through the real UI. Every AI exam, run on the real model.</td><td>Each failure is triaged: a fix to Ready on the goal, or a proposal for you. The milestone isn't done until a walk passes or you accept its findings.</td></tr>
+    <tr><td>Agent walk</td><td>Sonnet, on a fresh build with the real AI</td><td>Every screen: it opens, matches the mock-up, does its job, has its empty and error states, and reads well. Every day-one question, asked through the real UI. Every AI exam, run on the real model.</td><td>Only a broken day-one answer, a screen that won't open or can't do its job, or an exam below its pass mark fails the walk. Every finding files to Backlog as <code>scope:pending</code> for the scope judge. After two failed walks, what is left comes to you as one accept-or-build item.</td></tr>
+    <tr><td>Scope judge</td><td>Sonnet, read-only, every wave</td><td>Each <code>scope:pending</code> card, read with the north star's <code>## Fit for purpose</code> profile, the must-haves, day-one questions and invariants, never the foreman's opinion. Gate, next or drop, each with a citation. A script admits the gates: it checks the citation and caps the goal's growth at 25% of the frozen cards.</td><td>No citation: next. Past the cap, or a fix that changes a rule: you decide, admit or next. A drop waits for your yes.</td></tr>
   </table></div>
   <div class="tablebox"><table>
     <tr><th>Zone</th><th>What QA does</th></tr>
@@ -582,7 +583,7 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Cite or it's a note</td><td>A fail must point at a check (<code>AC2</code>), a rule (<code>I3</code>), a bar line, or a bug with steps to reproduce. Anything else is a note and doesn't send the card back.</td></tr>
     <tr><td>Proof is a file</td><td>Each ticked check names the test that proves it. "Looked fine" doesn't count; the merge gate refuses it.</td></tr>
     <tr><td>Evidence stays local</td><td>Screenshots, logs and recordings go to <code>.claude/super-board/evidence/</code> (not committed). The PR gets a text table: check, result, proof. The one exception is a screen's pair: QA commits it under <code>docs/shape/baseline/</code>, shows the screen beside its mock-up in the QA comment, and review looks at the pair before passing.</td></tr>
-    <tr><td>Stay in scope</td><td>A real problem outside the card becomes a new Backlog card; it doesn't fail this one.</td></tr>
+    <tr><td>Stay in scope</td><td>A real problem outside the card becomes a new Backlog card, labelled <code>scope:pending</code>; it doesn't fail this one. No worker puts a card on the goal: the scope judge decides.</td></tr>
     <tr><td>Round caps</td><td>Green 1, amber 2, red 3 tries. Then Blocked with "split, steer or ask".</td></tr>
     <tr><td>The whole loop</td><td>The Demo card walks the core loop end to end. Then the agent walk uses the real app with the real AI, screen by screen, and runs every AI exam. Its failures come back as feedback.</td></tr>
   </table></div>
@@ -661,14 +662,15 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><td>Health</td><td>Four numbers act: a card hit its round cap, rounds per merge above 2, 80% of the budget spent with under 60% of the goal merged, more than 2 failed lanes today.</td><td>A breach narrows the next wave and takes no new cards; budget asks you. It never halts the run.</td></tr>
     <tr><td>GitHub limit</td><td>A wave that hit GitHub's hourly limit.</td><td>The next wave runs one card narrower</td></tr>
     <tr><td>Digest</td><td>Goal, merges, health and budget, sent to you only when something merged, broke or needs you.</td><td>Your inbox, not the board</td></tr>
+    <tr><td>Scope judge</td><td>Every <code>scope:pending</code> card gets gate, next or drop, with a citation. The script admits gates up to 25% growth on the scope frozen at run start; a frozen card's own failed check doesn't count.</td><td>The goal grows only by admitted gates. Past the cap, owner calls and drops come to you as one item.</td></tr>
   </table></div>
   <p><strong>Which fix.</strong> When review keeps finding the same kind of fault, the cause on the scorecard says where to act. Mostly the ticket: sharpen the tickets and keep the model. Mostly the build: the builder model is short for those cards, and the factory asks you before moving it up.</p>
 
   <p class="groupcap">Every milestone</p>
   <div class="tablebox"><table>
     <tr><th>Step</th><th>What happens</th></tr>
-    <tr><td>Agent walk</td><td>Uses the real app, every screen and day-one question, and runs every AI exam (see <a href="#qa">Auto QA</a>). Its failures become cards on the goal, and the run goes again until a walk passes.</td></tr>
-    <tr><td>Report</td><td><span class="cmd">/super-board report --log</span> scores the milestone against every target and writes one line to <code>factory-log.jsonl</code>. <code>--compare</code> puts every app side by side, which shows whether the factory itself is improving.</td></tr>
+    <tr><td>Agent walk</td><td>Uses the real app, every screen and day-one question, and runs every AI exam (see <a href="#qa">Auto QA</a>). Its findings go to the scope judge; the admitted gates are built and the run walks again. After two failed walks, you decide: accept or build.</td></tr>
+    <tr><td>Report</td><td><span class="cmd">/super-board report --log</span> scores the milestone against every target, shows scope growth (cards at the freeze, admitted after, by the judge or you), and writes one line to <code>factory-log.jsonl</code>. <code>--compare</code> puts every app side by side, which shows whether the factory itself is improving.</td></tr>
     <tr><td>Retro</td><td>Beside the run log: the result against each target, product quality (screens, exams, walk, cuts), what worked, what broke (the symptom, then the cause) and the factory changes it needs. Its numbers come from the report and the walk; nothing is measured twice.</td></tr>
     <tr><td>Owner-found defects</td><td>Anything you find in the first days of use that the walk passed is a gap in the walk's checklist. It goes in the retro, and the checklist fix becomes a factory ticket.</td></tr>
   </table></div>
@@ -713,11 +715,14 @@ footer{color:var(--muted);font-size:14px;padding-top:28px;border-top:1px solid v
     <tr><th>You</th><th>When</th></tr>
     <tr><td>Say yes to the postcard</td><td>End of <span class="cmd">/north-star</span> and <span class="cmd">/mockup</span></td></tr>
     <tr><td>Score the blind test 1–5</td><td>End of <span class="cmd">/north-star</span></td></tr>
+    <tr><td>Sign the ten <code>Fit for purpose</code> lines: who it's for, where it runs, what matters most and least</td><td><span class="cmd">/north-star</span>, or onboard for an app that has none</td></tr>
     <tr><td>Approve the card list for scope</td><td><span class="cmd">/to-board</span>, once</td></tr>
     <tr><td>Sign <code>zones.yaml</code></td><td>Before the first run, and when an area is promoted</td></tr>
     <tr><td>Merge money, auth and destructive-schema PRs; run anything on a live database</td><td>A 🙋 card in Blocked</td></tr>
     <tr><td>Keep going, raise the budget, or stop</td><td>Budget breach in the digest</td></tr>
-    <tr><td>Build the agent walk's findings now, or accept them for later</td><td>A failed walk, on the Demo card</td></tr>
+    <tr><td>Build the agent walk's findings now, or accept them for later</td><td>Two failed walks on one goal, on the Demo card</td></tr>
+    <tr><td>Admit a card onto the goal, or send it to the next milestone</td><td>Past the scope cap, or when its fix changes a rule</td></tr>
+    <tr><td>Close the scope judge's drops</td><td>The drops digest</td></tr>
     <tr><td>Re-read the north star next morning</td><td>The day after signing</td></tr>
     <tr><td>Accept or reject a proposal from triage</td><td>The proposals digest, after the first build</td></tr>
     <tr><td>Sign the brief for a body of work</td><td>Before its cards are cut</td></tr>

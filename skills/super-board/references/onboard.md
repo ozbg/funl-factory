@@ -430,6 +430,14 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    token guidance from the same section as one dim line. Never applied without the yes.
    └─ Delete onboard-staged/; keep the answers file (re-runs use it).
 
+FIT FOR PURPOSE — an app with `docs/shape/north-star.md` whose
+      `bash $SB/super-board-scope.sh profile --config <saved config>` exits 1 has no
+      `## Fit for purpose` block, and the scope judge won't judge without it (factory #148).
+      Draft the ten lines (north-star SKILL.md → step 8) from the north star, spec.md and
+      zones.yaml, show them, and ask the owner once (AskUserQuestion): sign as is, or fix a
+      line. Write the block under `## North star` only after their yes. Never write it unsigned.
+      A new app mid-Define gets it from /north-star instead.
+
 DONE — run `python3 $SB/super-board-verification-ready.py --config <saved config>`;
       exit 9 reports setup incomplete (repair checks before run; do not reinstall/rebase).
       A new app mid-Define expects exit 9 here: no failure, just the one-line note that
@@ -471,6 +479,7 @@ wired by install.sh), which allows the shapes a rule cannot match. Add:
     "Bash(python3 .claude/bin/super-board-skills-ready.py:*)",
     "Bash(bash .claude/bin/super-board-usage.sh:*)",
     "Bash(bash .claude/bin/super-board-throttle.sh:*)",
+    "Bash(bash .claude/bin/super-board-scope.sh:*)",
     "Bash(python3 .claude/bin/super-board-scorecard.py:*)",
     "Bash(python3 .claude/bin/super-board-zone.py:*)",
     "Bash(python3 .claude/bin/super-board-coverage.py:*)",

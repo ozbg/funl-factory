@@ -742,7 +742,22 @@ def compute_report(cfg, rows, repo, goal_done=None, goal_total=None, board_json=
             "done": {"coverage": cov, "demo_passed": demo_done, "demo_first_try": demo_first},
             "exams": exams, "screens_match": sm, "walk": walk,
             "mockup_cuts": cov.get("mockup_cuts") if cov else None,
+            "scope": _scope_growth(cfg),
             "postcard": postcard, "_checks": checks}
+
+
+def _scope_growth(cfg):
+    """The goal's frozen scope (factory #148): cards at the freeze, admitted after, by whom."""
+    s = (cfg.get("goal") or {}).get("scope")
+    if not isinstance(s, dict):
+        return None
+    adm = s.get("admitted") or []
+    frozen = len(s.get("issues") or [])
+    return {"frozen": frozen, "admitted": len(adm),
+            "judge": sum(1 for x in adm if x.get("by") == "judge"),
+            "owner": sum(1 for x in adm if x.get("by") == "owner"),
+            "unfinished": sum(1 for x in adm if x.get("unfinished") is not None),
+            "cap": max(1, -(-frozen // 4))}
 
 
 def render_report(app, rep):
@@ -758,6 +773,11 @@ def render_report(app, rep):
         _num(b["rounds_per_merge"]), _num(b["k_tokens_per_card"]), _num(b["min_per_card"]), rules))
     out.append("Cost: {} of {} (API-equivalent)".format(
         NA if c["usd"] is None else "${}".format(c["usd"]), NA if c["budget_usd"] is None else "${}".format(c["budget_usd"])))
+    sg = rep.get("scope")
+    out.append("Scope: {}".format(NA if not sg else
+        "frozen {} · admitted after {} (judge {}, owner {}{}) · cap {}".format(
+            sg["frozen"], sg["admitted"], sg["judge"], sg["owner"],
+            ", {} unfinished".format(sg["unfinished"]) if sg["unfinished"] else "", sg["cap"])))
     cov = dn["coverage"]
     if cov:
         per = " · ".join("must-have {} {}/{}".format(m["must_have"], m["done"], m["total"]) for m in cov["must_haves"])
@@ -830,7 +850,8 @@ def _log_line(app, rep, today):
             "demo_passed": rep["done"]["demo_passed"], "postcard": rep["postcard"], "targets_met": rep["targets_met"],
             "exams": [{k: e[k] for k in ("card", "score", "total", "pass_mark")} for e in rep["exams"]] or None,
             "screens_match_pct": rep["screens_match"]["pct"],
-            "walk_pass_pct": rep["walk"]["pct"] if rep["walk"] else None, "mockup_cuts": rep["mockup_cuts"]}
+            "walk_pass_pct": rep["walk"]["pct"] if rep["walk"] else None, "mockup_cuts": rep["mockup_cuts"],
+            "scope": rep.get("scope")}
 
 
 def compare(repo):

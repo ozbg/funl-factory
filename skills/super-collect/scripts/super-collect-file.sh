@@ -27,13 +27,19 @@
 #   6. the owner's answer to the proposals digest: `--accept N` (bug or tweak → Ready,
 #      body of work stays in Backlog for the grill) and `--reject N --reason "<why>"`
 #      (comment, marker in the body, label `rejected`, closed as not planned).
+#   7. the scope gate (factory #148): `--milestone <m>` puts the card on a milestone.
+#      On the goal (`goal.milestone`) once `goal.scope` is frozen, it is refused (exit 67)
+#      unless the card is in that scope: frozen, or admitted by super-board-scope.sh.
+#      A new card is never admitted yet, so a finding files to Backlog with the
+#      `scope:pending` label and the scope judge decides. `--source walk` adds that
+#      label itself. No `goal.scope`: the milestone is set as asked.
 #
 # Usage:
 #   super-collect-file.sh --config <cfg.json> --type bug|feature|refactor|fix \
 #     --source sentry|posthog|github|prs|architecture|custom|walk|feedback --title "<one line>" --body-file <md> \
 #     --fingerprint "<stable key>" [--priority high|medium|low] [--area <a>] \
-#     [--label <l>]... [--track bug|tweak|body --decision fix|propose] [--yes]
-#   super-collect-file.sh --config <cfg.json> --adopt <issue#> --type bug|feature|refactor [--yes]
+#     [--label <l>]... [--track bug|tweak|body --decision fix|propose] [--milestone <m>] [--yes]
+#   super-collect-file.sh --config <cfg.json> --adopt <issue#> --type bug|feature|refactor [--milestone <m>] [--yes]
 #   super-collect-file.sh --config <cfg.json> --accept <issue#> [--yes]
 #   super-collect-file.sh --config <cfg.json> --reject <issue#> --reason "<why>" [--yes]
 #
@@ -41,13 +47,14 @@
 #         --yes   → the issue number (new, existing on a dedupe hit, adopted, accepted or rejected).
 # Exits:  0 ok · 64 bad args · 65 no holding column · 66 unreadable/weak body
 #         70 gh failure · 71 filed but not placed (number still on stdout)
+#         67 refused by the scope gate (the goal milestone for a card not in its scope)
 #         79 repository paused (existing issue number still on stdout after discovery)
 set -uo pipefail
 
 ORIGINAL_ARGS=("$@")
 CONFIG=""; TYPE=""; SOURCE=""; TITLE=""; BODY_FILE=""; FP=""
 PRIORITY="medium"; AREA=""; ADOPT=""; YES=0; EXTRA_LABELS=()
-TRACK=""; DECISION=""; ACCEPT=""; REJECT=""; REASON=""
+TRACK=""; DECISION=""; ACCEPT=""; REJECT=""; REASON=""; MILESTONE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -66,6 +73,7 @@ while [ $# -gt 0 ]; do
     --accept)      ACCEPT="$2"; shift 2 ;;
     --reject)      REJECT="$2"; shift 2 ;;
     --reason)      REASON="$2"; shift 2 ;;
+    --milestone)   MILESTONE="$2"; shift 2 ;;
     --yes)         YES=1; shift ;;
     *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
@@ -113,6 +121,22 @@ elif [ -z "$ADOPT" ]; then
 else
   case "$ADOPT" in *[!0-9]*|"") die "--adopt takes an issue number (got: $ADOPT)" 64 ;; esac
   [ "$TYPE" != "fix" ] || die "--adopt takes bug|feature|refactor" 64
+fi
+
+# --- scope gate (factory #148) ----------------------------------------------
+# Nobody files onto a frozen goal. Checked before any GitHub call.
+if [ -n "$MILESTONE" ] && [ -n "$ANSWER" ]; then die "--milestone files or adopts a card; it is not an answer" 64; fi
+[ "$SOURCE" != walk ] || EXTRA_LABELS+=("scope:pending")
+if [ -n "$MILESTONE" ]; then
+  IN_SCOPE=$(jq -r --arg m "$MILESTONE" --arg n "${ADOPT:-}" '
+    (.goal.milestone // "") as $g | .goal.scope as $s
+    | if $m != $g or ($s | type) != "object" or (($s.milestone // $g) != $g) then "free"
+      elif $n == "" then "no"
+      elif ([ ($s.issues // [])[], (($s.admitted // [])[] | .number) ] | index($n | tonumber)) != null then "yes"
+      else "no" end' "$CONFIG") || die "config unreadable" 66
+  if [ "$IN_SCOPE" = no ]; then
+    die "refused: the goal ${MILESTONE} is frozen and ${ADOPT:+#$ADOPT }is not in its scope. File it to Backlog with the scope:pending label; the scope judge decides (super-board-scope.sh admit)." 67
+  fi
 fi
 
 OWNER=$(jq -r '.project.owner // empty' "$CONFIG")
@@ -231,6 +255,14 @@ tag() { # $1 = issue number, rest = labels; best-effort
   return 0
 }
 
+set_milestone() { # $1 = issue number; --milestone only, after the scope gate passed it
+  [ -n "$MILESTONE" ] || return 0
+  python3 "$GITHUB_READ" --check || return $?
+  gh issue edit "$1" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --milestone "$MILESTONE" >/dev/null 2>&1 \
+    || echo "warn: could not put #${1} on ${MILESTONE}" >&2
+  return 0
+}
+
 # --- the owner's answer to a proposal ---------------------------------------
 if [ -n "$ANSWER" ]; then
   ISSUE=$(python3 "$GITHUB_READ" --kind issue -- issue view "$ANSWER" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --json number,title,body,labels,url) || exit $?
@@ -296,6 +328,7 @@ if [ -n "$ADOPT" ]; then
   state begin "$ADOPT" || exit $?
   tag "$ADOPT" "$TYPE" "source:collect" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"} || { RC=$?; echo "$ADOPT"; exit "$RC"; }
   place "$URL" || { RC=$?; echo "$ADOPT"; [ "$RC" -eq 79 ] && exit 79; echo "warn: #${ADOPT} not placed in '${HOLD}'" >&2; exit 71; }
+  set_milestone "$ADOPT" || { RC=$?; echo "$ADOPT"; exit "$RC"; }
   state success "$ADOPT" || exit $?
   echo "$ADOPT"; exit 0
 fi
@@ -377,6 +410,7 @@ if [ "$RC" -ne 0 ]; then
   echo "$N"; exit 79
 fi
 tag "$N" "source:collect" "collect:${SOURCE}" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"} || { RC=$?; echo "$N"; exit "$RC"; }
+set_milestone "$N" || { RC=$?; echo "$N"; exit "$RC"; }
 if [ "$RC" -eq 0 ]; then state success "$N" || exit $?; fi
 echo "$N"
 exit "$RC"

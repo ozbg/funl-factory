@@ -89,6 +89,11 @@
   //   budget_usd — v2: spend cap for the goal, in API-equivalent dollars
   //                (number; null = no cap).
   //   foundation — v2: true when this goal lays the foundation (bool, default false).
+  //   scope      — the frozen scope (factory #148). Written only by super-board-scope.sh:
+  //                `freeze` at run start, `admit` after. Never hand-edit it. Absent = no
+  //                scope gate (the planner and the collect filer behave as before).
+  //                { milestone, frozenAt, issues: [n], titles: {n: title},
+  //                  admitted: [{ number, by: "judge"|"owner", at, citation?, words?, unfinished? }] }
   "goal": { "milestone": null, "budget_usd": null, "foundation": false },
 
   // Targets `super-board report` grades a milestone against. Onboard writes these

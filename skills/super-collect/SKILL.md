@@ -264,6 +264,9 @@ track (`bug` or `tweak`). A proposal lands in Backlog, labelled with its track (
   closed-only hit is a **recurrence**, filed again naming the closed issue.
 - **Column** is `Ready` for a fix (none → refused, exit 65). Everything else goes to the board's holding
   column (`Backlog`, else `Todo`/`To do`/`Triage`/`Inbox`); none → refused (exit 65).
+- **Milestone** is never the frozen goal. Once a run has frozen the goal's scope, `--milestone <goal>`
+  is refused (exit 67) for any card the scope judge has not admitted. A walk finding gets the
+  `scope:pending` label and the judge decides (`super-board/references/scope-judge.md`).
 - **Rejected** items are never filed again: a closed issue whose body carries the rejection
   marker comes back `rejected|#N`, and nothing is written.
 - The same-host repository lock serializes collector calls; digest receipts skip identical repeat comments. See [state and recovery](references/scheduled-intake.md).

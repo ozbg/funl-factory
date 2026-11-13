@@ -58,6 +58,12 @@
 # `— test: <path>` the runner never runs, or whose open blocker is not on the
 # board, goes to `flag` (left in Ready, not built) with the reason.
 #
+# SCOPE GATE (factory #148). Once `super-board-scope.sh freeze` has written
+# `goal.scope` for the goal, a Ready goal card that is neither in its frozen
+# `issues` nor `admitted` is refused: "not in the frozen scope; the scope judge
+# has not admitted it". Only `super-board-scope.sh admit` lets one in. No
+# `goal.scope`, or one frozen for another milestone: no scope check, as before.
+#
 # Usage:
 #   super-board-wave-plan.sh --config <config.json> [--items <project-items.json>]
 #                            [--deps <deps.json>]
@@ -114,6 +120,12 @@ if [ -f "$NORTH_STAR" ]; then
 else
   MUST=null
 fi
+# The frozen scope (factory #148): frozen issues plus admitted ones, or null when
+# the goal has no frozen scope (no check, today's behaviour).
+SCOPE=$(echo "$CONFIG_JSON" | jq -c --arg g "$GOAL" '
+  .goal.scope as $s
+  | if $g != "" and ($s | type) == "object" and (($s.milestone // $g) == $g)
+    then [ ($s.issues // [])[], (($s.admitted // [])[] | .number) ] else null end')
 OWNER=$(echo "$CONFIG_JSON" | jq -r '.project.owner')
 NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
 
@@ -312,12 +324,16 @@ BOARD_NUMBERS=$(echo "$ITEMS" | jq -c '[ .items[] | select(.content.type == "Iss
 # actually is — the merge step takes a lock inside the wave workflow and the
 # freshness gate re-verifies under it — so reviews may run in parallel here.
 echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$CAP" --argjson deps "$DEPS" --arg goal "$GOAL" \
-                  --argjson must "$MUST" --argjson tf "$TESTFLAGS" --argjson board "$BOARD_NUMBERS" '
+                  --argjson must "$MUST" --argjson tf "$TESTFLAGS" --argjson board "$BOARD_NUMBERS" \
+                  --argjson scope "$SCOPE" '
   def dep($n): $deps[($n | tostring)];
   # One-line reason a Ready card is refused, or "" when admitted.
   def refusal:
     dep(.number) as $d
-    | ( if ($d.acs // 0) == 0 then "no Acceptance Criteria checkboxes" else empty end ),
+    | ( .number as $n
+        | if $scope != null and (($scope | index($n)) == null)
+          then "not in the frozen scope; the scope judge has not admitted it" else empty end ),
+      ( if ($d.acs // 0) == 0 then "no Acceptance Criteria checkboxes" else empty end ),
       # No `Files:` line (or an empty one): the card cannot be placed against the
       # others, and unknown files overlap everything, so it would be deferred
       # forever as a look-alike file clash. Refused like a missing must-have.

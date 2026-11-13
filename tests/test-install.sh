@@ -171,7 +171,7 @@ rm -rf "$T"
 T=$(mktemp -d)
 "$INSTALL" "$T" >/dev/null 2>&1
 for s in super-board-stop.sh super-board-wave-plan.sh \
-         super-board-card.sh super-board-throttle.sh super-board-scorecard.py super-board-zone.py super-board-coverage.py super-board-host.sh \
+         super-board-card.sh super-board-throttle.sh super-board-scope.sh super-board-scorecard.py super-board-zone.py super-board-coverage.py super-board-host.sh \
          super-board-deps.sh super-board-fresh-worktree.sh super-board-preflight.sh super-board-merge-gate.sh super-board-usage.sh super-board-pr-body.sh \
          super-review-file-refactor.sh super-qa-file-bug.sh super-board-config.py; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"

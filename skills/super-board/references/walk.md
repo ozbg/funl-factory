@@ -14,8 +14,10 @@ step 2):
 - its `walk` is `not run` or `failed`
 - no card on the goal is left in Ready, Building, QA or Review
 
-A failed walk's findings go through triage, like every collect finding: a clear fix goes to Ready,
-the rest to Backlog as proposals. When the fixes on the goal merge, the next run walks again.
+The walk finds things. It never decides what the milestone carries. Every finding files to
+Backlog with the `scope:pending` label, and the scope judge ([`scope-judge.md`](scope-judge.md))
+decides each one: `gate`, `next` or `drop`. Only an admitted gate joins the goal
+(`super-board-scope.sh admit`). When those merge, the next run walks again.
 
 ## Who walks
 
@@ -48,7 +50,8 @@ rubric alone.
 
 ## The rubric
 
-**Each screen.** Pass only when every line holds; a fail names the line.
+**Each screen.** Every line is checked, and a miss names its line. Only a and c gate the
+milestone; a miss on b, d or e is a finding, and the screen still passes.
 
 - a. **Opens.** It loads with no console error and no blank or broken state.
 - b. **Looks right.** Screenshot it at 1280×800 (`runtime_browser.mjs --shot`, as screen-match.md
@@ -63,6 +66,16 @@ rubric alone.
 **Each day-one question.** Ask it, or do it, through the real UI, never a direct API call. It
 passes when the answer or result holds the good answer's facts and would satisfy the owner. Save
 the screen after the answer as `<run folder>/q<n>.png`.
+
+**What gates the milestone.** Only these fail the walk:
+
+- a day-one question whose answer lacks a fact its good answer names
+- rubric a or c on a screen: it doesn't open, or it can't do its job
+- an exam below its pass mark
+
+Looks, states and "reads well" (b, d, e) never fail the walk. They file as `scope:pending` like
+every other finding, and the judge usually says `next`. The one exception is the judge's: a
+safety signal that is wrong on most answers is broken, and it gates (scope-judge.md, #181).
 
 **Each exam card.** Run its exam command on the real model and record it with
 `super-board-scorecard.py exam` (lanes/qa.md → "Exam cards"). The model key is missing, or the
@@ -82,31 +95,23 @@ Write `<run folder>/findings.md`: one table row per screen, question and exam.
 | E1 | exam #18 | ✅ | 9/10, pass mark 8, claude-sonnet-4-5 | | |
 ```
 
-Every ❌ goes through collect's triage, then the collect filer, as one card. The walk saw it
-fail, so its verdict is `file`.
-
-- a. Write one finding per ❌ into `<run folder>/triage.json`, with the triage fields
-  (`../../super-collect/SKILL.md` § Triage): `track`, `decision`, `breaks` (the rubric line plus
-  the mock-up anchor, must-have or day-one question it breaks), `screens`, `touches`, `zone`,
-  `recommendation`.
-- b. Run the rules in code:
-  `python3 .claude/skills/super-collect/scripts/collect_handoff.py triage --findings <run folder>/triage.json --config <cfg>`.
-- c. File each with its final `track` and `decision`. A fix lands in Ready, a proposal in Backlog:
+Every ❌ files as one card, to Backlog, with the `scope:pending` label. The walk never puts a
+card on the goal, and never into Ready: the collect filer refuses `--milestone <goal>` for a card
+the scope judge has not admitted (exit 67).
 
 ```bash
 .claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --type bug \
   --source walk --title "<one line>" --body-file <md> \
-  --fingerprint "walk|screen-<name>|<key>" --track <track> --decision <decision> --yes
+  --fingerprint "walk|screen-<name>|<key>" --yes
 ```
 
-- d. Put each fix card on the goal, so the next walk waits for it:
-  `gh issue edit <n> --milestone <goal.milestone>`.
+`--source walk` adds `scope:pending` itself. Write in Context which rubric line or day-one question
+it breaks, and whether it gates the walk. The judge reads that line, not your verdict.
 
 - `--type bug` when a must-have, an AC or the mock-up says it should work; `--type feature` when
   nothing on the board covers it.
-- The body is the ticket format (writing-standard.md § 3), plus the lines its decision needs
-  (`Breaks:` and `Failing test:` for a bug fix, `## Before and after` for a tweak,
-  `## Recommendation` for a proposal). Context names the screen or question,
+- The body is the ticket format (writing-standard.md § 3), with a `Breaks:` line naming the
+  rubric line, day-one question or exam. Context names the screen or question,
   the rubric line, the must-have, and embeds the shot as a path in the run folder. A bug adds the
   Evidence table.
 - Fingerprint `walk|screen-<name>|<key>` for a screen, `walk|M<n>|<key>` for a question, so a
@@ -130,10 +135,12 @@ pass mark. The agent returns one line: `walk: screens <p>/<n> · questions <a>/<
 
 - **Passed.** `super-board status` and `report` show the milestone done. The orchestrator commits
   the run folder with the run manifest and reports `🎯 <title> reached`.
-- **Failed.** The milestone stays not done. The orchestrator commits the run folder and posts one
-  `needs-you` item on the Demo card: the findings table, with each card's triage decision, and two
-  choices. Build them (the fixes are in Ready already; accept the proposals onto the goal, and the
-  next run builds them, then walks again), or accept them as they are.
+- **Failed.** The milestone stays not done. The orchestrator commits the run folder. The next wave's
+  scope judge decides each finding, and the admitted gates are built; then the run walks again.
+- **Two failed walks on one goal.** The findings still open go to the owner as one `needs-you`
+  item on the Demo card: the findings table, with each card's judge verdict, and two choices.
+  Build them (the owner admits them with their own words), or accept them as they are. No third
+  walk starts until the owner answers.
 - **Accepted.** On the owner's word only, never the agent's:
   `super-board-scorecard.py walk --accepted --note "<the owner's reason>" --milestone <goal.milestone>`.
   The finding cards stay in Backlog for later.

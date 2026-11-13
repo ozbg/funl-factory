@@ -23,6 +23,7 @@
 #     [--fingerprint "<slug>|<tc>|<signature>"] \
 #     [--suggested-skill super-build|super-qa|ui-refine-loop|super-review] \
 #     [--column <Status>] # board column, default Backlog
+#     [--label <l>]...    # extra labels, e.g. scope:pending for a lane follow-up (factory #148)
 #     [--check-body]      # run the body checks only, then exit (no gh calls)
 #       (ui-refine-loop only labels a UI ticket; a human can run /ui-refine-loop —
 #        the board never triggers it)
@@ -42,7 +43,7 @@
 set -uo pipefail
 
 TITLE=""; BODY_FILE=""; KIND="bug"; PRIORITY="medium"; CATEGORY=""
-AREA=""; ROUTE=""; SPEC=""; ITER=""; FINGERPRINT=""; SUGGESTED_SKILL=""; CHECK_ONLY=0; COLUMN=""
+AREA=""; ROUTE=""; SPEC=""; ITER=""; FINGERPRINT=""; SUGGESTED_SKILL=""; CHECK_ONLY=0; COLUMN=""; EXTRA=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -58,6 +59,7 @@ while [ $# -gt 0 ]; do
     --fingerprint)     FINGERPRINT="$2"; shift 2 ;;
     --suggested-skill) SUGGESTED_SKILL="$2"; shift 2 ;;
     --column)          COLUMN="$2"; shift 2 ;;
+    --label)           EXTRA+=("$2"); shift 2 ;;
     --check-body)      CHECK_ONLY=1; shift ;;
     *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
@@ -239,6 +241,7 @@ LABELS=("$KIND" "source:qa" "priority:${PRIORITY}")
 if [ -n "$AREA" ]; then LABELS+=("area:${AREA}"); fi
 if [ -n "$CATEGORY" ]; then LABELS+=("qa:${CATEGORY}"); fi
 if [ -n "$SUGGESTED_SKILL" ]; then LABELS+=("skill:${SUGGESTED_SKILL}"); fi
+LABELS+=(${EXTRA[@]+"${EXTRA[@]}"})
 
 # `gh issue create` hard-fails on an unknown label, which would lose the finding
 # entirely. Create them best-effort first.

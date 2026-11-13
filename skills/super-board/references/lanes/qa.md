@@ -8,7 +8,7 @@ The rules behind each step are in `../../super-qa/SKILL.md` (zone checks, citati
 **`qa` cards.** The Tester moves the card Ready → QA itself, creates `issue-<N>-<slug>` from the
 base branch (only when the card has no open PR; one that has a PR is tested on that PR's branch), and tests what is already there against the ACs. Tests it writes are committed to
 that branch; a PR opens only when there are tests to merge. A failure it cannot fix with tests
-alone is filed as a Backlog card (`super-qa-file-bug.sh --column Backlog`) and named in the
+alone is filed as a Backlog card (`super-qa-file-bug.sh --column Backlog --label scope:pending`) and named in the
 handoff. The `qa` card still moves on to Review with the findings.
 
 A live site with no repo is not a board. `/super-qa <url>` tests it on its own.
@@ -54,7 +54,8 @@ No key for the real model → Blocked, 🙋, `blocked-by: model key`. Never run 
    what changed. It holds client data, so never commit, embed or upload it.
 8. **Sort findings.** A fail cites `AC<n>`, `I<n>`, `bar: <line>` or `bug: <repro steps>`.
    Anything else is a note. Out-of-scope privacy, data-loss or visible bug → Backlog card via
-   `super-qa-file-bug.sh --column Backlog`; it does not fail this card.
+   `super-qa-file-bug.sh --column Backlog --label scope:pending`; it does not fail this card. Never put
+   it on a milestone: the scope judge decides (scope-judge.md).
 9. **Pass** → commit and push test files only (and the 7b pair) → tick the `ac` block with proof
    lines, write `visual` as text for UI (a screen card: the 7b pair), append a `history` row,
    rewrite `status` → `[qa] [report] ✅` PR comment with the AC table (text) and any 7b pair →

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+Workers find things; they no longer decide what a milestone carries. The goal's scope is frozen
+at run start, and an independent scope judge decides each new card (#148).
+
+- ✨ **`super-board-scope.sh`.** `freeze` records the goal's cards as `goal.scope`. `admit` lets a
+  card in only with a judge `gate` whose citation the north star backs (must-have, day-one
+  question, invariant, or `harm:` on a `## Fit for purpose` line), up to 25% growth (rounded up,
+  at least 1). A frozen card's own failed AC doesn't count. An `owner_call` or a card past the
+  cap needs `--owner "<words>"`. `status` shows who admitted what; `pending` strips Risk,
+  Recommendation, priority and orchestrator lines for the judge.
+- ✨ **Scope judge.** A read-only Sonnet step in the wave judges each `scope:pending` card: gate,
+  next or drop, with a citation (`references/scope-judge.md`). Drops wait for the owner.
+- 🔧 **The planner refuses a goal card outside the frozen scope**, and the collect filer refuses
+  `--milestone <goal>` for a card not admitted (exit 67). Walk and lane findings file to Backlog
+  as `scope:pending`. A config with no `goal.scope` behaves as before.
+- 🔧 **The walk gates on a broken day-one answer, rubric a or c, or an exam only.** After two
+  failed walks the rest goes to the owner as one accept-or-build item.
+- 🔧 **North star: a required `## Fit for purpose` block**, ten owner-signed lines. Lint fails
+  without it; onboard asks the owner to sign one for an existing app.
+- 🔧 **Report: a scope line.** Frozen N, admitted after M, by the judge or the owner.
+
 Waves run in Accept edits with no permission prompts, and the merge gate can't be skipped (#131).
 
 - 🔒 **Permission decider hook.** `permission-decider.py` allows a lane command when every part

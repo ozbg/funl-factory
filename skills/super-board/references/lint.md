@@ -75,6 +75,13 @@ PHASE 3d — Body-of-work gate (factory #102)
      `python3 .claude/bin/super-board-coverage.py briefs --repo-path . --issues-json <file>`.
      Each `error: #N:` line is criterion 25 on that card. Exit 1 is a lint failure, like 3b.
 
+PHASE 3e — Fit for purpose (factory #148)
+  └─ Run `bash .claude/bin/super-board-scope.sh profile --config <cfg>`. Exit 1 means
+     `docs/shape/north-star.md` has no signed `## Fit for purpose` block, or misses one of its
+     ten lines. That is a lint failure, like 3b: show its line, and send the owner to
+     `/super-board onboard`, which drafts the block and asks them to sign it. The scope judge
+     refuses to judge without it. No north star at all: skip this phase.
+
 PHASE 4 — Deep-dive flagged issues (skill-routed, PM voice, one at a time)
 
 PHASE 5 — Per-issue summary
